@@ -1,0 +1,12 @@
+-- Need to fix --------------------------------------------------------
+
+-- Small Changes ------------------------------------------------------
+o  Do fallback to default interface already in ip guessing phase
+o  Check for EINVAL when select()ing in plugins
+
+-- Future plans -------------------------------------------------------
+o  optional syslog support
+o  store connection data in bdb file
+o  dump attack data into MySQL and Postgres databases
+o  support approximate string matching (i.e. via edit distance) for new records
+o  add nfqueue and ipfw connection monitors

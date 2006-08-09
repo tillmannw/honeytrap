@@ -1,0 +1,77 @@
+README
+
+  Honeytrap  is  a network security tool written to observe attacks
+  against TCP or UDP services. It runs as a daemon and starts serv-
+  er  processes dynamically on requested ports. A server emulates a
+  well-known service by simply sending captured network traffic  to
+  a connected host.
+
+  Many  clients  and particularly attackers will be fooled and send
+  responses to a honeytrap server process. The arriving data is as-
+  sembled to a string and written to a database file. Such a string
+  is called an attack string.
+
+  Honeytrap can parse an attack string for  commands  advising  the
+  server  to  download a file from another host. If a download com-
+  mand is found, the server tries  to  retrieve  the  corresponding
+  file  automatically.  A downloaded file is stored locally with an
+  md5 checksum in its name. Currently, only ftp and tftp  are  sup-
+  ported.  Honeytrap implements its own clients with the aim to be-
+  have as similar as possible than Windows systems. Http  URIs  are
+  recognized  and  logged.  A http download routine may be added in
+  future releases.
+
+  Version 0.5.0 introduces the mirror mode (option '-m'). When run-
+  ning in this mode, whenever a connection request is handled, hon-
+  eytrap tries to establish a so called mirror connection  back  to
+  the  remote  host  requesting the same port. All data received on
+  one of the two connections is copied to the other one. Thus, hon-
+  eytrap is acting as a tcp proxy for a connection of a remote host
+  with itself. If no mirror connection can be  established,  honey-
+  trap falls back to normal mode.
+
+  A  plugin  interface  was  added in Version 0.6.0. Plugins can be
+  loaded as dynamic shared objects. Also, honeytrap can now be con-
+  figured  via a configuration file. The file is reprocessed when a
+  SIGHUP is received so changes can be  made  available  with  zero
+  downtime.
+
+  Version  0.6.2  comes  with  lots  of new features. Using the new
+  proxy mode, Connections can not only be mirrored back to the ini-
+  tiator,  but proxied to other systems and other ports. The appro-
+  priate mode can optionally be configured per TCP port. A new, li-
+  bipq-based  connection  monitor  was introduced (idea stolen from
+  the nepenthes honeytrap module).
+
+INSTALLATION
+
+  Installation of honeytrap should be pretty straight forward. Just
+  do  a  './configure  --with-<type>-mon  &&  make && make install'
+  where '<type>' is the connection monitor  type  of  your  choice.
+  Please  refer to the INSTALL file and to the output of './config-
+  ure --help' for further information.
+
+WARNINGS
+
+  Honeytrap is a low-interactive honeypot and therefore detectable.
+  It  is  written  in  C  and thus potentially vulnerable to buffer
+  overflow attacks. Take care. Running in mirror mode is dangerous.
+  Attacks  may  be directed to the attacker, appearing to come from
+  your system. Use with caution.
+
+  The program needs root privileges, but only  for  binding  server
+  processes to well-known ports. Use the -u and -g command line op-
+  tions to drop privileges and switch to another user and group  as
+  early as possible.
+
+THANKS
+
+  Many thanks to Steve, Gary to help me debugging compile errors on
+  FreeBSD and OpenBSD and to lots of others who  helped  me  fixing
+  bugs.
+
+CONTACT
+
+  If  you  have  problems,  questions, ideas or suggestions, please
+  contact me at <tillmann.werner@gmx.de>. If you would like to help
+  making honeytrap better, you are welcome.

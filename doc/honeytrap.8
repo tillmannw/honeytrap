@@ -1,0 +1,218 @@
+.\" -*- nroff -*- --------------------------------------------------------- *
+.\" $Id: honeytrap.8.in,v 0.6.2 2006/08/05 16:00:00 Exp $
+.\"  
+.\" Copyright (c) 1987, 1988, 1989, 1990, 1991, 1992, 1994, 1995, 1996, 1997
+.\"     The Regents of the University of California.  All rights reserved.
+.\" All rights reserved.
+.\"
+.\" Copyright (c) 2005-2006 Tillmann Werner - All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that: (1) source code distributions
+.\" retain the above copyright notice and this paragraph in its entirety, (2)
+.\" distributions including binary code include the above copyright notice and
+.\" this paragraph in its entirety in the documentation or other materials
+.\" provided with the distribution, and (3) all advertising materials mentioning
+.\" features or use of this software display the following acknowledgement:
+.\" ``This product includes software developed by the University of California,
+.\" Lawrence Berkeley Laboratory and its contributors.'' Neither the name of
+.\" the University nor the names of its contributors may be used to endorse
+.\" or promote products derived from this software without specific prior
+.\" written permission.
+.\" THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR IMPLIED
+.\" WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+.\"
+.\"----------------------------------------------------------------------- */
+.TH HONEYTRAP 8 "5 August 2006" " " 
+.SH NAME
+.B honeytrap 
+\- trap attacks against tcp services
+.SH SYNOPSIS
+.B honeytrap
+[
+.B \-Dpmv
+] [
+.B \-i
+.I interface
+] [
+.B \-a
+.I ip address
+]
+.br
+.ti +10
+[
+.B \-l
+.I listen timeout
+] [
+.B \-r
+.I read timeout
+]
+.ti +10
+[
+.B \-t
+.I loglevel
+] [
+.B \-L
+.I logfile
+] [
+.B \-P
+.I pidfile
+]
+.br
+.ti +10
+[
+.B \-C
+.I configfile
+] [
+.I expression
+]
+.br
+.SH DESCRIPTION
+.I honeytrap
+is a network security tool written to observe attacks against TCP services. As a low-interactive honeypot, it collects information regarding known or unknown network-based attacks. It starts server processes dynamically at the time of incoming connection requests. This generic behavior makes it possible to respond to most network-based attacks. Observed data can be processed with plugins for automatic analysis.
+.LP
+Data capture is basically done by the core system. The master process uses a connection monitor to catch incoming requests. Currently, connection monitoring can be performed via a PCAP based sniffer or by hooking the ip_queue API, a userland interface to netfilter/iptables on Linux systems. The appropriate technique has to be built in during compile time.
+.LP
+Incoming connections are processed in one of the following modi: normal, ignore, proxy and mirror. The specific bevavior for a connection can be configured per TCP port. If no explicit configuration is given, the default mode applies. It is possible to setup
+.I honeytrap
+as a meta-honeypot, forwarding some connections to different honeypot systems, handle some attacks with own routines or even route connections to different honeypots.
+.LP
+All data submitted to
+.I honeytrap
+or sent to the remote host can be analyzed with specialized plugins. All plugins are dynamically loaded at startup or during runtime at a reconfiguration initiation. Thus it is possible to add analysis functions without downtime of the honeypot.
+.LP
+.I honeytrap
+must be run by root or installed setuid to root, in order to bind to
+privileged ports. Always use the 
+.B -u 
+and 
+.B -g 
+flags to drop privileges early and switch to an unprivileged user and group as soon as possible.
+
+
+.SH OPTIONS
+.TP
+.B \-a
+Watch for rejected connections to
+.I ip
+.IR address .
+This is normally not needed as 
+.I honeytrap
+tries to get the corresponding address for
+.IR interface
+automatically. Only availabe when using the pcap connection monitor.
+.TP
+.B \-g
+.IR group.
+Change the group/GID of dynamic server processes to
+.I group
+after initialization.
+.TP
+.B \-h
+Print usage information to standard output, then exit gracefully.
+.TP
+.B \-i
+Watch for rejected connections on
+.IR interface .
+Only available when using the pcap connection monitor.
+.TP
+.B \-l
+.I listen
+.IR timeout .
+Terminate dynamic servers after the specified number of seconds. Default is 30.
+.TP
+.B \-m
+Run in mirror mode. Mirror incoming connections back to remote hosts.
+.TP
+.B \-p
+Put
+.I interface
+into promiscuous mode. Only available when using the pcap connection monitor.
+.TP
+.B \-r
+.I read 
+.IR timeout .
+Terminate connection handlers after the specified number of seconds. Default is 1.
+.TP
+.B \-t
+.I log
+.IR level.
+Log verbosity (0-6). Default is 3, 0 is off.
+.TP
+.B \-u
+.IR user.
+Run as 
+.I user
+after initialization.
+.TP
+.B \-v
+Print version number to standard output, then exit gracefully.
+.TP
+.B \-C
+.I configuration
+.IR file .
+Read configuration from
+.I configuration
+.IR file .
+.TP
+.B \-D
+Don't daemonize.
+.TP
+.B \-L
+.I log
+.IR file .
+Log messages to
+.I log
+.IR file .
+.TP
+.B \-P
+.I pid
+.IR file .
+Write process ID of master process to 
+.I pid
+.IR file .
+
+.IP "\fI expression\fP"
+To recognize rejected connections, 
+.I honeytrap
+uses a berkeley packet filter (bpf) to sniff TCP reset packets sent to a remote host. The filter can be restricted by adding a bpf
+.I expression.
+This only has an effect when using the pcap connection monitor.
+
+.SH EXAMPLE
+.LP
+Read configuration from
+.BR /etc/honeytrap.conf ,
+run on
+.B eth0
+as
+.B nobody/nogroup
+and log to
+.BR /var/log/honeytrap.log .
+Set the log level to LOG_NOISY (
+.BR 5
+) and stay in foreground (
+.BR -D
+):
+.LP
+.RS
+.nf
+\fBhoneytrap -C /etc/honeytrap.conf -i eth0 -u nobody -g nogroup -L /var/log/honeytrap.log -t 5 -D\fP
+.fi
+.RE
+.SH NOTES
+As a honeypot,
+.I honeytrap
+is exposed to attacks that might compromise the software itself. Running it into a hardened and secured environment is a good idea. Linking against a stack protection library might also improve security. The configure script supports the electric fence malloc debugger. Use it.
+.SH SEE ALSO
+.BR bpf (4),
+.BR iptables (8),
+.BR pcap (3),
+.BR tcp (7).
+.SH AUTHOR
+This version of
+.B honeytrap
+was written by Tillmann Werner <tillmann.werner@gmx.de>.
+.SH BUGS
+Please report any bugs to <honeytrap@users.sourceforge.net>.

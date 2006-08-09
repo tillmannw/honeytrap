@@ -1,0 +1,62 @@
+Version 0.6.2
+- Added a plugin for execution of HTTP downloads from VNC attacks via wget
+- Connection monitor can be chosen from "configure" parameter
+- Introduced an ip_queue based connection monitor
+  (idea from the nepenthes honeytrap module)
+- Native OS dl implementations and libdl are both supported
+- Should compile on Free/OpenBSD now, thanks to Stephen and Gary
+- Network device handling is completely done with pcap functions
+  for the pcap connection monitor
+- Trapping on device 'any' is now possible (if available)
+- Added support for other link types than ethernet
+- Logging of remote TCP port and IP address was faulty - fixed
+- Changed bpf string to filter RST packets to be more portable
+- Connections are closed before attack processor plugins are called
+- Configuration file supports includes of other files
+- Proxy mode introduced
+- Connection handling mode can be configured per port
+- Specific ports can be configured to ignore connection requests
+- Some minor bugfixes
+Version 0.6.1
+- Temporarily removed BDB stuff, a plugin will be available soon
+- Added plugin hooks 'unload_plugins' and 'process_attack'
+- Moved attack save code into a plugin
+- Moved ftp download code into a plugin
+- Moved tftp download code into a plugin
+- Establish mirror connection right after incoming SYN
+- Reload configuration on SIGHUP
+- Cleanup of TCP dynamic server code
+- Some file descriptors are closed earlier
+- Fixed bpf command line expression stuff
+- Some man page changes
+- Automake: shared libraries are only installed in plugin directory now
+Version 0.6.0
+- Support for configuration file added
+- Added a plugin interface (still a lot of work to do)
+- Mirrored connections are closed after a timeout
+Version 0.5.1
+- Fixed tftp bug - files bigger than 128k were corrupted during transfer
+- Many minor cosmetic fixes
+Version 0.5.0
+- Mirror mode added - get answers from mirror connection to the client 
+- Partial rewrite of TCP server stuff
+Version 0.4.2
+- PID file will correctly be removed if startup fails
+- Improved tftp routine
+- Made ftp command string parser more sensitive
+- Invalid IP addresses in download ressources are recognized and filtered
+Version 0.4.1
+- Retransmission of tftp packets after timeout occured
+- Silly bug in tftp routine fixed - files may also be sent from server port != 69
+- Workaround for communication with buggy ftp servers included
+- Fixed minor bugs in ftp and tftp routines
+- Improved download command parsing routine, it shouldn't fail anymore
+- Attack string naming corrected
+- Added logfile and pidfile support 
+- Switched to write() to improve logging performance
+Version 0.4.0
+- Auto download files via ftp using a fake Windows ftp dialogue
+- Auto download files via tftp
+- Improved signal handling to prevent zombie processes
+- Get IP address for bpf string from interface
+- Fixed error handling in db code
