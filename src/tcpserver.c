@@ -316,7 +316,7 @@ int handle_connection_normal(int connection_fd, uint16_t port, u_char timeout) {
 		/* check if read limit was hit */
 		if (bytes_read >= read_limit) {
 			/* read limit hit, process attack string */
-			logmsg(LOG_WARN, 1, "Warning - %u\t  Byte limit (%d) hit. Closing connection.\n", read_limit, port);
+			logmsg(LOG_WARN, 1, "%u\t  Warning - Byte limit (%d) hit. Closing connection.\n", read_limit, port);
 			close(connection_fd);
 			return(process_data(attack_string, total_bytes, NULL, 0, attack.a_conn.l_port));
 		}
@@ -499,7 +499,7 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 		total_from_server += bytes_read;
 		if (total_from_server >= read_limit) {
 			/* read limit hit, process attack string */
-			logmsg(LOG_WARN, 1, "%s %u\tWarning - Byte limit (%d) hit. Closing %s connections.\n",
+			logmsg(LOG_WARN, 1, "%s %u\t  Warning - Byte limit (%d) hit. Closing %s connections.\n",
 				logpre, dport, read_limit, logact);
 			close(server_sock_fd);
 			close(connection_fd);
