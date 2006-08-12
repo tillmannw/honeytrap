@@ -44,6 +44,9 @@ int main(int argc, char **argv) {
 	arg_c = argc;
 	arg_v = argv;
 
+
+	/* the following are default values - change them in your configuration file */
+	
 	mirror_mode	= 0;		/* mirror mode is not on by default */
 	daemonize	= 1;		/* default is to daemonize */
 
@@ -61,6 +64,7 @@ int main(int argc, char **argv) {
 	conn_timeout	= 120;		/* 2 minutes connect timeout */
 	read_timeout	= 1;		/* 1 second read timeout */
 	m_read_timeout	= 60;		/* 1 minute read timeout for mirror connections */
+	read_limit	= 10485760;	/* read max. 10MB from attack connections */
 	
 	conffile_name	= strdup("/etc/honeytrap/honeytrap.conf");
 	pidfile_name	= strdup("/var/run/honeytrap.pid");
