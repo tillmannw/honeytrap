@@ -76,12 +76,16 @@ void *get_value(char *buf, const char delim) {
 	retval[0] = '\0';
 	retval++;
 	index = buf;
-	/* strip blanks */
+	/* cut trailing blanks */
 	while (!isspace((int) *index) && strlen(index)) index++;
 	index[0] = '\0';
 
-	/* advance through whitespaces */
+	/* strip leading whitespaces */
 	while (isspace((int) *retval)) retval++;
+	/* cut trailing blanks */
+	index = retval;
+	while (!isspace((int) *index) && strlen(index)) index++;
+	index[0] = '\0';
 
 	return(retval);
 }
@@ -438,6 +442,9 @@ int process_config_option(char *opt, char* val) {
 		promisc_mode = 1;
 		DEBUG_FPRINTF(stdout, "  Activating promiscuous mode.\n");
 #endif
+	} else if (OPT_IS("read_limit")) {
+		read_limit = atol(val);
+		DEBUG_FPRINTF(stdout, "  Setting read limit to %d.\n", read_limit);
 	} else if (OPT_IS("pidfile")) {
 		free(pidfile_name);
 		pidfile_name = strdup(val);

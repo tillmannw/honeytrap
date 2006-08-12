@@ -111,9 +111,9 @@ GZIP_ENV = --best
 all: all-redirect
 .SUFFIXES:
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ Makefile.am $(top_srcdir)/configure.in $(ACLOCAL_M4) 
-	cd $(top_srcdir) && $(AUTOMAKE) --foreign --include-deps Makefile
+	cd $(top_srcdir) && $(AUTOMAKE) --foreign Makefile
 
-Makefile: $(srcdir)/Makefile.in  $(top_builddir)/config.status
+Makefile: $(srcdir)/Makefile.in  $(top_builddir)/config.status $(BUILT_SOURCES)
 	cd $(top_builddir) \
 	  && CONFIG_FILES=$@ CONFIG_HEADERS= $(SHELL) ./config.status
 
@@ -280,6 +280,11 @@ distdir: $(DISTFILES)
 	-rm -rf $(distdir)
 	mkdir $(distdir)
 	-chmod 777 $(distdir)
+	here=`cd $(top_builddir) && pwd`; \
+	top_distdir=`cd $(distdir) && pwd`; \
+	distdir=`cd $(distdir) && pwd`; \
+	cd $(top_srcdir) \
+	  && $(AUTOMAKE) --include-deps --build-dir=$$here --srcdir-name=$(top_srcdir) --output-dir=$$top_distdir --foreign Makefile
 	$(mkinstalldirs) $(distdir)/doc
 	@for file in $(DISTFILES); do \
 	  d=$(srcdir); \
@@ -378,13 +383,14 @@ mostlyclean distclean maintainer-clean
 
 
 install-data-local:
-	$(mkinstalldirs) $(sysconfdir)
-	$(mkinstalldirs) $(sysconfdir)/honeytrap
-	$(mkinstalldirs) $(sysconfdir)/honeytrap/responses
+	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)
+	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap
+	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/responses
 
-	$(INSTALL_DATA) etc/honeytrap.conf.dist $(sysconfdir)/honeytrap/honeytrap.conf.dist
-	$(INSTALL_DATA) etc/honeytrap.conf.dist $(sysconfdir)/honeytrap/honeytrap.conf
-	$(INSTALL_DATA) etc/responses/* $(sysconfdir)/honeytrap/responses
+	$(INSTALL_DATA) etc/honeytrap.conf.dist $(DESTDIR)/$(sysconfdir)/honeytrap/honeytrap.conf.dist
+	$(INSTALL_DATA) etc/honeytrap.conf.dist $(DESTDIR)/$(sysconfdir)/honeytrap/honeytrap.conf
+	$(INSTALL_DATA) etc/ports.conf.dist $(DESTDIR)/$(sysconfdir)/honeytrap/portd.conf.dist
+	$(INSTALL_DATA) etc/responses/* $(DESTDIR)/$(sysconfdir)/honeytrap/responses
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

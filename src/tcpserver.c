@@ -180,11 +180,13 @@ void start_tcp_server(struct in_addr ip_r, u_int16_t port_r, struct in_addr ip_l
 
 
 				logmsg(LOG_DEBUG, 1, "== %u\t  Requesting proxy connection to %s:%u.\n",
-				    (uint16_t) proxy_dst->d_port,
+				    (uint16_t) ntohs(port_l),
 				    inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]), proxy_dst->d_port);
 				p_addr = (struct in_addr *) proxy_addr->h_addr_list[0];
-				if ((proxy_sock_fd = proxy_connect(PORTCONF_PROXY, *p_addr, ntohs(port_l))) == -1) {
-				   logmsg(LOG_INFO, 1, "== %u\t  Proxy connection rejected, falling back to normal mode.\n",
+				if ((proxy_sock_fd = proxy_connect(PORTCONF_PROXY, *p_addr,
+				    ntohs(port_l), proxy_dst->d_port)) == -1) {
+				    logmsg(LOG_INFO, 1,
+					"== %u\t  Proxy connection rejected, falling back to normal mode.\n",
 					(uint16_t) ntohs(port_l));
 				    proxy_this = 0;
 				} else logmsg(LOG_NOTICE, 1, "== %u\t  Proxy connection to %s:%u established.\n",
@@ -198,7 +200,7 @@ void start_tcp_server(struct in_addr ip_r, u_int16_t port_r, struct in_addr ip_l
 			logmsg(LOG_DEBUG, 1, "<> %u\t  Requesting mirror connection to %s:%u.\n",
 			    (uint16_t) ntohs(port_l), inet_ntoa(ip_r), ntohs(port_l));
 			if ((mirror_sock_fd = proxy_connect(PORTCONF_MIRROR,
-			    (struct in_addr) ip_r, ntohs(port_l))) == -1) {
+			    (struct in_addr) ip_r, ntohs(port_l), ntohs(port_l))) == -1) {
 			    logmsg(LOG_INFO, 1, "<> %u\t  Mirror connection rejected, falling back to normal mode.\n",
 				(uint16_t) ntohs(port_l));
 			    mirror_this = 0;
@@ -311,6 +313,13 @@ int handle_connection_normal(int connection_fd, uint16_t port, u_char timeout) {
 		}
 		memcpy(attack_string + total_bytes - bytes_read, buffer, bytes_read);
     		disconnect = 0;
+		/* check if read limit was hit */
+		if (bytes_read >= read_limit) {
+			/* read limit hit, process attack string */
+			logmsg(LOG_WARN, 1, "Warning - %u\t  Byte limit (%d) hit. Closing connection.\n", read_limit, port);
+			close(connection_fd);
+			return(process_data(attack_string, total_bytes, NULL, 0, attack.a_conn.l_port));
+		}
 	    } else {
 		logmsg(LOG_INFO, 1, "   %u\t  Connection closed by foreign host.\n", port);
 
@@ -488,6 +497,14 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 		logmsg(LOG_INFO, 1, "%s %u\t* %u (of %u) bytes copied from %s connection to %s:%u.\n",
 			logpre, dport, bytes_sent, bytes_read, logact, inet_ntoa(ipaddr), sport);
 		total_from_server += bytes_read;
+		if (total_from_server >= read_limit) {
+			/* read limit hit, process attack string */
+			logmsg(LOG_WARN, 1, "%s %u\tWarning - Byte limit (%d) hit. Closing %s connections.\n",
+				logpre, dport, read_limit, logact);
+			close(server_sock_fd);
+			close(connection_fd);
+	    		return(process_data(attack_string, total_bytes, server_string, total_from_server, dport));
+		}
 	    } else if (retval == 0) {
 		/* remote host closed server connection */
 		logmsg(LOG_INFO, 1, "%s %u\t  %s connection closed by foreign host.\n", logpre, dport, Logstr);
@@ -509,6 +526,14 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 		logmsg(LOG_INFO, 1, "%s %u\t* %u (of %u) bytes copied from client connection to %s:%u.\n",
 			logpre, dport, bytes_sent, bytes_read, inet_ntoa(ipaddr), dport);
 		total_bytes += bytes_read;
+		if (total_from_server >= read_limit) {
+			/* read limit hit, process attack string */
+			logmsg(LOG_WARN, 1, "%s %u\tWarning - Byte limit (%d) hit. Closing %s connections.\n",
+				logpre, dport, read_limit, logact);
+			close(server_sock_fd);
+			close(connection_fd);
+	    		return(process_data(attack_string, total_bytes, server_string, total_from_server, dport));
+		}
 	    } else if (retval == 0) {
 		/* remote host closed client connection */
 		logmsg(LOG_INFO, 1, "%s %u\t  Connection closed by foreign host.\n", logpre, dport);

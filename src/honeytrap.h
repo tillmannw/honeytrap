@@ -55,6 +55,7 @@ gid_t g_id;
 uint32_t conn_timeout;
 uint32_t read_timeout;
 uint32_t m_read_timeout;
+uint32_t read_limit;
 
 
 /* struct for destinationa if connection is handled in proxy mode */

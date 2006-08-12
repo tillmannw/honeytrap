@@ -20,6 +20,8 @@
 # plugin_dir	path		path to directory with honeytrap plugins (defaults to /etc/honeytrap/plugins)
 # attacks_dir	path		where to save attack strings (default is /var/spool/honeytrap)
 # dlsave_dir	path		where to save downloaded files (default is /var/spool/honeytrap)
+# read_limt     number          max. bytes to read from a socket - prevents honeytrap from memory exhaustion
+
 
 pidfile	= /var/run/honeytrap.pid
 logfile	= /etc/honeytrap/honeytrap.log
@@ -30,6 +32,10 @@ plugin_dir = /etc/honeytrap/plugins
 attacks_dir = /var/spool/honeytrap/attacks
 dlsave_dir = /var/spool/honeytrap/downloads
 
+# max bytes to read from an attack connection (10MB = 10485760)
+read_limit = 10485760
+
+
 # run in mirror mode - mirror connections back to the initiator (use with caution!)
 mirror
 
@@ -37,5 +43,8 @@ mirror
 #promisc
 
 # run as the following user and group
-user	= nobody 
+user	= nobody
 group	= nogroup
+
+#include explicit port configuration
+#include = ./ports.conf

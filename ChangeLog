@@ -1,3 +1,8 @@
+Version 0.6.3
+- Fixed a bug with config file lines with trailing blanks, thanks to Emre
+- DESTDIR is used in Makefiles now, thanks to kanedaaa for the patch
+- Attack connections are closed after a configurable byte limit
+  to prevent memory exhaustion - suggestion from kanedaaa
 Version 0.6.2
 - Added a plugin for execution of HTTP downloads from VNC attacks via wget
 - Connection monitor can be chosen from "configure" parameter
