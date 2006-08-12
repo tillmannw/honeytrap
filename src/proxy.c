@@ -26,7 +26,7 @@
 int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port) {
 	int proxy_sock_fd, local_addr_len;
 	struct sockaddr_in proxy_socket, local_socket;
-	char *logstr, *Logstr, *logact, *logpre;
+	char *logstr=NULL, *Logstr=NULL, *logact=NULL, *logpre=NULL;
 
 	if (mode == PORTCONF_PROXY) {
 		logact = strdup("proxy");
@@ -39,7 +39,8 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 		Logstr = strdup("Mirror");
 		logpre = strdup("<>");
 	} else {
-		logmsg(LOG_ERR, 1, "%s %u\t  Error - Mode %u for connection handling is not supported.\n", l_port, mode);
+		logmsg(LOG_ERR, 1, "%s %u\t  Error - Mode %u for connection handling is not supported.\n",
+			logpre, l_port, mode);
 		return(-1);
 	}
 
