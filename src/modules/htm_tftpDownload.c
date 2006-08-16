@@ -8,6 +8,11 @@
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
  * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ *
+ * Description:
+ *   This honeytrap module parses an attack string for tftp download commands.
+ *   It performs the downloads with an own tftp implementation.
  */
 
 #include <stdio.h>

@@ -91,7 +91,7 @@ INCLUDES = -I../
 DESTDIR = 
 libdir = /plugins
 
-lib_LTLIBRARIES = htm_aSaveFile.la htm_ftpDownload.la htm_tftpDownload.la htm_vncDownload.la
+lib_LTLIBRARIES = htm_aSaveFile.la htm_ftpDownload.la htm_tftpDownload.la htm_vncDownload.la htm_b64Decode.la
 
 htm_aSaveFile_la_SOURCES = htm_aSaveFile.c htm_aSaveFile.h
 htm_aSaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
@@ -104,6 +104,9 @@ htm_tftpDownload_la_LDFLAGS = -module -no-undefined -avoid-version
 
 htm_vncDownload_la_SOURCES = htm_vncDownload.c htm_vncDownload.h
 htm_vncDownload_la_LDFLAGS = -module -no-undefined -avoid-version
+
+htm_b64Decode_la_SOURCES = htm_b64Decode.c htm_b64Decode.h
+htm_b64Decode_la_LDFLAGS = -module -no-undefined -avoid-version
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = ../../config.h
 CONFIG_CLEAN_FILES = 
@@ -122,6 +125,8 @@ htm_tftpDownload_la_LIBADD =
 htm_tftpDownload_la_OBJECTS =  htm_tftpDownload.lo
 htm_vncDownload_la_LIBADD = 
 htm_vncDownload_la_OBJECTS =  htm_vncDownload.lo
+htm_b64Decode_la_LIBADD = 
+htm_b64Decode_la_OBJECTS =  htm_b64Decode.lo
 CFLAGS = @CFLAGS@
 COMPILE = $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -134,8 +139,8 @@ DISTFILES = $(DIST_COMMON) $(SOURCES) $(HEADERS) $(TEXINFOS) $(EXTRA_DIST)
 
 TAR = tar
 GZIP_ENV = --best
-SOURCES = $(htm_aSaveFile_la_SOURCES) $(htm_ftpDownload_la_SOURCES) $(htm_tftpDownload_la_SOURCES) $(htm_vncDownload_la_SOURCES)
-OBJECTS = $(htm_aSaveFile_la_OBJECTS) $(htm_ftpDownload_la_OBJECTS) $(htm_tftpDownload_la_OBJECTS) $(htm_vncDownload_la_OBJECTS)
+SOURCES = $(htm_aSaveFile_la_SOURCES) $(htm_ftpDownload_la_SOURCES) $(htm_tftpDownload_la_SOURCES) $(htm_vncDownload_la_SOURCES) $(htm_b64Decode_la_SOURCES)
+OBJECTS = $(htm_aSaveFile_la_OBJECTS) $(htm_ftpDownload_la_OBJECTS) $(htm_tftpDownload_la_OBJECTS) $(htm_vncDownload_la_OBJECTS) $(htm_b64Decode_la_OBJECTS)
 
 all: all-redirect
 .SUFFIXES:
@@ -228,6 +233,9 @@ htm_tftpDownload.la: $(htm_tftpDownload_la_OBJECTS) $(htm_tftpDownload_la_DEPEND
 
 htm_vncDownload.la: $(htm_vncDownload_la_OBJECTS) $(htm_vncDownload_la_DEPENDENCIES)
 	$(LINK) -rpath $(libdir) $(htm_vncDownload_la_LDFLAGS) $(htm_vncDownload_la_OBJECTS) $(htm_vncDownload_la_LIBADD) $(LIBS)
+
+htm_b64Decode.la: $(htm_b64Decode_la_OBJECTS) $(htm_b64Decode_la_DEPENDENCIES)
+	$(LINK) -rpath $(libdir) $(htm_b64Decode_la_LDFLAGS) $(htm_b64Decode_la_OBJECTS) $(htm_b64Decode_la_LIBADD) $(LIBS)
 
 tags: TAGS
 
