@@ -34,12 +34,12 @@
 
 struct dec {
 	char *str;
-	int len;
+	u_int32_t len;
 };
 
 struct dec decode(const char* code, int len) {
 	u_char ch, inbuf[3], outbuf[4];
-	int charctr, bufctr, ign, eot, i;
+	u_int32_t charctr, bufctr, ign, eot, i;
 	struct dec ret;
 
 	eot	= 0;
