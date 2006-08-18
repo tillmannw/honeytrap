@@ -21467,9 +21467,10 @@ cat >>conftest.$ac_ext <<_ACEOF
 #endif
 #include <sys/types.h>
 #include <sys/socket.h>
-#ifdef HAVE_PCAP-BPF_H
+#ifndef HAVE_PCAP_BPF_H
   #ifdef HAVE_NET_BPF_H
   #include <net/bpf.h>
+  #endif
 #else
 #include <pcap.h>
 #endif

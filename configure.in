@@ -187,9 +187,10 @@ AC_CACHE_VAL(sn_cv_decl_needed_$1,
 #endif
 #include <sys/types.h>
 #include <sys/socket.h>
-#ifdef HAVE_PCAP-BPF_H
+#ifndef HAVE_PCAP_BPF_H
   #ifdef HAVE_NET_BPF_H
   #include <net/bpf.h>
+  #endif
 #else
 #include <pcap.h>
 #endif
