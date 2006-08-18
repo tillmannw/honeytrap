@@ -68,9 +68,9 @@ struct dec *decode(const char* code, u_int32_t len) {
 	for (i=0; i<len; i++) {
 		ch = code[i];
 
-		if isupper(ch) ch -= 'A';
-		else if islower(ch) ch = ch - 'a' + 26;
-		else if isdigit(ch) ch = ch - '0' + 52;
+		if (isupper(ch)) ch -= 'A';
+		else if (islower(ch)) ch = ch - 'a' + 26;
+		else if (isdigit(ch)) ch = ch - '0' + 52;
 		else if (ch == '+') ch = 62;
 		else if (ch == '=') eot = 1;
 		else if (ch == '/') ch = 63;
