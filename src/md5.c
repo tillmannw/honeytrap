@@ -304,7 +304,7 @@ char *mem_md5sum(u_char *mempos, u_int32_t size)
 
 	ptr = md5sum;
 	for(i = 0; i < 16; i++) {
-		sprintf(ptr, "%02x", digest[i]);
+		snprintf(ptr, 2, "%02x", digest[i]);
 		ptr += 2;
 	}
 

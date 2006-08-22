@@ -40,9 +40,10 @@ void logmsg(int level, int add_time, const char *format, ...) {
 		va_start(ap, format);
 		if (add_time) {
 			snprintf(logline, 24, "[%s]  ", log_time(ltime));
-			if (log_level == LOG_DEBUG) sprintf(logline + strlen(logline), "%5d  ", getpid());
+			if (log_level == LOG_DEBUG)
+				snprintf(logline + strlen(logline), LOGLINE_SIZE - strlen(logline), "%5d  ", getpid());
 		}
-		vsprintf(logline + strlen(logline), format, ap);
+		vsnprintf(logline + strlen(logline), LOGLINE_SIZE - strlen(logline), format, ap);
 		logline_size = strlen(logline);
 
 		if ((bytes_written = write(logfile_fd, logline, logline_size)) != logline_size)

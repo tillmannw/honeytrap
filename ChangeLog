@@ -4,6 +4,8 @@ Version 0.6.3
 - Attack connections are closed after a configurable byte limit
   to prevent memory exhaustion - suggestion from kanedaaa
 - Added a plugin to decode and process base64 attacks
+- Small pcap connection monitor changes
+- Further small changes
 Version 0.6.2
 - Added a plugin for execution of HTTP downloads from VNC attacks via wget
 - Connection monitor can be chosen from "configure" parameter

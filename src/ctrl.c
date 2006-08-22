@@ -166,7 +166,7 @@ int create_pid_file(void) {
 	parent_pid = getpid();
 
 	bzero(pid_str, 5);
-	sprintf(pid_str, "%d\n", parent_pid);
+	snprintf(pid_str, 5,"%d\n", parent_pid);
 	if (!(write(pidfile_fd, pid_str, strlen(pid_str)))) {
 		logmsg(LOG_ERR, 1, "Error - Unable to write pid file: %s\n", strerror(errno));
 		return(0);

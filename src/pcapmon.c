@@ -34,6 +34,7 @@
 #include "tcpserver.h"
 #include "ctrl.h"
 
+
 void tcp_server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_char * packet) {
 	ip = (struct ip_header *) (packet + pcap_offset);
 	tcp = (struct tcp_header *) (packet + pcap_offset + ip->ip_hl * 4);
@@ -70,30 +71,50 @@ int start_pcap_mon(void) {
 	logmsg(LOG_DEBUG, 1, "Starting pcap sniffer on %s.\n", dev);
 	if ((tcp_sniffer = pcap_open_live(dev, BUFSIZ, promisc_mode, 10, errbuf)) != NULL) {
 		switch (pcap_datalink(tcp_sniffer)) {
+#ifdef DLT_RAW
 			case DLT_RAW:
 				pcap_offset = 0;
 				break;
+#endif
+#ifdef DLT_SLIP
 			case DLT_SLIP:
+#endif
+#ifdef DLT_PPP
 			case DLT_PPP:
+#endif
+#ifdef DLT_PPP_SERIAL
 			case DLT_PPP_SERIAL:
 				pcap_offset = 2;
 				break;
+#endif
+#ifdef DLT_NULL
 			case DLT_NULL:
+#endif
+#ifdef DLT_LOOP
 			case DLT_LOOP:
 				pcap_offset = 4;
 				break;
+#endif
+#ifdef DLT_SUNATM
 			case DLT_SUNATM:
 				pcap_offset = 8;
 				break;
+#endif
+#ifdef DLT_EN10MB
 			case DLT_EN10MB:
 				pcap_offset = ETHER_HDRLEN;
 				break;
+#endif
+#ifdef DLT_LINUX_SLL
 			case DLT_LINUX_SLL:
 				pcap_offset = 16;
 				break;
+#endif
+#ifdef DLT_PFLOG
 			case DLT_PFLOG:
 				pcap_offset = 50;
 				break;
+#endif
 			default:
 				logmsg(LOG_ERR, 1, "Error - Link type of %s is currently not supported.\n", dev);
 				exit(1);
