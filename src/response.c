@@ -71,7 +71,7 @@ int prepare_default_response(char *filename, uint16_t port) {
 
 
 	/* read response */
-	DEBUG_FPRINTF(stdout, "  Loading default response for port %u/tcp.\n", port);
+	fprintf(stdout, "  Loading default response for port %u/tcp.\n", port);
 	if (((answer_fd = open(filename, O_NOCTTY | O_RDONLY, 0640)) == -1) || (!(answer_file = fopen(filename, "rb")))) {
 		DEBUG_FPRINTF(stdout, "  Warning - Unable to open file '%s'\n", filename);
 	} else {
@@ -86,8 +86,9 @@ int prepare_default_response(char *filename, uint16_t port) {
 				new_response->size += ccopy;
 			}
 		}
-		if (new_response->size != 0) fprintf(stdout, "  Loaded default response string for port %u/tcp.\n", port);
-		else DEBUG_FPRINTF(stdout, "  Warning - Default response file '%s' is empty.\n", filename);
+		if (new_response->size != 0) {
+			DEBUG_FPRINTF(stdout, "  Default response string for port %u/tcp successfully loaded.\n", port);
+		} else DEBUG_FPRINTF(stdout, "  Warning - Default response file '%s' is empty.\n", filename);
 	}
 	fclose(answer_file);
 	close(answer_fd);

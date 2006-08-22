@@ -50,6 +50,9 @@ int cmd_parse_for_vnc(Attack *attack) {
 
 	logmsg(LOG_DEBUG, 1, "Checking for VNC session string in attack string.\n");
 
+	/* no data, nothing to do */
+	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) return(1);
+
 	/* parse for VNC session indicator - if found, search for url */
 	if (memcmp(attack->a_conn.payload.data, vnc_str, strlen(vnc_str)) == 0) {
 		logmsg(LOG_DEBUG, 1, "Found VNC session string, parsing attack string for HTTP URL.\n");

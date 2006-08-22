@@ -49,7 +49,7 @@ int load_plugins(char *dir) {
 		return(-1);
 	} else while(n--) {
 		stat(namelist[n]->d_name, &statbuf);
-		if (fnmatch("htm_*.so", namelist[n]->d_name, 0) == 0) {
+		if (fnmatch("htm_*.so*", namelist[n]->d_name, 0) == 0) {
 			/* found a plugin */
 			if ((full_path = (char *) malloc(strlen(dir) + strlen(namelist[n]->d_name) + 2)) == NULL) {
 				fprintf(stderr, "  Error - Unable to allocate memory: %s\n", strerror(errno));
@@ -94,7 +94,6 @@ int init_plugin(char *plugin_name) {
 			return(-1);
 		} else new_plugin->filename = (char *) strdup(plugin_name);
 	}
-	DEBUG_FPRINTF(stdout, "  Loading plugin %s.\n", new_plugin->filename);
 
 	dlerror();      /* Clear any existing error */
 	if (((new_plugin->handle = dlopen(new_plugin->filename, RTLD_NOW)) == NULL) &&
@@ -121,7 +120,7 @@ int init_plugin(char *plugin_name) {
 		unload_at_err(new_plugin);
 		return(-1);
 	}
-	DEBUG_FPRINTF(stdout, "  Loaded plugin %s v%s.\n", new_plugin->name, new_plugin->version);
+	fprintf(stdout, "  Loading plugin %s v%s.\n", new_plugin->name, new_plugin->version);
 
 	DEBUG_FPRINTF(stdout, "  Initializing plugin %s.\n", new_plugin->name);
 	/* resolve module's unload function and add it to unload hook */
@@ -149,7 +148,7 @@ int init_plugin(char *plugin_name) {
 	}
 	retval = -1;
 	init_plugin();
-	fprintf(stdout, "  Initialized plugin %s.\n", new_plugin->name);
+	DEBUG_FPRINTF(stdout, "  Plugin %s successfully initialized.\n", new_plugin->name);
 
 	/* attach plugin to plugin_list */
 	if (!plugin_list) plugin_list = new_plugin;

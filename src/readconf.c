@@ -377,17 +377,13 @@ int parse_config_file(const char *filename) {
 		/* ignore comments and blank lines */
 		if ((*recvline == '#') || (*recvline == 0x0a) || (*recvline == 0x00) || (recvline == NULL)) continue;
 
+		/* remove newlines */
+		if ((recvline)[strlen(recvline)-1] == '\n') recvline[strlen(recvline)-1] = 0;
+		DEBUG_FPRINTF(stdout, "  Config file parser - Line %u in %s: %s\n", line_number, filename, recvline);
+
 		config_opt = recvline;
-		if ((config_val = get_value(recvline, '=')) != NULL) {
-			/* remove newlines */
-			if ((config_val)[strlen(config_val)-1] == '\n') config_val[strlen(config_val)-1] = 0;
-			DEBUG_FPRINTF(stdout, "  Config file parser - Line %u in %s: %s=%s\n",
-				line_number, filename, config_opt, config_val);
-		} else {
+		if ((config_val = get_value(recvline, '=')) == NULL) {
 			if ((config_opt)[strlen(config_opt)-1] == '\n') config_opt[strlen(config_opt)-1] = 0;
-			DEBUG_FPRINTF(stdout, "  Config file parser - Line %u in %s: %s=%s\n",
-				line_number, filename, config_opt, config_val);
-			config_val = NULL;
 		}
 		if (process_config_option(config_opt, config_val) == -1) {
 			fprintf(stderr, "  Error - Invalid line %u in file %s.\n", line_number, filename); 

@@ -106,8 +106,14 @@ int b64_decode(Attack *attack) {
 
 	logmsg(LOG_NOISY, 1, "Base64 decoder - Searching for base64 encoded attack string.\n");
 
+	/* no data, nothing to do */
+	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) return(1);
+
+fprintf(stdout, "---> len is %d.\n", attack->a_conn.payload.size);
+code = strstr(attack->a_conn.payload.data, "Negotiate ");
+fprintf(stdout, "---> data is %x.\n", attack->a_conn.payload.data);
 	/* look for characteristic strings after which base64 encoded data starts */
-	if (((code = strstr(attack->a_conn.payload.data, "Negotiate ")) != NULL)
+	if (((code = (u_char *) strstr(attack->a_conn.payload.data, "Negotiate ")) != NULL)
 	    /* add additional checks here
  	    || (code = strstr(attack->a_conn.payload.data, "[DUMMY_STRING]")) != NULL) */
 	    ) {

@@ -2,8 +2,7 @@ AUTOMAKE_OPTIONS = foreign no-dependencies
 
 INCLUDES = -I../
 
-DESTDIR=
-libdir=/plugins
+libdir=$(DESTDIR)/$(sysconfdir)/honeytrap/plugins
 
 lib_LTLIBRARIES = htm_aSaveFile.la htm_ftpDownload.la htm_tftpDownload.la htm_vncDownload.la htm_b64Decode.la
 
@@ -25,7 +24,7 @@ htm_b64Decode_la_LDFLAGS = -module -no-undefined -avoid-version
 install-exec-am:
 	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/plugins
 	for module in `find .libs -name 'htm_*.so'`; do \
-		$(INSTALL_DATA) "$$module" $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/ ; \
+		[ -h $$module ] || $(INSTALL_DATA) "$$module" $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/ ; \
 	done
 	for module in `find . -name 'htm_*.*a'`; do \
 		rm -f $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/`basename "$$module"` ; \

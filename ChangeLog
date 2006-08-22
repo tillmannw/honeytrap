@@ -5,6 +5,7 @@ Version 0.6.3
   to prevent memory exhaustion - suggestion from kanedaaa
 - Added a plugin to decode and process base64 attacks
 - Small pcap connection monitor changes
+- Fixed a segfault for zero lenght attacks in the htm_vncDownload plugin
 - Further small changes
 Version 0.6.2
 - Added a plugin for execution of HTTP downloads from VNC attacks via wget
