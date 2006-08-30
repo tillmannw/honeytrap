@@ -1,6 +1,8 @@
 Version 0.6.3
+- md5 checksum calculation snprintf size parameter corrected
 - Fixed a bug with config file lines with trailing blanks, thanks to Emre
 - DESTDIR is used in Makefiles now, thanks to kanedaaa for the patch
+- Plugin installation was wrong on non-Linux systems and is fixed now
 - Attack connections are closed after a configurable byte limit
   to prevent memory exhaustion - suggestion from kanedaaa
 - Added a plugin to decode and process base64 attacks
