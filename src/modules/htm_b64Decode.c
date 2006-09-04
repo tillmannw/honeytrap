@@ -99,23 +99,29 @@ struct dec *decode(const char* code, u_int32_t len) {
 }
 
 int b64_decode(Attack *attack) {
-	u_char *code;
+	char *code, *astr;
 	struct dec *decoded;
 	Attack dec_attack;
 
+int i;
 
 	logmsg(LOG_NOISY, 1, "Base64 decoder - Searching for base64 encoded attack string.\n");
 
 	/* no data, nothing to do */
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) return(1);
 
-fprintf(stdout, "---> len is %d.\n", attack->a_conn.payload.size);
-code = strstr(attack->a_conn.payload.data, "Negotiate ");
-fprintf(stdout, "---> data is %x.\n", attack->a_conn.payload.data);
+	/* zero-terminate attack string */
+	if ((astr = (char *) malloc(attack->a_conn.payload.size+1)) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		return(-1);
+	}
+	bzero(astr, attack->a_conn.payload.size+1);
+	strncpy(astr, (char *) attack->a_conn.payload.data, attack->a_conn.payload.size);
+	
 	/* look for characteristic strings after which base64 encoded data starts */
-	if (((code = (u_char *) strstr(attack->a_conn.payload.data, "Negotiate ")) != NULL)
+	if (((code = (char *) strstr(astr, "Negotiate ")) != NULL)
 	    /* add additional checks here
- 	    || (code = strstr(attack->a_conn.payload.data, "[DUMMY_STRING]")) != NULL) */
+ 	    || (code = strstr(astr, "[DUMMY_STRING]")) != NULL) */
 	    ) {
 		/* decode base64 code */
 		logmsg(LOG_INFO, 1, "Base64 decoder - Encoded attack string found, trying to decode.\n");

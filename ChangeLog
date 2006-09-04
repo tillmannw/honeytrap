@@ -1,4 +1,6 @@
 Version 0.6.3
+- A 10 second timeout is used for mirror connection attempts to prevent
+  simultaneous timeouts after a blocking connect() returns
 - md5 checksum calculation snprintf size parameter corrected
 - Fixed a bug with config file lines with trailing blanks, thanks to Emre
 - DESTDIR is used in Makefiles now, thanks to kanedaaa for the patch

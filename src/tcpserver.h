@@ -34,6 +34,8 @@ struct s_conn {
 	struct in_addr		r_addr;		/* remote ip address */
 	uint16_t		l_port;		/* local (tcp) port */
 	uint16_t		r_port;		/* remote (tcp) port */
+	uint32_t		protocol;	/* protocol id */
+	uint32_t		flags;		/* flags (frag, etc) */
 	struct s_payload	payload;	/* payload read from fd */
 };
 

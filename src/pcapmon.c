@@ -110,6 +110,16 @@ int start_pcap_mon(void) {
 				pcap_offset = 16;
 				break;
 #endif
+#ifdef DLT_FDDI
+			case DLT_FDDI:
+				pcap_offset = 21;
+				break;
+#endif
+#ifdef DLT_IEEE802
+			case DLT_IEEE802:
+				pcap_offset = 22;
+				break;
+#endif
 #ifdef DLT_PFLOG
 			case DLT_PFLOG:
 				pcap_offset = 50;

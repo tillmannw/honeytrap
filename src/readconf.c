@@ -286,13 +286,13 @@ int configure(int my_argc, char *my_argv[]) {
 	}
 
 
-#ifdef USE_PCAP_MON
-	if(promisc_mode) fprintf(stdout,"  Promiscuous mode enabled.\n");
-#endif
 	if(mirror_mode) fprintf(stdout,"  Mirror mode enabled.\n");
 
 
 #ifdef USE_PCAP_MON
+	DEBUG_FPRINTF(stdout, "  Using %s.\n", pcap_lib_version());
+	if(promisc_mode) fprintf(stdout,"  Promiscuous mode enabled.\n");
+
 	/* assemble bpf expression from command line */
 	if ((first_init ) && (optind < my_argc)) {
 		while (optind < my_argc) {

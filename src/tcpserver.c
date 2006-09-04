@@ -358,6 +358,7 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *m_data, uint32_t m_siz
 		attack.a_conn.payload.data = (char *) malloc(a_size);
 		memcpy(attack.a_conn.payload.data, a_data, a_size);
 	}
+
 	memcpy(attack.a_conn.payload.chksum, (char*)mem_md5sum(attack.a_conn.payload.data, attack.a_conn.payload.size), 33);
 	/* mirror string */
 	attack.m_conn.payload.size = m_size;
