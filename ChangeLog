@@ -7,7 +7,7 @@ Version 0.6.3
 - Plugin installation was wrong on non-Linux systems and is fixed now
 - Attack connections are closed after a configurable byte limit
   to prevent memory exhaustion - suggestion from kanedaaa
-- Added a plugin to decode and process base64 attacks
+- Added a plugin to decode and process base64 encoded attacks
 - Small pcap connection monitor changes
 - Fixed a segfault for zero lenght attacks in the htm_vncDownload plugin
 - Further small changes
