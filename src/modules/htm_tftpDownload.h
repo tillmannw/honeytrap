@@ -20,7 +20,7 @@
 #define MAX_TRANSMISSION_TRIES  10      /* retransmit 9 times */
 
 const char module_name[]="htm_tftpDownload";
-const char module_version[]="0.1";
+const char module_version[]="0.2";
 
 void plugin_init(void);
 void plugin_unload(void);

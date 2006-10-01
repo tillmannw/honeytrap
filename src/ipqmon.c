@@ -35,10 +35,10 @@ static void die(struct ipq_handle *h) {
 }
 
 int start_ipq_mon(void) {
-	int status;
+	int status, process;
 	unsigned char buf[BUFSIZE];
 	struct ipq_handle *h;
-	ipq_packet_msg_t *m;
+	ipq_packet_msg_t *packet;
 	struct ip_header *ip;
 	struct tcp_header *tcp;
 
@@ -51,7 +51,8 @@ int start_ipq_mon(void) {
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via IPQ. ----\n");
 
 	for (;;) {
-		status = ipq_read(h, buf, BUFSIZE, 0);
+		process	= 1;
+		status	= ipq_read(h, buf, BUFSIZE, 0);
 		if (status < 0) die(h);
 
 		switch (ipq_message_type(buf)) {
@@ -59,13 +60,48 @@ int start_ipq_mon(void) {
 				logmsg(LOG_ERR, 1, "IPQ Error: %s\n", strerror(ipq_get_msgerr(buf)));
 				break;
 			case IPQM_PACKET:
-				m = ipq_get_packet(buf);
-				ip = (struct ip_header*) m->payload;
-				tcp = (struct tcp_header*) (m->payload + (4 * ip->ip_hlen));
+				packet	= ipq_get_packet(buf);
+				ip	= (struct ip_header*) packet->payload;
+				tcp	= (struct tcp_header*) (packet->payload + (4 * ip->ip_hlen));
+
 				/* Got a connection request, fork handler and pass it back to the kernel */
+				switch (port_flags[ntohs(tcp->th_dport)]) {
+				case PORTCONF_NONE:
+					logmsg(LOG_DEBUG, 1, "Port %u/tcp has no explicit configuration.\n",
+						ntohs(tcp->th_dport));
+					break;
+				case PORTCONF_IGNORE:
+					logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be ignored.\n",
+						ntohs(tcp->th_dport));
+					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) die(h);
+					process = 0;
+					break;
+				case PORTCONF_NORMAL:
+					logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in normal mode.\n",
+						ntohs(tcp->th_dport));
+					break;
+				case PORTCONF_MIRROR:
+					logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in mirror mode.\n",
+						ntohs(tcp->th_dport));
+					break;
+				case PORTCONF_PROXY:
+					logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in proxy mode\n",
+						ntohs(tcp->th_dport));
+					break;
+				default:
+					logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/tcp.\n",
+						ntohs(tcp->th_dport));
+					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) die(h);
+					process = 0;
+					break;
+				}
+				
+				if (process == 0) break;
+
 				logmsg(LOG_INFO, 1, "Connection request on port %d.\n", ntohs(tcp->th_dport));
 				start_tcp_server(ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport);
-				if ((status = ipq_set_verdict(h, m->packet_id, NF_ACCEPT, 0, NULL)) < 0) die(h);
+				sleep(1);	//dirty, but you don't want IPC as alternative
+				if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) die(h);
 				break;
 			default:
 				logmsg(LOG_DEBUG, 1, "IPQ Warning - Unknown message type!\n");
@@ -75,6 +111,6 @@ int start_ipq_mon(void) {
 
 	ipq_destroy_handle(h);
 	return(1);
-}
+	}
 
 #endif

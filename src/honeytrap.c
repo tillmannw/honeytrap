@@ -74,6 +74,8 @@ int main(int argc, char **argv) {
 	attacks_dir	= strdup("/var/spool/honeytrap");
 	dlsave_dir	= strdup("/var/spool/honeytrap");
 
+	ftp_host	= NULL;		/* Explicit ip address (hostname) for FTP data connections */
+
 #ifdef USE_PCAP_MON
 	dev		= NULL;	/* network device pointer */
 	tcp_sniffer	= NULL;	/* pcap device pointer */

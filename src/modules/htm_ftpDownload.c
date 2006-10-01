@@ -96,7 +96,7 @@ int get_ftpcmd(char *attack_string, int string_size, struct in_addr lhost) {
 				logmsg(LOG_ERR, 1, "FTP download error - Unable to resolve %s.\n", token.string);
 				return(-1);
 			}
-			logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s\n", token.string,
+			logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s.\n", token.string,
 				inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 
 			if (!valid_ipaddr((uint32_t) *(host->h_addr_list[0]))) {
@@ -251,6 +251,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	int control_sock_fd, data_sock_listen_fd, data_sock_fd, dumpfile_fd,
 	    local_data_port, bytes_read, total_bytes, addr_len, select_return, timeout, retval;
 	uint8_t ip_octet[4], *binary_stream;
+	struct hostent *data_host = NULL;
 	struct ftp_port_t {
 		uint16_t first_half:8, second_half:8;
 	} ftp_port;
@@ -422,6 +423,23 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 		ntohs(local_data_socket.sin_port));
 
 	/* send PORT */
+	if (ftp_host) {
+		/* use this ip address (host) for data connection */
+		logmsg(LOG_DEBUG, 1, "FTP download - Accept data connections on %s.\n", ftp_host);
+		if ((data_host = gethostbyname(ftp_host)) == NULL) {
+			logmsg(LOG_ERR, 1, "FTP download error - Unable to resolve %s.\n", ftp_host);
+			return(-1);
+		}
+		logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s.\n", ftp_host,
+			inet_ntoa(*(struct in_addr*)data_host->h_addr_list[0]));
+
+		if (!valid_ipaddr((uint32_t) *(data_host->h_addr_list[0]))) {
+			logmsg(LOG_INFO, 1, "FTP download error - %s is not a valid ip address.\n",
+				inet_ntoa(*(struct in_addr*)data_host->h_addr_list[0]));
+			return(-1);
+		}
+		lhost = (struct in_addr*)data_host->h_addr_list[0];
+	}
 	memcpy(ip_octet, lhost, 4);
 	memcpy(&ftp_port, &local_data_socket.sin_port, sizeof(local_data_socket.sin_port));
 	logmsg(LOG_NOISY, 1, "FTP download - Sending 'PORT %u,%u,%u,%u,%u,%u.\n",
@@ -533,6 +551,8 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 			memcpy(binary_stream + total_bytes, rbuf, bytes_read);
 			total_bytes += bytes_read;
 		}
+		logmsg(LOG_NOISY, 1, "FTP download - Successfully downloaded %s.\n", save_file);
+		ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
 		/* save file */
 		if(total_bytes) {
 			/* we need the length of directory + "/" + filename plus md5 checksum */
@@ -544,13 +564,12 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 			    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {
 				logmsg(LOG_WARN, 1, "FTP download - Unable to save %s: %s.\n", save_file,
 					strerror(errno));
-				ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
 				return(-1);
 			}
 			if (write(dumpfile_fd, binary_stream, total_bytes) != total_bytes) { 
 				logmsg(LOG_ERR, 1, "FTP download error - Unable to write data to file: %s\n",
 					strerror(errno));
-				ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+				close(dumpfile_fd);
 				return(-1);
 			}
 			close(dumpfile_fd);

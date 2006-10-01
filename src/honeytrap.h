@@ -47,6 +47,7 @@ char *response_dir;
 char *plugin_dir;
 char *attacks_dir;
 char *dlsave_dir;
+char *ftp_host;
 int daemonize;
 int mirror_mode;
 int promisc_mode;

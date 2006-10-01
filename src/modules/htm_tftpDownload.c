@@ -95,7 +95,7 @@ int get_tftpcmd(char *attack_string, int string_size) {
 				logmsg(LOG_ERR, 1, "TFTP download error - Unable to resolve %s.\n", token.string);
 				return(-1);
 			}
-			logmsg(LOG_DEBUG, 1, "TFTP download - %s resolves to %s\n", token.string,
+			logmsg(LOG_DEBUG, 1, "TFTP download - %s resolves to %s.\n", token.string,
 				inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 
 			if (!valid_ipaddr((uint32_t) *(host->h_addr_list[0]))) {

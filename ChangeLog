@@ -1,3 +1,11 @@
+Version 0.6.3.1
+- The FTP download plugin supports explicit binding of data connections
+  to ip addresses or hostnames to work on NAT'ed hosts
+- Modes of operation are already determined in network stream monitors
+  to prevent gratuitous forking
+- Listener processes now have a backlog queue of size 10
+- BPF strings can include up to 2^32 characters instead of 2^8
+- Some changes and cleanups make the code more readable
 Version 0.6.3
 - A 10 second timeout is used for mirror connection attempts to prevent
   simultaneous timeouts after a blocking connect() returns

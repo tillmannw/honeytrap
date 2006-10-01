@@ -46,5 +46,8 @@ mirror
 user	= nobody
 group	= nogroup
 
+# use this host (ip address) to listen for FTP data connections (you would need the htm_ftpDownload plugin version 3)
+#ftp_host = example.com
+
 #include explicit port configuration
 #include = ./ports.conf

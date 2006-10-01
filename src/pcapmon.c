@@ -38,8 +38,31 @@
 void tcp_server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_char * packet) {
 	ip = (struct ip_header *) (packet + pcap_offset);
 	tcp = (struct tcp_header *) (packet + pcap_offset + ip->ip_hl * 4);
+
+	switch (port_flags[ntohs(tcp->th_sport)]) {
+	case PORTCONF_NONE:
+		logmsg(LOG_DEBUG, 1, "Port %u/tcp has no explicit configuration.\n", ntohs(tcp->th_sport));
+		break;
+	case PORTCONF_IGNORE:
+		logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be ignored.\n", ntohs(tcp->th_sport));
+		return;
+	case PORTCONF_NORMAL:
+		logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in normal mode.\n", ntohs(tcp->th_sport));
+		break;
+	case PORTCONF_MIRROR:
+		logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in mirror mode.\n", ntohs(tcp->th_sport));
+		break;
+	case PORTCONF_PROXY:
+		logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in proxy mode\n", ntohs(tcp->th_sport));
+		break;
+	default:
+		logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/tcp.\n", ntohs(tcp->th_sport));
+		return;
+	}
+
 	logmsg(LOG_INFO, 1, "Connection request on port %d.\n", ntohs(tcp->th_sport));
 	start_tcp_server(ip->ip_dst, tcp->th_dport, ip->ip_src, tcp->th_sport);
+	return;
 }
 
 
@@ -142,6 +165,7 @@ int start_pcap_mon(void) {
 			logmsg(LOG_ERR, 1, "Pcap error - Unable to start tcp sniffer: %s\n", errbuf);
 			clean_exit(0);
 		}
+		pcap_freecode(&filter);
 
 		logmsg(LOG_NOTICE, 1, "---- Trapping attacks on %s. ----\n", dev);
 
@@ -164,7 +188,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 	pcap_if_t *curdev = NULL;
 	pcap_addr_t *curaddr = NULL;
 	struct sockaddr *saptr = NULL;
-	uint8_t oldstrsize = 0, newstrsize = 0;
+	uint32_t oldstrsize = 0, newstrsize = 0;
 	int dev_found;
 
 	if (pcap_findalldevs(&alldevsp, errbuf) == -1) {

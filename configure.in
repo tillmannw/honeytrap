@@ -1,8 +1,8 @@
 # $Id$ 
 AC_PREREQ(02.50)
-AC_INIT([honeytrap], [0.6.3], [tillmann.werner@gmx.de])
+AC_INIT([honeytrap], [0.6.3.1], [tillmann.werner@gmx.de])
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(honeytrap,0.6.3)
+AM_INIT_AUTOMAKE(honeytrap,0.6.3.1)
 
 # Since we get -O2 from configure defaults, which doesn't work in 64bit
 # mode, let's make some changes here before calling _CC macros.

@@ -469,6 +469,10 @@ int process_config_option(char *opt, char* val) {
 		free(dlsave_dir);
 		dlsave_dir = strdup(val);
 		DEBUG_FPRINTF(stdout, "  Storing downloaded files in %s.\n", val);
+	} else if (OPT_IS("ftp_host")) {
+		free(ftp_host);
+		ftp_host = strdup(val);
+		DEBUG_FPRINTF(stdout, "  Using '%s' as bind address for FTP data connections (needs a module).\n", val);
 	} else if (OPT_IS("user")) {
 		if ((pwd_entry = getpwnam(val)) == NULL) {
 			if (errno) fprintf(stderr, "  Invalid user in configuration file: %s\n", strerror(errno));
