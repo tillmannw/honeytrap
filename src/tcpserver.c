@@ -198,6 +198,7 @@ void start_tcp_server(struct in_addr ip_r, u_int16_t port_r, struct in_addr ip_l
 
 		    /* accept connection request */
 		    bzero(&client_addr, sizeof(client_addr));
+		    client_addr_len = sizeof(client_addr);
 		    if ((connection_fd = accept(listenfd, (struct sockaddr *) &client_addr, &client_addr_len)) < 0) {
 			if (errno == EINTR) break;
 			else {

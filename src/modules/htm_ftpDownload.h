@@ -18,7 +18,7 @@
 #endif
 
 const char module_name[]="htm_ftpDownload";
-const char module_version[]="0.3";
+const char module_version[]="0.3.1";
 
 void plugin_init(void);
 void plugin_unload(void);

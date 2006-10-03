@@ -93,7 +93,8 @@ int get_ftpcmd(char *attack_string, int string_size, struct in_addr lhost) {
 
 			logmsg(LOG_DEBUG, 1, "FTP download - Host found: %s\n", token.string);
 			if ((host = gethostbyname(token.string)) == NULL) {
-				logmsg(LOG_ERR, 1, "FTP download error - Unable to resolve %s.\n", token.string);
+				logmsg(LOG_ERR, 1, "FTP download error - Unable to resolve %s: %s.\n",
+					token.string, strerror(errno));
 				return(-1);
 			}
 			logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s.\n", token.string,
@@ -237,7 +238,7 @@ int ftp_quit(int control_sock_fd, int data_sock_fd, int dumpfile_fd) {
 		read_result = read_ftp_line(control_sock_fd, rline, timeout);
 		if (strstr(rline, "221") == rline) logmsg(LOG_NOISY, 1, "FTP download - Remote host said 'Goodbye'.\n");
 	} else {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s.\n", strerror(errno));
 		shutdown(control_sock_fd, 1);
 		return(-1);
 	}
@@ -272,7 +273,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	/* create socket for ftp control channel */
 	logmsg(LOG_DEBUG, 1, "FTP download - Initializing FTP control channel.\n");
 	if (!(control_sock_fd = socket(AF_INET, SOCK_STREAM, 0))) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to initialize FTP control channel: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to initialize FTP control channel: %s.\n", strerror(errno));
 		return(-1);
 	}
 	logmsg(LOG_DEBUG, 1, "FTP download - FTP control channel initialized.\n");
@@ -298,7 +299,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 
 	logmsg(LOG_NOISY, 1, "FTP download - Sending 'USER %s'.\n", user);
 	if ((ftp_command = (char *) realloc(ftp_command, 5 + strlen(user) + 3)) == NULL) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s.\n", strerror(errno));
 		shutdown(control_sock_fd, 1);
 		return(-1);
 	}
@@ -307,7 +308,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	if (write(control_sock_fd, ftp_command, strlen(ftp_command))) {
 		logmsg(LOG_DEBUG, 1, "FTP download - USER sent.\n");
 	} else {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s.\n", strerror(errno));
 		shutdown(control_sock_fd, 1);
 		return(-1);
 	}
@@ -320,7 +321,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	while ((strstr(rline, "331") == rline) && (strstr(rline, "230") != rline)) {
 		logmsg(LOG_NOISY, 1, "FTP download - Sending 'PASS %s'.\n", pass);
 		if ((ftp_command = (char *) realloc(ftp_command, 5 + strlen(pass) + 3)) == NULL) {
-			logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s.\n", strerror(errno));
 			shutdown(control_sock_fd, 1);
 			return(-1);
 		}
@@ -328,7 +329,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 		if (write(control_sock_fd, ftp_command, strlen(ftp_command))) {
 			logmsg(LOG_DEBUG, 1, "FTP download - PASS sent.\n");
 		} else {
-			logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s.\n", strerror(errno));
 			shutdown(control_sock_fd, 1);
 			return(-1);
 		}
@@ -363,7 +364,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 								"FTP download - TYPE command failed.\n");
 					} else {
 						logmsg(LOG_ERR, 1,
-							"FTP download error - Unable to write to control socket: %s\n",
+							"FTP download error - Unable to write to control socket: %s.\n",
 							strerror(errno));
 						shutdown(control_sock_fd, 1);
 						return(-1);
@@ -371,7 +372,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 				} else if (strstr(rline, "200") != rline) 
 					logmsg(LOG_DEBUG, 1, "FTP download - SYST command failed.\n");
 			} else {
-				logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s\n",
+				logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s.\n",
 					strerror(errno));
 				shutdown(control_sock_fd, 1);
 				return(-1);
@@ -384,7 +385,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	/* create listening socket for ftp data channel and send PORT */
 	logmsg(LOG_DEBUG, 1, "FTP download - Initializing ftp data channel.\n");
 	if (!(data_sock_listen_fd = socket(AF_INET, SOCK_STREAM, 0))) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to initialize FTP data channel: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to initialize FTP data channel: %s.\n", strerror(errno));
 		shutdown(control_sock_fd, 1);
 		return(-1);
 	}
@@ -414,7 +415,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 
 	if ((listen(data_sock_listen_fd, 0)) < 0) {
 		logmsg(LOG_ERR, 1,
-			"FTP download error - Unable to create listening socket for data channel: %s\n",
+			"FTP download error - Unable to create listening socket for data channel: %s.\n",
 			strerror(errno));
 		close(data_sock_listen_fd);
 		ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
@@ -446,7 +447,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 		ip_octet[0], ip_octet[1], ip_octet[2], ip_octet[3],
 		ftp_port.first_half, ftp_port.second_half);
 	if ((ftp_command = (char *) realloc(ftp_command, 30)) == NULL) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s\n.", strerror(errno));
 		close(data_sock_listen_fd);
 		shutdown(control_sock_fd, 1);
 		return(-1);
@@ -456,7 +457,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	if (write(control_sock_fd, ftp_command, strlen(ftp_command)) == strlen(ftp_command)) {
 		logmsg(LOG_DEBUG, 1, "FTP download - PORT sent.\n");
 	} else {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s.\n", strerror(errno));
 		shutdown(control_sock_fd, 1);
 		return(-1);
 	}
@@ -470,7 +471,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	/* send RETR to retrieve file */
 	logmsg(LOG_NOISY, 1, "FTP download - Sending 'RETR %s'.\n", save_file);
 	if ((ftp_command = (char *) realloc(ftp_command, 5 + strlen(save_file) + 3)) == NULL) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s.\n", strerror(errno));
 		close(data_sock_listen_fd);
 		shutdown(control_sock_fd, 1);
 		return(-1);
@@ -479,7 +480,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	if (write(control_sock_fd, ftp_command, strlen(ftp_command))) {
 		logmsg(LOG_DEBUG, 1, "FTP download - RETR sent.\n");
 	} else {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s.\n", strerror(errno));
 		close(data_sock_fd);
 		shutdown(control_sock_fd, 1);
 		return(-1);
@@ -505,7 +506,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	select_return = select(data_sock_listen_fd + 1, &rfds, NULL, NULL, &r_timeout);
 	if (select_return < 0) {
 		if (errno != EINTR) {
-			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s.\n", strerror(errno));
 			ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
 			return(-1);
 		}
@@ -534,7 +535,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 	select_return = select(data_sock_fd + 1, &rfds, NULL, NULL, &r_timeout);
 	if (select_return < 0) {
 		if (errno != EINTR) {
-			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s.\n", strerror(errno));
 			ftp_quit(control_sock_fd, data_sock_listen_fd, dumpfile_fd);
 			return(-1);
 		}
