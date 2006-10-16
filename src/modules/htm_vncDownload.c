@@ -22,6 +22,7 @@
 
 #include <logging.h>
 #include <plughook.h>
+#include <honeytrap.h>
 
 #include "htm_vncDownload.h"
 

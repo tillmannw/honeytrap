@@ -13,7 +13,7 @@
 #ifndef __HONEYTRAP_PLUGHOOK_H
 #define __HONEYTRAP_PLUGHOOK_H 1
 
-#include "tcpserver.h"
+#include "attack.h"
 
 typedef struct plugin_func_list {
 	int (*func)(void *arg[]);

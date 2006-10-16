@@ -25,7 +25,6 @@
 
 #include <logging.h>
 #include <honeytrap.h>
-#include <tcpserver.h>
 #include <plughook.h>
 
 #include "htm_aSaveFile.h"
@@ -94,6 +93,6 @@ int save_to_file(Attack *attack) {
 		return(-1);
 	}
 	close(dumpfile_fd);
-	logmsg(LOG_DEBUG, 1, "Plugin aSave: Attack string saved as %s.\n", filename);
+	logmsg(LOG_DEBUG, 1, "Plugin aSaveFile: Attack string saved as %s.\n", filename);
 	return(0);
 }

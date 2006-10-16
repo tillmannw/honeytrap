@@ -4,7 +4,7 @@ INCLUDES = -I../
 
 libdir=$(DESTDIR)/$(sysconfdir)/honeytrap/plugins
 
-lib_LTLIBRARIES = htm_aSaveFile.la htm_ftpDownload.la htm_tftpDownload.la htm_vncDownload.la htm_b64Decode.la
+lib_LTLIBRARIES = htm_aSaveFile.la htm_ftpDownload.la htm_tftpDownload.la htm_vncDownload.la htm_b64Decode.la htm_SpamSum.la
 
 htm_aSaveFile_la_SOURCES = htm_aSaveFile.c htm_aSaveFile.h
 htm_aSaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
@@ -20,6 +20,9 @@ htm_vncDownload_la_LDFLAGS = -module -no-undefined -avoid-version
 
 htm_b64Decode_la_SOURCES = htm_b64Decode.c htm_b64Decode.h
 htm_b64Decode_la_LDFLAGS = -module -no-undefined -avoid-version
+
+htm_SpamSum_la_SOURCES = htm_SpamSum.c htm_SpamSum.h
+htm_SpamSum_la_LDFLAGS = -module -no-undefined -avoid-version
 
 install-exec-am:
 	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/plugins

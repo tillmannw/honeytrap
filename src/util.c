@@ -132,3 +132,24 @@ struct strtk extract_token(char *parse_string) {
 
 	return(retval);
 }
+
+
+char *get_next_line(FILE * file) {
+	/* return next line from file */
+
+	char buf[BUFSIZ];
+	char *index;
+
+	bzero((char *)buf, BUFSIZ);
+
+	while(fgets(buf, BUFSIZ, file)) {
+		index = buf;
+		/* advance through whitespaces at the beginning of the line */
+		while (isspace((int) *index)) ++index;
+
+		return((char *) strdup(index));
+	}
+	return(NULL);
+}
+
+

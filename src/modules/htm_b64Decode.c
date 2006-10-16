@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <strings.h>
 
+#include <honeytrap.h>
 #include <logging.h>
 #include <plughook.h>
 
@@ -105,7 +106,7 @@ int b64_decode(Attack *attack) {
 
 int i;
 
-	logmsg(LOG_NOISY, 1, "Base64 decoder - Searching for base64 encoded attack string.\n");
+	logmsg(LOG_DEBUG, 1, "Base64 decoder - Searching for base64 encoded attack string.\n");
 
 	/* no data, nothing to do */
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) return(1);
@@ -140,7 +141,7 @@ int i;
 			free(decoded->str);
 		}
 	} else {
-		logmsg(LOG_NOISY, 1, "Base64 decoder - No base64 encoded attack string found.\n");
+		logmsg(LOG_DEBUG, 1, "Base64 decoder - No base64 encoded attack string found.\n");
 		return(0);
 	}
 	return(1);

@@ -28,7 +28,7 @@ void init_plugin_hooks(void) {
 }
 
 
-PlugFuncList *add_attack_func_to_list(const char *plugname, const char *funcname, int (*func)(struct s_attack)) {
+PlugFuncList *add_attack_func_to_list(const char *plugname, const char *funcname, int (*func)(Attack)) {
 	PlugFuncList *func_tmp, *func_new;
 
 	DEBUG_FPRINTF(stdout, "    Hooking plugin %s to 'process_attack'.\n", plugname);
@@ -54,7 +54,7 @@ PlugFuncList *add_attack_func_to_list(const char *plugname, const char *funcname
 }
 
 
-void plughook_process_attack(struct s_attack attack) {
+void plughook_process_attack(Attack attack) {
 	PlugFuncList *func_tmp = NULL;
 
 	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'process_attack'.\n");

@@ -1,3 +1,6 @@
+Version 0.6.4
+- PoC plugin for locality sensitive hashing
+- Fixed a segfault in the bpf filter string assembling routine
 Version 0.6.3.1
 - The FTP download plugin supports explicit binding of data connections
   to ip addresses or hostnames to work on NAT'ed hosts

@@ -1,4 +1,4 @@
-/* htm_aSave.h
+/* htm_aSaveFile.h
  * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
@@ -18,7 +18,7 @@
 #endif
 
 const char module_name[]="htm_aSaveFile";
-const char module_version[]="0.1";
+const char module_version[]="0.1.1";
 
 void plugin_init(void);
 void plugin_unload(void);

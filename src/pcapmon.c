@@ -29,9 +29,13 @@
   #endif
 #endif
 
+#ifndef ETHER_HDRLEN
+ #define ETHER_HDRLEN 14
+#endif
+
 #include "pcapmon.h"
 #include "logging.h"
-#include "tcpserver.h"
+#include "dynsrv.h"
 #include "ctrl.h"
 
 
@@ -61,7 +65,7 @@ void tcp_server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u
 	}
 
 	logmsg(LOG_INFO, 1, "Connection request on port %d.\n", ntohs(tcp->th_sport));
-	start_tcp_server(ip->ip_dst, tcp->th_dport, ip->ip_src, tcp->th_sport);
+	start_dynamic_server(ip->ip_dst, tcp->th_dport, ip->ip_src, tcp->th_sport, ip->ip_p);
 	return;
 }
 
@@ -77,7 +81,7 @@ int start_pcap_mon(void) {
 	if (!dev) {
 		logmsg(LOG_WARN, 1, "Warning - No device given, trying to use default device.\n");
 		if ((dev = pcap_lookupdev(errbuf)) == NULL) {
-			logmsg(LOG_ERR, 1, "Error - Couldn't find default device: %s\n", errbuf);
+			logmsg(LOG_ERR, 1, "Error - Could not find default device: %s\n", errbuf);
 			exit(1);
 		}
 	}
@@ -85,7 +89,7 @@ int start_pcap_mon(void) {
 	logmsg(LOG_DEBUG, 1, "Looking up device properties for %s.\n", dev);
 	/* Find the properties for the device */
 	if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
-		fprintf(stderr, "  Couldn't get netmask for device %s: %s\n", dev, errbuf);
+		logmsg(LOG_WARN, 1, "Could not get netmask: %s\n", errbuf);
 		net = 0;
 		mask = 0;
 	}
@@ -212,12 +216,12 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 
 	/* add ip addresses for chosen devices */
 	dev_found = 0;
-	for(curdev = alldevsp; curdev; curdev = curdev->next) {
+	for(curdev = alldevsp; curdev && (dev_found == 0); curdev = curdev->next) {
 		DEBUG_FPRINTF(stdout, "  Processing interface %s.\n",curdev->name);
 		/* advance through device list until name matches command line argument, process all for 'any' */
 
 		if ((strcmp(dev, "any") != 0) && (strcmp(curdev->name, dev) != 0)) continue;
-		else dev_found = 1;
+		else if (strcmp(dev, "any") != 0) dev_found = 1;
 
 		for (curaddr = curdev->addresses; curaddr != NULL; curaddr = curaddr->next) {
 			if (curaddr->addr == NULL) continue;
@@ -249,7 +253,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 		}
 	}
 	pcap_freealldevs(alldevsp);
-	if (!dev_found) {
+	if ((strcmp(dev, "any") != 0) && (!dev_found)) {
 		fprintf(stderr, "  Error - No such interface: %s.\n", dev);
 		exit(1);
 	}
@@ -260,7 +264,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 		snprintf(bpf_filter_string+strlen(bpf_filter_string), 
 			strlen((char *) inet_ntoa(*(struct in_addr*)ip_cmd_opt->h_addr_list[0]))+17,
 			" and (src host %s)%c", (char*) inet_ntoa(*(struct in_addr*)ip_cmd_opt->h_addr_list[0]), 0);
-	} else {
+	} else if (bpf_ip_filter) {
 		/* add addresses guessed from interfaces to bpf string */
 		bpf_filter_string = (char *) realloc(bpf_filter_string, strlen(bpf_filter_string)+strlen(bpf_ip_filter)+19);
 		snprintf(bpf_filter_string + strlen(bpf_filter_string), strlen(bpf_ip_filter)+19, 

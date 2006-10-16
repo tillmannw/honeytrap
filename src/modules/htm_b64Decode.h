@@ -18,7 +18,7 @@
 #endif
 
 const char module_name[]="htm_b64Decode";
-const char module_version[]="0.2";
+const char module_version[]="0.3";
 
 struct dec {
 	char *str;

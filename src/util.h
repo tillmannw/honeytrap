@@ -24,5 +24,6 @@ struct strtk {
 int valid_ipaddr(uint32_t address);
 int read_line(int socket, char *line, int timeout);
 struct strtk extract_token(char *parse_string);
+char *get_next_line(FILE * file);
 
 #endif

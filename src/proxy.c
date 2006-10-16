@@ -19,16 +19,21 @@
 #include <string.h>
 #include <errno.h>
 
+#include "honeytrap.h"
 #include "proxy.h"
 #include "logging.h"
-#include "tcpserver.h"
 
-int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port) {
+int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port, Attack *attack) {
 	int proxy_sock_fd, local_addr_len, flags;
 	struct sockaddr_in proxy_socket, local_socket;
 	char *logstr=NULL, *Logstr=NULL, *logact=NULL, *logpre=NULL;
 	struct timeval timeout;
 	fd_set rfds, wfds;
+
+	if (attack == NULL) {
+		logmsg(LOG_ERR, 1, "Error - No attack record to fill.\n");
+		return(-1);
+	}
 
 	if (mode == PORTCONF_PROXY) {
 		logact = strdup("proxy");
@@ -68,7 +73,7 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 			logpre, l_port, logact, inet_ntoa(ipaddr), port);
 
 		bzero(&proxy_socket, sizeof(proxy_socket));
-		proxy_socket.sin_family	= AF_INET;
+		proxy_socket.sin_family		= AF_INET;
 		proxy_socket.sin_addr.s_addr	= ipaddr.s_addr;
 		proxy_socket.sin_port		= htons(port);
 		
@@ -83,6 +88,8 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 			}
 		} else if (mode == PORTCONF_MIRROR) {
 			/* non-blocking connect() with short timeout to prevent simultane connection timeouts */
+			logmsg(LOG_DEBUG, 1, "%s %u\t  Non-blocking, short-timeout connect to %s:%d.\n",
+				logpre, l_port, inet_ntoa(ipaddr), port);
 			flags = fcntl(proxy_sock_fd, F_GETFL, 0);
 			if (fcntl(proxy_sock_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
 				fprintf(stderr, "Error in fcntl(): %s.\n", strerror(errno));
@@ -124,10 +131,10 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 				logpre, port, logact, strerror(errno));
 			return(-1);
 		}
-		attack.p_conn.l_addr	= local_socket.sin_addr; 
-		attack.p_conn.r_addr	= proxy_socket.sin_addr;
-		attack.p_conn.l_port	= local_socket.sin_port;
-		attack.p_conn.r_port	= proxy_socket.sin_port;
+		attack->p_conn.l_addr	= local_socket.sin_addr; 
+		attack->p_conn.r_addr	= proxy_socket.sin_addr;
+		attack->p_conn.l_port	= local_socket.sin_port;
+		attack->p_conn.r_port	= proxy_socket.sin_port;
 	}
 	return(proxy_sock_fd);
 }

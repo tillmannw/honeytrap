@@ -15,7 +15,11 @@ honeytrap_SOURCES = 	honeytrap.c honeytrap.h \
  			pcapmon.c pcapmon.h \
 			ipqmon.c ipqmon.h \
 			response.c response.h \
-			tcpserver.c tcpserver.h \
+			dynsrv.c dynsrv.h \
+			attack.c attack.h \
+			ip.h \
+			tcp.c tcp.h \
+			udp.c udp.h \
 			proxy.c proxy.h \
 			md5.c md5.h
 

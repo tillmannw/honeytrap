@@ -17,7 +17,6 @@
 
 char *user, *group;
 
-char *get_next_line(FILE * file);
 void *get_value(char *buf, const char delim);
 int configure(int argc, char *argv[]);
 int parse_config_file(const char *filename);

@@ -28,7 +28,6 @@
 
 #include <honeytrap.h>
 #include <logging.h>
-#include <tcpserver.h>
 #include <plughook.h>
 #include <util.h>
 #include <md5.h>

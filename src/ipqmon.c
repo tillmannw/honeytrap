@@ -21,7 +21,7 @@
 #include <string.h>
 
 #include "logging.h"
-#include "tcpserver.h"
+#include "dynsrv.h"
 #include "ctrl.h"
 #include "ipqmon.h"
 
@@ -29,6 +29,7 @@
 #define BUFSIZE 256
 
 static void die(struct ipq_handle *h) {
+ipq_perror("IPQ Error: ");
 	logmsg(LOG_ERR, 1, "IPQ Error: %s - %s.\n", ipq_errstr(), strerror(errno));
 	ipq_destroy_handle(h);
 	clean_exit(0);
@@ -36,75 +37,108 @@ static void die(struct ipq_handle *h) {
 
 int start_ipq_mon(void) {
 	int status, process;
+	uint16_t sport, dport;
 	unsigned char buf[BUFSIZE];
-	struct ipq_handle *h;
 	ipq_packet_msg_t *packet;
+	struct ipq_handle *h;
 	struct ip_header *ip;
 	struct tcp_header *tcp;
+	struct udp_header *udp;
+
+	sport	= 0;
+	dport	= 0;
+	packet	= NULL;
+	ip	= NULL;
+	tcp	= NULL;
+	udp	= NULL;
 
 	logmsg(LOG_DEBUG, 1, "Creating ipq connection monitor.\n");
-	if ((h = ipq_create_handle(0, PF_INET)) == NULL) die(h);
+	if ((h = ipq_create_handle(0, PF_INET)) == NULL) {
+		die(h);
+		logmsg(LOG_ERR, 1, "Error - Could not create IPQ handle.\n");
+	}
 
-	status = ipq_set_mode(h, IPQ_COPY_PACKET, BUFSIZE);
-	if (status < 0) die(h);
+	if ((status = ipq_set_mode(h, IPQ_COPY_PACKET, BUFSIZE)) < 0) {
+		logmsg(LOG_ERR, 1, "Error - Could not set IPQ mode.\n");
+		die(h);
+	}
 
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via IPQ. ----\n");
 
 	for (;;) {
 		process	= 1;
-		status	= ipq_read(h, buf, BUFSIZE, 0);
-		if (status < 0) die(h);
-
+		if ((status = ipq_read(h, buf, BUFSIZE, 0)) < 0) {
+			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+			die(h);
+		}
 		switch (ipq_message_type(buf)) {
 			case NLMSG_ERROR:
-				logmsg(LOG_ERR, 1, "IPQ Error: %s\n", strerror(ipq_get_msgerr(buf)));
+				logmsg(LOG_ERR, 1, "IPQ Error - Error message received: %s\n",
+					strerror(ipq_get_msgerr(buf)));
 				break;
 			case IPQM_PACKET:
 				packet	= ipq_get_packet(buf);
 				ip	= (struct ip_header*) packet->payload;
-				tcp	= (struct tcp_header*) (packet->payload + (4 * ip->ip_hlen));
+				if (ip->ip_p == TCP) {
+					tcp	= (struct tcp_header*) (packet->payload + (4 * ip->ip_hlen));
+					sport	= ntohs(tcp->th_sport);
+					dport	= ntohs(tcp->th_dport);
+				} else if (ip->ip_p == UDP) {
+					udp	= (struct udp_header*) (packet->payload + (4 * ip->ip_hlen));
+					sport	= ntohs(udp->uh_sport);
+					dport	= ntohs(udp->uh_dport);
+				}
 
 				/* Got a connection request, fork handler and pass it back to the kernel */
-				switch (port_flags[ntohs(tcp->th_dport)]) {
+				switch (port_flags[dport]) {
 				case PORTCONF_NONE:
-					logmsg(LOG_DEBUG, 1, "Port %u/tcp has no explicit configuration.\n",
-						ntohs(tcp->th_dport));
+					logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n",
+							dport, PROTO(ip->ip_p));
 					break;
 				case PORTCONF_IGNORE:
-					logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be ignored.\n",
-						ntohs(tcp->th_dport));
-					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) die(h);
+					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n",
+						dport, PROTO(ip->ip_p));
+					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+						die(h);
+					}
 					process = 0;
 					break;
 				case PORTCONF_NORMAL:
-					logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in normal mode.\n",
-						ntohs(tcp->th_dport));
+					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in normal mode.\n",
+						dport, PROTO(ip->ip_p));
 					break;
 				case PORTCONF_MIRROR:
-					logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in mirror mode.\n",
-						ntohs(tcp->th_dport));
+					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in mirror mode.\n",
+						dport, PROTO(ip->ip_p));
 					break;
 				case PORTCONF_PROXY:
-					logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in proxy mode\n",
-						ntohs(tcp->th_dport));
+					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in proxy mode\n",
+						dport, PROTO(ip->ip_p));
 					break;
 				default:
-					logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/tcp.\n",
-						ntohs(tcp->th_dport));
-					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) die(h);
+					logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n",
+						dport, PROTO(ip->ip_p));
+					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+						die(h);
+					}
 					process = 0;
 					break;
 				}
 				
 				if (process == 0) break;
 
-				logmsg(LOG_INFO, 1, "Connection request on port %d.\n", ntohs(tcp->th_dport));
-				start_tcp_server(ip->ip_src, tcp->th_sport, ip->ip_dst, tcp->th_dport);
+				logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
+				start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 				sleep(1);	//dirty, but you don't want IPC as alternative
-				if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) die(h);
+				if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+					logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+					die(h);
+				}
 				break;
 			default:
-				logmsg(LOG_DEBUG, 1, "IPQ Warning - Unknown message type!\n");
+				logmsg(LOG_DEBUG, 1, "IPQ Warning - Unknown message type.\n");
 				break;
 		}
 	}

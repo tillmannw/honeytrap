@@ -29,6 +29,7 @@
 #include "honeytrap.h"
 #include "logging.h"
 #include "response.h"
+#include "util.h"
 #include "ctrl.h"
 #include "signals.h"
 #include "plugin.h"
@@ -42,25 +43,6 @@
 #endif
 
 #define OPT_IS(A)	(strcmp(low_opt, (A)) == 0)
-
-char *get_next_line(FILE * file) {
-	/* return next line from file */
-
-	char buf[BUFSIZ];
-	char *index;
-
-	bzero((char *)buf, BUFSIZ);
-
-	while(fgets(buf, BUFSIZ, file)) {
-		index = buf;
-		/* advance through whitespaces at the beginning of the line */
-		while (isspace((int) *index)) ++index;
-
-		return((char *) strdup(index));
-	}
-	return(NULL);
-}
-
 
 void *get_value(char *buf, const char delim) {
 	/* find delimiter in string and overwrite it with \0 to terminate keywort,

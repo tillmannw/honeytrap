@@ -15,6 +15,8 @@
 
 #include <sys/types.h>
 
-int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port);
+#include "attack.h"
+
+int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port, Attack *attack);
 
 #endif

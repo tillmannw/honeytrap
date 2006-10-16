@@ -16,7 +16,7 @@
 #include "honeytrap.h"
 #include "connectmon.h"
 #include "logging.h"
-#include "tcpserver.h"
+#include "dynsrv.h"
 #include "ctrl.h"
 #include "pcapmon.h"
 #include "ipqmon.h"
