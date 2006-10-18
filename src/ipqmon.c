@@ -29,8 +29,8 @@
 #define BUFSIZE 256
 
 static void die(struct ipq_handle *h) {
-ipq_perror("IPQ Error: ");
-	logmsg(LOG_ERR, 1, "IPQ Error: %s - %s.\n", ipq_errstr(), strerror(errno));
+	unsigned char buf[BUFSIZE];
+	logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
 	ipq_destroy_handle(h);
 	clean_exit(0);
 }
@@ -74,7 +74,7 @@ int start_ipq_mon(void) {
 		switch (ipq_message_type(buf)) {
 			case NLMSG_ERROR:
 				logmsg(LOG_ERR, 1, "IPQ Error - Error message received: %s\n",
-					strerror(ipq_get_msgerr(buf)));
+					ipq_get_msgerr(buf));
 				break;
 			case IPQM_PACKET:
 				packet	= ipq_get_packet(buf);
@@ -120,6 +120,7 @@ int start_ipq_mon(void) {
 					logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n",
 						dport, PROTO(ip->ip_p));
 					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+			logmsg(LOG_DEBUG, 1, "Dynamic server process forked.\n");
 						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 						die(h);
 					}
@@ -133,6 +134,7 @@ int start_ipq_mon(void) {
 				start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 				sleep(1);	//dirty, but you don't want IPC as alternative
 				if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+		logmsg(LOG_DEBUG, 1, "Dynamic server process forked.\n");
 					logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 					die(h);
 				}
