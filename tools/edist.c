@@ -45,7 +45,8 @@ struct bstr {
 };
 
 
-/* load data into memory */
+/* load data into memory
+ * faster than mmap() at least on Linux */
 struct bstr file2string(const char *filename) {
 	int bytes_read, fd;
 	u_char buffer[BUFSIZ];
@@ -80,7 +81,7 @@ u_int32_t edit_dist(struct bstr str1, struct bstr str2) {
 	register u_int32_t i, j;
 	u_int32_t *p, *q, *r;
 
-	if ((p = (uint *) calloc(str1.len, sizeof(uint))) == NULL) {
+	if ((p = (uint *) calloc(str2.len, sizeof(uint))) == NULL) {
 		fprintf(stderr, "Unable to allocate memory: %s.\n", strerror(errno));
 		exit(1);
 	}
@@ -88,13 +89,13 @@ u_int32_t edit_dist(struct bstr str1, struct bstr str2) {
 		fprintf(stderr, "Unable to allocate memory: %s.\n", strerror(errno));
 		exit(1);
 	}
+
 	p[0] = 0;
+	for(j=1; j<=str2.len; ++j) p[j] = p[j-1] + COST_INS;
 
-	for(j=1; j<str2.len; ++j) p[j] = p[j-1] + COST_INS;
-
-	for(i=1; i<str1.len; ++i) {
+	for(i=1; i<=str1.len; ++i) {
 		q[0] = p[0] + COST_DEL;
-		for(j=1; j<str2.len; ++j) 
+		for(j=1; j<=str2.len; ++j)
 			q[j] = min(min(p[j]+COST_DEL, q[j-1]+COST_INS),
 				p[j-1]+(str1.str[i-1] == str2.str[j-1] ? 0 : COST_REP));
 
