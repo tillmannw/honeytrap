@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
 	struct dec decoded;
 
 	if (argc < 2) {
-		fprintf(stderr, "Errror - No filename given.\n");
+		fprintf(stderr, "Error - No filename given.\n");
 		exit(1);
 	}
 
@@ -127,6 +127,7 @@ int main(int argc, char *argv[]) {
 			exit(1);
 		}
 	}
+	close(fd);
 
 	/* look for 'Negotiate ' in content, base64 code starts after it */
 	/* checks for other characteristic strings can be done here as well */
@@ -141,5 +142,4 @@ int main(int argc, char *argv[]) {
 
 	free(decoded.str);
 	free(content);
-	close(fd);
 }
