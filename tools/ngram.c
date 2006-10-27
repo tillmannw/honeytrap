@@ -32,6 +32,7 @@
 #include <ctype.h>
 #include <strings.h>
 #include <math.h>
+#include <sys/mman.h>
 
 #define max(a, b) ((a) > (b) ? a : b)
 
@@ -64,10 +65,10 @@ avl_tree avl_del_tree(avl_tree t) {
 }
 
 
-pos avl_find(ngram *x, avl_tree t, int n) {
+pos avl_find(const u_char *key, avl_tree t, int n) {
 	if (t == NULL) return(NULL);
-	if (memcmp(x->key, t->ng->key, n) < 0) return avl_find(x, t->left, n);
-	else if (memcmp(x->key, t->ng->key, n) > 0) return(avl_find(x, t->right, n));
+	if (memcmp(key, t->ng->key, n) < 0) return(avl_find(key, t->left, n));
+	if (memcmp(key, t->ng->key, n) > 0) return(avl_find(key, t->right, n));
 
 	return(t);
 }
@@ -121,7 +122,7 @@ static pos avl_double_rrot(pos k3) {
 }
 
 
-avl_tree avl_ins(ngram *x, avl_tree t, int n, int id) {
+avl_tree avl_ins(const u_char *key, avl_tree t, int n, int id) {
 	if (t == NULL) {
 		if (((t = malloc(sizeof(avl_node))) == NULL) ||
 		    ((t->ng = malloc(sizeof(ngram))) == NULL) ||
@@ -129,27 +130,26 @@ avl_tree avl_ins(ngram *x, avl_tree t, int n, int id) {
 			fprintf(stderr, "Could not allocate memory: %s.\n", strerror(errno));
 			exit(1);
 		} else {
-			memcpy(&(t->ng), &x, sizeof(ngram));
-			memcpy(t->ng->key, x->key, n);
+			memcpy(t->ng->key, key, n);
 			t->height = 0;
 			t->left = t->right = NULL;
 				
 			if (id == 0) t->ng->freq1 = 1;
 			else t->ng->freq2 = 1;
 		}
-	} else if (memcmp(x->key, t->ng->key, n) < 0) {
-		t->left = avl_ins(x, t->left, n, id);
+	} else if (memcmp(key, t->ng->key, n) < 0) {
+		t->left = avl_ins(key, t->left, n, id);
 		if (avl_height(t->left) - avl_height(t->right) == 2)
-			if (memcmp(x->key, t->left->ng->key, n) < 0) t = avl_single_lrot(t);
+			if (memcmp(key, t->left->ng->key, n) < 0) t = avl_single_lrot(t);
 			else t = avl_double_lrot(t);
-	} else if (memcmp(x->key, t->ng->key, n) > 0) {
-		t->right = avl_ins(x, t->right, n, id);
+	} else if (memcmp(key, t->ng->key, n) > 0) {
+		t->right = avl_ins(key, t->right, n, id);
 		if (avl_height(t->right) - avl_height(t->left) == 2)
-			if (memcmp(x->key, t->right->ng->key, n) > 0) t = avl_single_rrot(t);
+			if (memcmp(key, t->right->ng->key, n) > 0) t = avl_single_rrot(t);
 			else t = avl_double_rrot(t);
 	} else {
-		/* ngram already in tree, just update x's frequency */
-		t = avl_find(x, t, n);
+		/* ngram already in tree, just update key's frequency */
+		t = avl_find(key, t, n);
 		if (id == 0) t->ng->freq1++;
 		else t->ng->freq2++;
 	}
@@ -161,40 +161,26 @@ avl_tree avl_ins(ngram *x, avl_tree t, int n, int id) {
 
 avl_tree calc_ngrams(int n, const u_char *data1, const u_char *data2, ssize_t len1, ssize_t len2) {
 	int i, dim;
-	ngram *new;
+	u_char *key;
 	avl_tree ngtree;
 
-	new = NULL;
+	key = NULL;
 	dim = 0;
 
 	bzero(&ngtree, sizeof(avl_node));
 
-	/* process first data string */
-	for (i=0; i<=len1-n; i++) {
-		if (((new = malloc(sizeof(ngram))) == NULL) || ((new->key = malloc(n)) == NULL)) {
-			fprintf(stderr, "Could not allocate memory: %s.\n", strerror(errno));
-			exit(1);
-		}
-		new->freq1 = 0;
-		new->freq2 = 0;
-		memcpy(new->key, &data1[i], n);
-
-		ngtree = avl_ins(new, ngtree, n, 0);
+	if ((key = malloc(n)) == NULL) {
+		fprintf(stderr, "Unable to create ngram structure: %s.\n", strerror(errno));
+		exit(1);
 	}
+
+	/* process first data string */
+	for (i=0; i<=len1-n; ngtree = avl_ins(key = memcpy(key, &data1[i++], n), ngtree, n, 0));
 
 	/* process second data string */
-	for (i=0; i<=len2-n; i++) {
-		if (((new = malloc(sizeof(ngram))) == NULL) || ((new->key = malloc(n)) == NULL)) {
-			fprintf(stderr, "Could not allocate memory: %s.\n", strerror(errno));
-			exit(1);
-		}
-		new->freq1 = 0;
-		new->freq2 = 0;
-		memcpy(new->key, &data2[i], n);
+	for (i=0; i<=len2-n; ngtree = avl_ins(key = memcpy(key, &data2[i++], n), ngtree, n, 1));
 
-		ngtree = avl_ins(new, ngtree, n, 1);
-	}
-
+	free(key);
 	return(ngtree);
 }
 
@@ -219,13 +205,15 @@ int main(int argc, char *argv[]) {
 	float dotproduct, len1, len2, result;
 	avl_tree ngtree;
 
-	n = 0;
-	bytes_read = 0;
-	len1 = 0;
-	len2 = 0;
-	result = 0;
-	dotproduct = 0;
-	result = 0;
+	n		= 0;
+	len1		= 0;
+	len2		= 0;
+	result		= 0;
+	dotproduct	= 0;
+	result		= 0;
+	bytes_read	= 0;
+	content1	= NULL;
+	content2	= NULL;
 
 	if (argc < 4) {
 		fprintf(stdout, "Usage: %s n file1 file2\n", argv[0]);
@@ -234,48 +222,32 @@ int main(int argc, char *argv[]) {
 
 	if ((n = atoi(argv[1])) == 0) n = 3;
 
-	/* open file */
+
+	/* map first file */
 	if ((fd = open(argv[2], O_RDONLY)) == -1) {
 		fprintf(stderr, "Error - Unable to open file: %s.\n", strerror(errno));
 		exit(1);
 	}
-
-	/* get file size */
 	if (fstat(fd, &fs1) != 0) {
 		fprintf(stderr, "Error - Unable to get file size: %s.\n", strerror(errno));
 		exit(1);
 	}
 	if (fs1.st_size < 1) {
-		fprintf(stdout, "File is empty.\n");
+		fprintf(stdout, "File %s is empty.\n", argv[2]);
 		exit(0);
 	}
-
-	/* map file content into memory */
-	if ((content1 = (u_char *) malloc(fs1.st_size)) == NULL) {
-		fprintf(stderr, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+	if ((content1 = mmap(0, fs1.st_size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED) {
+		fprintf(stderr, "Error - Unable to map file into memory: %s.\n", strerror(errno));
 		exit(1);
-	}
-	bzero(content1, fs1.st_size);
-	bytes_read = 0;
-	if ((bytes_read = read(fd, content1+bytes_read, fs1.st_size)) < fs1.st_size) {
-		if (bytes_read  == -1) {
-			fprintf(stderr, "Error - Unable to map file into memory: %s.\n", strerror(errno));
-			exit(1);
-		}
-		if (bytes_read == 0) {
-			fprintf(stderr, "Error - EOF reached too early.\n");
-			exit(1);
-		}
 	}
 	close(fd);
 
-	/* open file */
+
+	/* map second file */
 	if ((fd = open(argv[3], O_RDONLY)) == -1) {
 		fprintf(stderr, "Error - Unable to open file: %s.\n", strerror(errno));
 		exit(1);
 	}
-
-	/* get file size */
 	if (fstat(fd, &fs2) != 0) {
 		fprintf(stderr, "Error - Unable to get file size: %s.\n", strerror(errno));
 		exit(1);
@@ -284,36 +256,21 @@ int main(int argc, char *argv[]) {
 		fprintf(stdout, "File is empty.\n");
 		exit(0);
 	}
-
-	/* map file content into memory */
-	if ((content2 = (u_char *) malloc(fs2.st_size)) == NULL) {
-		fprintf(stderr, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+	if ((content2 = mmap(0, fs2.st_size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED) {
+		fprintf(stderr, "Error - Unable to map file into memory: %s.\n", strerror(errno));
 		exit(1);
-	}
-	bzero(content2, fs2.st_size);
-	bytes_read = 0;
-	if ((bytes_read = read(fd, content2+bytes_read, fs2.st_size)) < fs2.st_size) {
-		if (bytes_read  == -1) {
-			fprintf(stderr, "Error - Unable to map file into memory: %s.\n", strerror(errno));
-			exit(1);
-		}
-		if (bytes_read == 0) {
-			fprintf(stderr, "Error - EOF reached too early.\n");
-			exit(1);
-		}
 	}
 	close(fd);
 
 
 	/* calculate ngrams */
-	fprintf(stdout, "Calculating ngrams.\n");
 	ngtree = calc_ngrams(n, content1, content2, fs1.st_size, fs2.st_size);
 
-	/* calculate similarity */
-	fprintf(stdout, "Calculating similarity.\n");
+	/* calculate vector lenghts and delete tree */ 
 	calc_lens(ngtree, &len1, &len2, &dotproduct);
 	avl_del_tree(ngtree);
 
+	/* calculate similarity */
 	len1 = sqrt(len1);
 	len2 = sqrt(len2);
 
@@ -322,8 +279,10 @@ int main(int argc, char *argv[]) {
 
 	fprintf(stdout, "Similarity: %.2f%%.\n", result);
 
-	free(content1);
-	free(content2);
+	if ((munmap(content1, fs1.st_size) != 0) || (munmap(content1, fs1.st_size) != 0)) {
+		fprintf(stderr, "Unmapping files failed: %s.\n", strerror(errno));
+		exit(1);
+	}
 	
 	return(0);
 }
