@@ -68,7 +68,7 @@ int start_ipq_mon(void) {
 	for (;;) {
 		process	= 1;
 		if ((status = ipq_read(h, buf, BUFSIZE, 0)) < 0) {
-			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+			logmsg(LOG_ERR, 1, "Error - Could not read queued packet.\n");
 			die(h);
 		}
 		switch (ipq_message_type(buf)) {
@@ -120,7 +120,6 @@ int start_ipq_mon(void) {
 					logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n",
 						dport, PROTO(ip->ip_p));
 					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
-			logmsg(LOG_DEBUG, 1, "Dynamic server process forked.\n");
 						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 						die(h);
 					}
@@ -134,7 +133,6 @@ int start_ipq_mon(void) {
 				start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 				sleep(1);	//dirty, but you don't want IPC as alternative
 				if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
-		logmsg(LOG_DEBUG, 1, "Dynamic server process forked.\n");
 					logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 					die(h);
 				}
