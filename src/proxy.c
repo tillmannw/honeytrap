@@ -24,11 +24,14 @@
 #include "logging.h"
 
 int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port, Attack *attack) {
-	int proxy_sock_fd, local_addr_len, flags;
+	int proxy_sock_fd, local_addr_len, flags, retval, error;
+	socklen_t len;
 	struct sockaddr_in proxy_socket, local_socket;
 	char *logstr=NULL, *Logstr=NULL, *logact=NULL, *logpre=NULL;
 	struct timeval timeout;
 	fd_set rfds, wfds;
+
+	error = 0;
 
 	if (attack == NULL) {
 		logmsg(LOG_ERR, 1, "Error - No attack record to fill.\n");
@@ -91,37 +94,59 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 			logmsg(LOG_DEBUG, 1, "%s %u\t  Non-blocking, short-timeout connect to %s:%d.\n",
 				logpre, l_port, inet_ntoa(ipaddr), port);
 			flags = fcntl(proxy_sock_fd, F_GETFL, 0);
+
 			if (fcntl(proxy_sock_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
 				fprintf(stderr, "Error in fcntl(): %s.\n", strerror(errno));
 				logmsg(LOG_ERR, 1, "%s %u\t  Error - Unable to set mirror socket to non-blocking: %s.\n",
 						logpre, l_port, strerror(errno));
 				return(-1);
 			}
-
-			if (connect(proxy_sock_fd, (struct sockaddr *) &proxy_socket, sizeof(proxy_socket)) != 0) {
+			
+			errno = 0;
+			if ((retval = connect(proxy_sock_fd, (struct sockaddr *) &proxy_socket, sizeof(proxy_socket))) <0) {
 				if (errno != EINPROGRESS) {
 					logmsg(LOG_DEBUG, 1,
 						"%s %u\t  Error - Unable to establish mirror connection to %s:%d.\n",
 						logpre, l_port, inet_ntoa(ipaddr), port);
 					return(-1);
 				}
-
+			}
+			
+			if (retval != 0) {
 				FD_ZERO(&rfds);
 				FD_SET(proxy_sock_fd, &rfds);
 				wfds = rfds;
-				timeout.tv_sec = 10;
+				timeout.tv_sec = 3;
 				timeout.tv_usec = 0;
 				if (select(proxy_sock_fd+1, &rfds, &wfds, NULL, &timeout) == -1) {
+					close(proxy_sock_fd);
+					errno = ETIMEDOUT;
 					logmsg(LOG_ERR, 1, "%s %u\t  Error - select() call failed: %s \n",
 						logpre, l_port, strerror(errno));
 					return(-1);
 				}
-				if (!(FD_ISSET(proxy_sock_fd, &rfds) || FD_ISSET(proxy_sock_fd, &wfds))) {
-					logmsg(LOG_DEBUG, 1, "%s %u\t  Error - Mirror connection to %s:%d timed out.\n",
-						logpre, l_port, inet_ntoa(ipaddr), port);
+				if (FD_ISSET(proxy_sock_fd, &rfds) || FD_ISSET(proxy_sock_fd, &wfds)) {
+					len = sizeof(error);
+					if (getsockopt(proxy_sock_fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+						logmsg(LOG_DEBUG, 1,
+							"%s %u\t  Error - Mirror connection to %s:%d timed out.\n",
+							logpre, l_port, inet_ntoa(ipaddr), port);
+						return(-1);
+					}
+				} else {
+					close(proxy_sock_fd);
+					logmsg(LOG_DEBUG, 1, "Error - Unable to establish mirror connection: %s.\n",
+						strerror(ETIMEDOUT));
 					return(-1);
 				}
-				fcntl(proxy_sock_fd, F_SETFL, flags);
+
+			}
+			fcntl(proxy_sock_fd, F_SETFL, flags);
+			if (error) {
+				close(proxy_sock_fd);
+					logmsg(LOG_DEBUG, 1, "Error - Unable to establish mirror connection: %s.\n",
+						strerror(error));
+				return(-1);
 			}
 		}
 		

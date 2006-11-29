@@ -25,11 +25,14 @@
 #include "ctrl.h"
 #include "ipqmon.h"
 
-// BUFSIZE >= 256 seem to work for new tcp connections
-#define BUFSIZE 256
+/* Set BUFSIZE to 1500 (ethernet frame size) to prevent
+ * errors with ipq_read due to truncated messages.
+ * This is only necessary for UDP. A buffer size of
+ * 256 seems to be enough to hanlde TCP when there is
+ * no data on the SYNs */
+#define BUFSIZE 1500
 
 static void die(struct ipq_handle *h) {
-	unsigned char buf[BUFSIZE];
 	logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
 	ipq_destroy_handle(h);
 	clean_exit(0);
@@ -73,9 +76,9 @@ int start_ipq_mon(void) {
 		}
 		switch (ipq_message_type(buf)) {
 			case NLMSG_ERROR:
-				logmsg(LOG_ERR, 1, "IPQ Error - Error message received: %s\n",
-					ipq_get_msgerr(buf));
-				break;
+				logmsg(LOG_ERR, 1, "IPQ Error: %s\n", strerror(ipq_get_msgerr(buf)));
+				ipq_destroy_handle(h);
+				clean_exit(0);
 			case IPQM_PACKET:
 				packet	= ipq_get_packet(buf);
 				ip	= (struct ip_header*) packet->payload;

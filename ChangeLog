@@ -1,6 +1,12 @@
 Version 0.6.4
 - PoC plugin for locality sensitive hashing
 - Fixed a segfault in the bpf filter string assembling routine
+- Failed mirror connections did not fall back to normal mode sometimes.
+  This was due to wrong return value handling for a non-blocking
+  connect() and is fixed now.
+- The dynamic server code was redesigned.
+- UDP support added (still not complete, currently only available
+  when using the ipq connection monitor).  
 Version 0.6.3.1
 - The FTP download plugin supports explicit binding of data connections
   to ip addresses or hostnames to work on NAT'ed hosts

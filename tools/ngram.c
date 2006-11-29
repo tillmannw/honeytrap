@@ -274,8 +274,7 @@ int main(int argc, char *argv[]) {
 	len1 = sqrt(len1);
 	len2 = sqrt(len2);
 
-	if (isnan(result = 100-(100*acos(dotproduct/(len1*len2))/1.5707963)))
-		result = 100;
+	if (isnan(result = 100-(100*acos(dotproduct/(len1*len2))/1.5707963))) result = 100;
 
 	fprintf(stdout, "Similarity: %.2f%%.\n", result);
 

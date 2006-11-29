@@ -156,7 +156,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			mirror_this = 0;
 			proxy_this = 0;
 		    } else if (port_flags[ntohs(port_l)] & PORTCONF_PROXY) {
-			/* get proxy server for port */
+			/* get proxy server address for port */
 			logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection in proxy mode.\n", (uint16_t) ntohs(port_l));
 			proxy_dst = proxy_dest;
 			while (proxy_dst) {
@@ -164,7 +164,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			    proxy_dst = proxy_dst->next;
 			}
 			if (proxy_dst->attack_port == ntohs(port_l)) {
-				/* try establish proxy connection to server */
+				/* try to establish proxy connection to server */
                             if ((proxy_addr = gethostbyname(proxy_dst->d_addr)) == NULL) {
                                 logmsg(LOG_ERR, 1, "   %u\t  Error - Unable to resolve proxy host %s.\n",
 				    (uint16_t) ntohs(port_l), proxy_dst->d_addr);
