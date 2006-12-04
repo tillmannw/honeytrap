@@ -17,6 +17,7 @@
 #ifdef USE_IPQ_MON
 
 #include <libipq.h>
+#include <linux/netfilter.h>
 
 struct ipq_handle *h;
 ipq_packet_msg_t *packet;

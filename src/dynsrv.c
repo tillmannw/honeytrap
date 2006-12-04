@@ -37,9 +37,6 @@
 #include "udp.h"
 #include "attack.h"
 
-#ifdef USE_IPQ_MON
-#include <linux/netfilter.h>
-#endif
 
 u_char buffer[BUFSIZ], *attack_string;
 
@@ -134,7 +131,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	    logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 	    logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
 	    ipq_destroy_handle(h);
-	    clean_exit(0);
+	    exit(1);
 	}
 
 	/* don't need root privs any more */

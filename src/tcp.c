@@ -26,11 +26,19 @@
 
 #include "honeytrap.h"
 #include "logging.h"
+#include "ipqmon.h"
 #include "tcp.h"
+
+#ifdef USE_IPQ_MON
+#include <linux/netfilter.h>
+#endif
 
 
 int tcpsock(struct sockaddr_in *server_addr, uint16_t port) {
 	int fd, sockopt;
+#ifdef USE_IPQ_MON
+	int status;
+#endif
 
 	if (!(fd = socket(AF_INET, SOCK_STREAM, 0))) {
 	    logmsg(LOG_ERR, 1, "Error - Could not create tcp socket: %s\n", strerror(errno));
@@ -46,8 +54,15 @@ int tcpsock(struct sockaddr_in *server_addr, uint16_t port) {
 	server_addr->sin_addr.s_addr	= htonl(INADDR_ANY);
 	server_addr->sin_port		= port;
 	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) < 0) {
+	/* we already got one server process */
 #ifdef USE_IPQ_MON
-	    /* we already got one server process, simply return */
+	    /* hand packet processing back to the kernel */
+	    if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+		logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+		logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
+		ipq_destroy_handle(h);
+		exit(1);
+	    }
 	    return(-1);
 #else
 	    if (errno != 98)
