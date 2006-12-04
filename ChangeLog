@@ -1,5 +1,7 @@
 Version 0.6.4
 - PoC plugin for locality sensitive hashing
+- Clean solution for giving packet control back to the kernel
+  when using the ip_queue connection monitor
 - Fixed a segfault in the bpf filter string assembling routine
 - Failed mirror connections did not fall back to normal mode sometimes.
   This was due to wrong return value handling for a non-blocking

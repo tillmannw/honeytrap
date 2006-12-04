@@ -42,8 +42,6 @@ int start_ipq_mon(void) {
 	int status, process;
 	uint16_t sport, dport;
 	unsigned char buf[BUFSIZE];
-	ipq_packet_msg_t *packet;
-	struct ipq_handle *h;
 	struct ip_header *ip;
 	struct tcp_header *tcp;
 	struct udp_header *udp;
@@ -134,11 +132,6 @@ int start_ipq_mon(void) {
 
 				logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
 				start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
-				sleep(1);	//dirty, but you don't want IPC as alternative
-				if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
-					logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
-					die(h);
-				}
 				break;
 			default:
 				logmsg(LOG_DEBUG, 1, "IPQ Warning - Unknown message type.\n");

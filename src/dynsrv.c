@@ -24,6 +24,7 @@
 #include <netdb.h>
 #include <string.h>
 
+#include "ctrl.h"
 #include "honeytrap.h"
 #include "logging.h"
 #include "dynsrv.h"
@@ -35,6 +36,10 @@
 #include "tcp.h"
 #include "udp.h"
 #include "attack.h"
+
+#ifdef USE_IPQ_MON
+#include <linux/netfilter.h>
+#endif
 
 u_char buffer[BUFSIZ], *attack_string;
 
@@ -56,6 +61,9 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
     pid_t pid;
     int listen_fd, mirror_sock_fd, proxy_sock_fd, connection_fd, disconnect,
 	total_bytes, select_return, mirror_this, proxy_this, established;
+#ifdef USE_IPQ_MON
+    int status;
+#endif
     socklen_t client_addr_len;
     struct sockaddr_in client_addr, server_addr;
     struct timeval c_timeout;
@@ -105,9 +113,11 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		exit(0);
 	}
 
+#ifndef USE_IPQ_MON
 	/* don't need root privs any more */
 	drop_privileges(); 
 	logmsg(LOG_DEBUG, 1, "Server is now running with user id %d and group id %d.\n", getuid(), getgid());
+#endif
 
 	/* create listener when handling tcp connection request */
 	/* a backlog queue size of 10 should give us enough time to fork */
@@ -118,6 +128,19 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	}
 	logmsg(LOG_DEBUG, 1, "Listening on port %u/%s.\n", ntohs(port_l), PROTO(proto));
 
+#ifdef USE_IPQ_MON
+	/* hand packet processing back to the kernel */
+	if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+	    logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+	    logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
+	    ipq_destroy_handle(h);
+	    clean_exit(0);
+	}
+
+	/* don't need root privs any more */
+	drop_privileges(); 
+	logmsg(LOG_DEBUG, 1, "Server is now running with user id %d and group id %d.\n", getuid(), getgid());
+#endif
 		  
 	/* wait for incoming connections */
 	for (;;) {
@@ -265,7 +288,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		    if (established) {
 			/* connection successful established, fork handler process */
 					
-			logmsg(LOG_NOTICE, 1, "   %u\t  Connection from %s:%u established.\n",
+			logmsg(LOG_NOTICE, 1, "   %u\t  Connection from %s:%u accepted.\n",
 				(uint16_t) ntohs(port_l), inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 			attack->a_conn.r_port	= ntohs(client_addr.sin_port);
 			

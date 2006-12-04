@@ -16,6 +16,11 @@
 
 #ifdef USE_IPQ_MON
 
+#include <libipq.h>
+
+struct ipq_handle *h;
+ipq_packet_msg_t *packet;
+
 int start_ipq_mon(void);
 
 #endif
