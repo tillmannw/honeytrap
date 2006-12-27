@@ -34,6 +34,9 @@
 #define PORTCONF_MIRROR	4
 #define PORTCONF_PROXY	8
 
+#define TCP 	6
+#define UDP	17
+
 char *conffile_name, **arg_v;
 int arg_c;
 
@@ -68,7 +71,12 @@ struct s_proxy_dest {
 };
 
 /* explicit port configurations */
-uint8_t port_flags[0x10000];
+typedef struct sport_flag {
+	u_int8_t tcp;
+	u_int8_t udp;
+} port_flag;
+
+port_flag port_flags[0x10000];
 struct s_proxy_dest *proxy_dest;
 
 // end of global config variables
@@ -79,7 +87,7 @@ char *bpf_filter_string;
 bpf_u_int32 mask;
 bpf_u_int32 net;
 
-pcap_t *tcp_sniffer, *udp_sniffer;
+pcap_t *packet_sniffer;
 struct in_addr this_host;
 pid_t parent_pid;
 u_char pcap_offset;

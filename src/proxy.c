@@ -23,8 +23,8 @@
 #include "proxy.h"
 #include "logging.h"
 
-int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port, Attack *attack) {
-	int proxy_sock_fd, local_addr_len, flags, retval, error;
+int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port, uint16_t proto, Attack *attack) {
+	int proxy_sock_fd, local_addr_len, flags, retval, error, sock_type;
 	socklen_t len;
 	struct sockaddr_in proxy_socket, local_socket;
 	char *logstr=NULL, *Logstr=NULL, *logact=NULL, *logpre=NULL;
@@ -32,6 +32,7 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 	fd_set rfds, wfds;
 
 	error = 0;
+	sock_type = 0;
 
 	if (attack == NULL) {
 		logmsg(LOG_ERR, 1, "Error - No attack record to fill.\n");
@@ -64,7 +65,14 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 	/* prepare client socket */
 
 	logmsg(LOG_DEBUG, 1, "%s %u\t  Creating client socket for %s connection.\n", logpre, l_port, logact);
-	if (!(proxy_sock_fd = socket(AF_INET, SOCK_STREAM, 0))) { 
+	if (proto == TCP) sock_type = SOCK_STREAM;
+	else if (proto == UDP) sock_type = SOCK_DGRAM;
+	else {
+		logmsg(LOG_ERR, 1, "%s %u\t  Error - Protocol %d is not supported.\n",
+			logpre, port, sock_type);
+		return(-1);
+	}	
+	if (!(proxy_sock_fd = socket(AF_INET, sock_type, 0))) { 
 		logmsg(LOG_ERR, 1, "%s %u\t  Error - Unable to create client socket for %s connection.\n",
 			logpre, port, logact);
 		return(-1);
@@ -90,6 +98,7 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 				return(-1);
 			}
 		} else if (mode == PORTCONF_MIRROR) {
+	if (proto == TCP) {
 			/* non-blocking connect() with short timeout to prevent simultane connection timeouts */
 			logmsg(LOG_DEBUG, 1, "%s %u\t  Non-blocking, short-timeout connect to %s:%d.\n",
 				logpre, l_port, inet_ntoa(ipaddr), port);
@@ -148,6 +157,18 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 						strerror(error));
 				return(-1);
 			}
+	} else if (proto == UDP) {
+fprintf(stdout, "---> connecting.\n");
+			if ((retval = connect(proxy_sock_fd, (struct sockaddr *) &proxy_socket, sizeof(proxy_socket))) <0) {
+				if (errno != EINPROGRESS) {
+					logmsg(LOG_DEBUG, 1,
+						"%s %u\t  Error - Unable to establish mirror connection to %s:%d.\n",
+						logpre, l_port, inet_ntoa(ipaddr), port);
+					return(-1);
+				}
+			}
+fprintf(stdout, "---> connected.\n");
+	}
 		}
 		
 		local_addr_len = 0;
@@ -161,5 +182,8 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 		attack->p_conn.l_port	= local_socket.sin_port;
 		attack->p_conn.r_port	= proxy_socket.sin_port;
 	}
+//fprintf(stdout, "---> writing test pattern.\n");
+//write(proxy_sock_fd, "back\n", 5);
+//fprintf(stdout, "---> done.\n");
 	return(proxy_sock_fd);
 }

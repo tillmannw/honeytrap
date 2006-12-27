@@ -1,8 +1,10 @@
 # honeytrap configuration file
 # Explicit configuration for some tcp ports
 #
-# the syntax is 'port = portnum,mode[,host,port]'
-# e.g. 'port = 80,mirror'
+# the syntax is 'port = portnum/protocol: mode[,host,port]'
+# e.g. 'port = 80/tcp: mirror'
+#
+# protocol must either be tcp or udp
 #
 # possible values for mode are:
 # ignore:	ignore connection requests on this port
@@ -11,11 +13,13 @@
 # proxy:	always handle connections on this port in proxy mod
 #
 # 'proxy' takes the arguments 'host,port' where port is optional
-# e.g. 'port = 80,proxy,example.com:8000
+# e.g. 'port = 80/tcp: proxy,example.com:8000
 # if no port argument is given, the attacked port is used.
+# the proxy destination port does not support protocol changes
 #
 
-#port = 21,normal
-#port = 22,ignore
-#port = 25,mirror
-#port = 80,proxy,example.com:8000
+#port = 21/tcp: normal
+#port = 22/tcp: ignore
+#port = 25/tcp: mirror
+#port = 53/udp: ignore
+#port = 80/tcp: proxy,example.com:8000

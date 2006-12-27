@@ -25,6 +25,7 @@
 
 #include <logging.h>
 #include <honeytrap.h>
+#include <attack.h>
 #include <plughook.h>
 
 #include "htm_aSaveFile.h"
@@ -49,7 +50,7 @@ void plugin_register_hooks(void) {
 int save_to_file(Attack *attack) {
 	struct tm *file_time;
 	time_t loc_time;
-	char *filename;
+	char *filename = NULL, *proto_str = NULL;
 	int dumpfile_fd;
 
 	logmsg(LOG_DEBUG, 1, "Dumping attack string into file.\n");
@@ -61,7 +62,14 @@ int save_to_file(Attack *attack) {
 	}
 
 	/* create filename */
-	if ((filename = (char *) malloc(strlen(attacks_dir)+34)) == NULL) {
+	if (attack->a_conn.protocol == TCP) proto_str = strdup("tcp");
+	else if (attack->a_conn.protocol == UDP) proto_str = strdup("udp");
+	else {
+		logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", attack->a_conn.protocol);
+		return(-1);
+	}
+
+	if ((filename = (char *) malloc(strlen(attacks_dir) + strlen(proto_str) + 34)) == NULL) {
 		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s\n", strerror(errno));
 		return(-1);
 	}
@@ -71,9 +79,9 @@ int save_to_file(Attack *attack) {
 	loc_time = time(NULL);
 	if((file_time = localtime(&loc_time)) == NULL) {
 		logmsg(LOG_WARN, 1, "Warning - Unable to get local time for filename.\n");
-		sprintf(filename, "%s/from_port_%u_%u", attacks_dir, attack->a_conn.l_port, getpid());
+		sprintf(filename, "%s/from_port_%u-%s_%u", attacks_dir, attack->a_conn.l_port, proto_str, getpid());
 	} else {
-		sprintf(filename, "%s/from_port_%u_%u-%04d-%02d-%02d", attacks_dir, attack->a_conn.l_port,
+		sprintf(filename, "%s/from_port_%u-%s_%u_%04d-%02d-%02d", attacks_dir, attack->a_conn.l_port, proto_str,
 			getpid(), file_time->tm_year+1900, file_time->tm_mon+1, file_time->tm_mday);
 	}
 

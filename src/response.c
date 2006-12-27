@@ -30,6 +30,7 @@
 
 #include "response.h"
 #include "honeytrap.h"
+#include "ip.h"
 #include "logging.h"
 
 
@@ -45,7 +46,7 @@ void unload_default_responses(void) {
 	return;
 }
 
-int prepare_default_response(char *filename, uint16_t port) {
+int prepare_default_response(char *filename, uint16_t port, uint16_t proto) {
 	int answer_fd, ccopy;
         u_char buffer[100];
 	FILE* answer_file = NULL;
@@ -57,6 +58,7 @@ int prepare_default_response(char *filename, uint16_t port) {
 		return(-1);
 	} else {
 		new_response->port	= port;
+		new_response->proto	= proto;
 		new_response->size	= 0;
 		new_response->response	= NULL;
 		new_response->next	= NULL;
@@ -71,7 +73,11 @@ int prepare_default_response(char *filename, uint16_t port) {
 
 
 	/* read response */
-	fprintf(stdout, "  Loading default response for port %u/tcp.\n", port);
+	if ((proto != TCP) && (proto != UDP)) {
+		fprintf(stderr, "  Error - Protocol %u is not supported.\n", proto);
+		return(-1);
+	}
+	DEBUG_FPRINTF(stdout, "  Loading default response for port %u/%s.\n", port, PROTO(proto));
 	if (((answer_fd = open(filename, O_NOCTTY | O_RDONLY, 0640)) == -1) || (!(answer_file = fopen(filename, "rb")))) {
 		DEBUG_FPRINTF(stdout, "  Warning - Unable to open file '%s'\n", filename);
 	} else {
@@ -79,7 +85,8 @@ int prepare_default_response(char *filename, uint16_t port) {
 		while((ccopy = fread(buffer, 1, 100, answer_file))) {
 			if (!(new_response->response =
 				(u_char *) realloc(new_response->response, new_response->size + ccopy))) {
-				fprintf(stderr, "  Error - Not enough memory for %u/tcp response string.", port);
+				fprintf(stderr, "  Error - Not enough memory for %u/%s response string.",
+					port, PROTO(proto));
 				return(-1);
 			} else {
 				memcpy(new_response->response + new_response->size, buffer, ccopy);
@@ -87,7 +94,8 @@ int prepare_default_response(char *filename, uint16_t port) {
 			}
 		}
 		if (new_response->size != 0) {
-			DEBUG_FPRINTF(stdout, "  Default response string for port %u/tcp successfully loaded.\n", port);
+			DEBUG_FPRINTF(stdout, "  Default response string for port %u/%s successfully loaded.\n",
+				port, PROTO(proto));
 		} else DEBUG_FPRINTF(stdout, "  Warning - Default response file '%s' is empty.\n", filename);
 	}
 	fclose(answer_file);
@@ -118,7 +126,7 @@ int load_default_responses(char *dir) {
 		return(-1);
 	} else while(n--) {
 		stat(namelist[n]->d_name, &statbuf);
-		if (fnmatch("*_tcp", namelist[n]->d_name, 0) == 0) {
+		if ((fnmatch("*_tcp", namelist[n]->d_name, 0) == 0) || (fnmatch("*_udp", namelist[n]->d_name, 0) == 0)) {
 			/* found a default response file */
 			if ((full_path = (char *) malloc(strlen(dir) + strlen(namelist[n]->d_name) + 2)) == NULL) {
 				fprintf(stderr, "  Error - Unable to allocate memory: %s\n", strerror(errno));
@@ -127,7 +135,10 @@ int load_default_responses(char *dir) {
 			snprintf(full_path, strlen(dir)+strlen(namelist[n]->d_name)+2, "%s/%s", dir, namelist[n]->d_name);
 			DEBUG_FPRINTF(stdout, "  Response file found: %s\n", full_path);
 			port = atoi(namelist[n]->d_name);
-			prepare_default_response(full_path, port);
+			if (fnmatch("*_tcp", namelist[n]->d_name, 0) == 0)
+				prepare_default_response(full_path, port, TCP);
+			else if (fnmatch("*_udp", namelist[n]->d_name, 0) == 0)
+				prepare_default_response(full_path, port, UDP);
 		}
 		free(namelist[n]);
 	}
@@ -137,16 +148,22 @@ int load_default_responses(char *dir) {
 }
 
 
-int send_default_response(int connection_fd, uint16_t port, u_char timeout) {
+int send_default_response(int connection_fd, uint16_t port, uint16_t proto, u_char timeout) {
 	struct default_resp *cur_response;
 
-	logmsg(LOG_DEBUG, 1, "Searching for default response for port %u/tcp.\n", port);
+	if ((proto != TCP) && (proto != UDP)) {
+		fprintf(stderr, "  Error - Protocol %u is not supported.\n", proto);
+		return(-1);
+	}
+
+	logmsg(LOG_DEBUG, 1, "Searching for default response for port %u/%s.\n", port, PROTO(proto));
 	
 	/* advance through list to find response for port */
 	cur_response = default_response;
-	while(cur_response && (cur_response->port != port)) cur_response = cur_response->next;
+	while(cur_response && (cur_response->port != port) && (cur_response->proto != proto))
+		cur_response = cur_response->next;
 	
-	if (cur_response && (cur_response->port == port)) {
+	if (cur_response && (cur_response->port == port) && (cur_response->proto == proto)) {
 		/* default response for port found */
 		logmsg(LOG_NOISY, 1, "   %u\t  No data for %u second(s), sending default response.\n",
 			port, (u_char) timeout);

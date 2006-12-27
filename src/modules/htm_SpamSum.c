@@ -125,10 +125,10 @@ int calc_spamsum(Attack *attack) {
 			fclose(hashfile);
 			return(0);
 		}
-		logmsg(LOG_NOISY, 1, "MD5 hash appended to signature file.\n");
+		logmsg(LOG_INFO, 1, "MD5 hash appended to signature file.\n");
 		fclose(hashfile);
 	} else {
-		logmsg(LOG_NOISY, 1, "Found an exact MD5 hash match.\n");
+		logmsg(LOG_INFO, 1, "Found an exact MD5 hash match.\n");
 		return(1);
 	}
 
@@ -164,7 +164,7 @@ int calc_spamsum(Attack *attack) {
 	/* sum is not in signature file, append it */
 	if (sig_match == 0) {
 		score = spamsum_match_db("/tmp/spamsum.sigs", sum, threshold);
-		logmsg(LOG_NOISY, 1, "Spamsum match score is %u.\n", score);
+		logmsg(LOG_INFO, 1, "Spamsum match score is %u.\n", score);
 
 		if ((sigfile = fopen("/tmp/spamsum.sigs", "a")) == NULL) {
 			logmsg(LOG_ERR, 1, "Error - Could not open spamsum signature file: %s.\n", strerror(errno));

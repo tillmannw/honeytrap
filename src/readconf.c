@@ -49,7 +49,10 @@ void *get_value(char *buf, const char delim) {
 	 * skip following whitespaces and return pointer to the found value
 	 * return NULL if delimiter is not found */
 
-	char *index, *retval = NULL;
+	char *retval = NULL;
+	int i;
+
+	if (buf == NULL) return(NULL);
 
 	/* search for delimiter */
 	if ((retval = strchr(buf, delim)) == NULL) return(NULL);
@@ -57,17 +60,15 @@ void *get_value(char *buf, const char delim) {
 	/* overwrite delimiter to terminate keyword */
 	retval[0] = '\0';
 	retval++;
-	index = buf;
-	/* cut trailing blanks */
-	while (!isspace((int) *index) && strlen(index)) index++;
-	index[0] = '\0';
 
-	/* strip leading whitespaces */
+	/* cut trailing blanks from key */
+	for (i=strlen(buf)-1; i>0 && isspace((int) buf[i]); buf[i--] = '\0');
+
+	/* strip leading whitespaces from value */
 	while (isspace((int) *retval)) retval++;
-	/* cut trailing blanks */
-	index = retval;
-	while (!isspace((int) *index) && strlen(index)) index++;
-	index[0] = '\0';
+
+	/* cut trailing whitespaces from value */
+	for (i=strlen(retval)-1; i>0 && isspace((int) retval[i]); retval[i--] = '\0');
 
 	return(retval);
 }
@@ -92,7 +93,7 @@ int configure(int my_argc, char *my_argv[]) {
 #endif
 
 	/* initialize port flags array with zeros */
-	bzero(port_flags, 0x10000); 
+	memset(port_flags, 0, sizeof(port_flags)); 
 
 
 	/* scan command line options to determine logging level or print version number or usage */
@@ -263,6 +264,7 @@ int configure(int my_argc, char *my_argv[]) {
 
 	/* load default responses */
 	if (response_dir) {
+		fprintf(stdout, "  Loading default responses.\n");
 		if (load_default_responses(response_dir) == -1)
 			fprintf(stdout, "  Warning - Unable to load default responses.\n");
 	}
@@ -367,7 +369,7 @@ int parse_config_file(const char *filename) {
 		if ((config_val = get_value(recvline, '=')) == NULL) {
 			if ((config_opt)[strlen(config_opt)-1] == '\n') config_opt[strlen(config_opt)-1] = 0;
 		}
-		if (process_config_option(config_opt, config_val) == -1) {
+		if (process_config_option(config_opt, config_val, line_number, filename) == -1) {
 			fprintf(stderr, "  Error - Invalid line %u in file %s.\n", line_number, filename); 
 			return(-1);
 		}
@@ -382,15 +384,17 @@ int parse_config_file(const char *filename) {
 	return(0);
 }
 
-int process_config_option(char *opt, char* val) {
-	char *index, *low_opt, *portnum, *portconf, *d_addr, *port_str;
+int process_config_option(char *opt, char* val, const int line_number, const char *filename) {
+	char *index, *low_opt, *portnum, *portconf, *proto, *d_addr, *port_str;
 	struct passwd *pwd_entry;
 	struct group *grp_entry;
 	uint16_t d_port;
 	struct s_proxy_dest *pd_tmp, *pd_new;
+	int i;
 
 	portnum		= NULL;
 	portconf	= NULL;
+	proto		= NULL;
 	low_opt		= NULL;
 	d_addr		= NULL;
 	d_port		= 0;
@@ -457,8 +461,9 @@ int process_config_option(char *opt, char* val) {
 		DEBUG_FPRINTF(stdout, "  Using '%s' as bind address for FTP data connections (needs a module).\n", val);
 	} else if (OPT_IS("user")) {
 		if ((pwd_entry = getpwnam(val)) == NULL) {
-			if (errno) fprintf(stderr, "  Invalid user in configuration file: %s\n", strerror(errno));
-			else fprintf(stderr, "  User %s not found.\n", val);
+			if (errno) fprintf(stderr, "  Invalid user (%s line %u): %s\n",
+				filename, line_number, strerror(errno));
+			else fprintf(stderr, "  User %s not found (%s line %u).\n", val, filename, line_number);
 			exit(0);
 		} else {
 			u_id = pwd_entry->pw_uid;
@@ -466,32 +471,71 @@ int process_config_option(char *opt, char* val) {
 		}
 	} else if (OPT_IS("group")) {
 		if ((grp_entry = getgrnam(val)) == NULL) {
-			if (errno) fprintf(stderr, "  Invalid group in configuration file: %s\n", strerror(errno));
-			else fprintf(stderr, "  Group %s not found.\n", val);
+			if (errno) fprintf(stderr, "  Invalid group (%s line %u): %s\n",
+				filename, line_number, strerror(errno));
+			else fprintf(stderr, "  Group %s not found (%s line %u).\n", val, filename, line_number);
 			exit(0);
 		} else {
 			g_id = grp_entry->gr_gid;
 			group = strdup(val);
 		}
 	} else if (OPT_IS("port")) {
-		if ((portconf = get_value(val, ',')) != NULL) {
+		for (i=0; i<strlen(val); i++) val[i] = tolower(val[i]);
+		if ((((portconf = get_value(val, ':')) != NULL)) &&
+			((proto = get_value(val, '/')) != NULL)) {
 			if (strcmp(portconf, "normal") == 0) {
-				port_flags[atoi(val)] = PORTCONF_NORMAL;
-				fprintf(stdout, "  Connections to port %u/tcp will be handled in normal mode.\n",atoi(val));
+				if (strncmp(proto, "tcp", strlen(proto)) == NULL)
+					port_flags[atoi(val)].tcp = PORTCONF_NORMAL;
+				else if (strncmp(proto, "udp", strlen(proto)) == NULL)
+					port_flags[atoi(val)].udp = PORTCONF_NORMAL;
+				else {
+					fprintf(stderr, "  Protocol '%s' not supported (%s line %u.\n",
+						proto, filename, line_number);
+					exit(0);
+				}
+				fprintf(stdout, "  Connections to port %u/%s will be handled in normal mode.\n",
+					atoi(val), proto);
 			} else if (strcmp(portconf, "ignore") == 0) {
-				port_flags[atoi(val)] = PORTCONF_IGNORE;
-				fprintf(stdout, "  Connections to port %u/tcp will be ignored.\n", atoi(val));
+				if (strncmp(proto, "tcp", strlen(proto)) == NULL) {
+					port_flags[atoi(val)].tcp = PORTCONF_IGNORE;
+					port_flags[atoi(val)].tcp = PORTCONF_IGNORE;
+				} else if (strncmp(proto, "udp", strlen(proto)) == NULL) {
+					port_flags[atoi(val)].udp = PORTCONF_IGNORE;
+				} else {
+					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
+						proto, filename, line_number);
+					exit(0);
+				}
+				fprintf(stdout, "  Connections to port %u/%s will be ignored.\n", atoi(val), proto);
+				return(0);
 			} else if (strcmp(portconf, "mirror") == 0) {
-				port_flags[atoi(val)] = PORTCONF_MIRROR;
-				fprintf(stdout, "  Connections to port %u/tcp will be handled in mirror mode.\n",atoi(val));
+				if (strncmp(proto, "tcp", strlen(proto)) == NULL)
+					port_flags[atoi(val)].tcp = PORTCONF_MIRROR;
+				else if (strncmp(proto, "udp", strlen(proto)) == NULL)
+					port_flags[atoi(val)].udp = PORTCONF_MIRROR;
+				else {
+					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
+						proto, filename, line_number);
+					exit(0);
+				}
+				fprintf(stdout, "  Connections to port %u/%s will be handled in mirror mode.\n",
+					atoi(val), proto);
 			} else if (strncmp(portconf, "proxy", 5) == 0) {
-				port_flags[atoi(val)] = PORTCONF_PROXY;
+				if (strncmp(proto, "tcp", strlen(proto)) == NULL)
+					port_flags[atoi(val)].tcp = PORTCONF_PROXY;
+				else if (strncmp(proto, "udp", strlen(proto)) == NULL)
+					port_flags[atoi(val)].udp = PORTCONF_PROXY;
+				else {
+					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
+						proto, filename, line_number);
+					exit(0);
+				}
 				if ((d_addr = get_value(portconf, ',')) != NULL) {
 					if ((port_str = get_value(d_addr, ':')) != NULL)
 						d_port = atoi(port_str);
 					else d_port = atoi(val);
 				} else {
-					fprintf(stderr, "  Invalid port configuration, no proxy destination found.\n");
+					fprintf(stderr, "  Invalid port configuration, no proxy destination found (%s line %u).\n", filename, line_number);
 					exit(0);
 				}
 
@@ -513,17 +557,17 @@ int process_config_option(char *opt, char* val) {
 				pd_new->d_addr		= strdup(d_addr);
 				pd_new->d_port		= d_port;
 
-				fprintf(stdout, "  Connections to port %u/tcp will be handled in 'proxy' mode (to %s:%u/tcp).\n", pd_new->attack_port, pd_new->d_addr, pd_new->d_port);
+				fprintf(stdout, "  Connections to port %u/%s will be handled in 'proxy' mode (to %s:%u/%s).\n", pd_new->attack_port, proto, pd_new->d_addr, pd_new->d_port, proto);
 			} else {
-				fprintf(stderr, "  Invalid port configuration.\n");
+				fprintf(stderr, "  Invalid port configuration (%s line %u).\n", filename, line_number);
 				exit(0);
 			}
 		} else {
-			fprintf(stderr, "  Invalid port configuration.\n");
+			fprintf(stderr, "  Invalid port configuration, must have format \"port = num/protocol: action\" (%s line %u).\n", filename, line_number);
 			exit(0);
 		}
 	} else {
-		fprintf(stderr, "  Error - Invalid keyword '%s' in configuration file.\n", opt);
+		fprintf(stderr, "  Error - Invalid keyword '%s' (%s line %u).\n", opt, filename, line_number);
 		return(-1);
 	}
 

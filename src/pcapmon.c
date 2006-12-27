@@ -39,33 +39,87 @@
 #include "ctrl.h"
 
 
-void tcp_server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_char * packet) {
-	ip = (struct ip_header *) (packet + pcap_offset);
-	tcp = (struct tcp_header *) (packet + pcap_offset + ip->ip_hl * 4);
+u_char *icmp_dissect(const u_char *packet) {
+	struct ip_header *ip, *icmp_data;
+	u_char *icmp;
+	u_int32_t len;
 
-	switch (port_flags[ntohs(tcp->th_sport)]) {
-	case PORTCONF_NONE:
-		logmsg(LOG_DEBUG, 1, "Port %u/tcp has no explicit configuration.\n", ntohs(tcp->th_sport));
-		break;
-	case PORTCONF_IGNORE:
-		logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be ignored.\n", ntohs(tcp->th_sport));
-		return;
-	case PORTCONF_NORMAL:
-		logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in normal mode.\n", ntohs(tcp->th_sport));
-		break;
-	case PORTCONF_MIRROR:
-		logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in mirror mode.\n", ntohs(tcp->th_sport));
-		break;
-	case PORTCONF_PROXY:
-		logmsg(LOG_DEBUG, 1, "Port %u/tcp is configured to be handled in proxy mode\n", ntohs(tcp->th_sport));
-		break;
-	default:
-		logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/tcp.\n", ntohs(tcp->th_sport));
+	ip = (struct ip_header *) packet;
+	if (ip->ip_p != ICMP) return(NULL);
+
+	/* It's an ICMP message */
+	icmp = (u_char *) (packet + 4*ip->ip_hl);
+	if ((icmp[0] != 3) || (icmp[1] != 3)) return(NULL);
+
+	/* It's 'port unreachable', locate encapsulated IP packet */
+	if ((len = ntohs(ip->ip_len) - 4*ip->ip_hl - 8) < 10) {
+		logmsg(LOG_ERR, 1, "Error - ICMP message truncated.\n");
+		return(NULL);
+	}
+	icmp_data = (struct ip_header *) (packet + 4*ip->ip_hl + 8);
+	if (icmp_data->ip_p != 17) return(NULL);
+	
+	/* It's a UDP port unreachable response */
+	return((u_char *)icmp_data);
+}
+
+
+void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_char * packet) {
+	struct ip_header *ip_hdr;
+	struct udp_header *udp;
+	struct tcp_header *tcp;
+	u_char *ip;
+	uint16_t sport, dport;
+	u_int8_t port_mode;
+
+	sport		= 0;
+	dport		= 0;
+	port_mode	= PORTCONF_IGNORE;
+
+	ip = (u_char *)(packet + pcap_offset);
+	ip_hdr = (struct ip_header *)ip;
+	if (ip_hdr->ip_p == TCP) {
+		tcp	= (struct tcp_header*) (ip + (4 * ip_hdr->ip_hlen));
+		sport	= ntohs(tcp->th_sport);
+		dport	= ntohs(tcp->th_dport);
+		port_mode = port_flags[sport].tcp;
+	} else if (ip_hdr->ip_p == ICMP) {
+		if ((ip = icmp_dissect(ip)) == NULL) return;
+		ip_hdr	= (struct ip_header *) ip;
+		udp	= (struct udp_header *) (ip + (4 * ip_hdr->ip_hlen));
+		sport	= ntohs(udp->uh_dport);
+		dport	= ntohs(udp->uh_sport);
+		port_mode = port_flags[dport].udp;
+	} else {
+		logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip_hdr->ip_p);
 		return;
 	}
 
-	logmsg(LOG_INFO, 1, "Connection request on port %d.\n", ntohs(tcp->th_sport));
-	start_dynamic_server(ip->ip_dst, tcp->th_dport, ip->ip_src, tcp->th_sport, ip->ip_p);
+	switch (port_mode) {
+	case PORTCONF_NONE:
+		logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n", sport, PROTO(ip_hdr->ip_p));
+		break;
+	case PORTCONF_IGNORE:
+		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n", sport, PROTO(ip_hdr->ip_p));
+		return;
+	case PORTCONF_NORMAL:
+		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in normal mode.\n",
+			sport, PROTO(ip_hdr->ip_p));
+		break;
+	case PORTCONF_MIRROR:
+		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in mirror mode.\n",
+			sport, PROTO(ip_hdr->ip_p));
+		break;
+	case PORTCONF_PROXY:
+		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in proxy mode\n", sport, PROTO(ip_hdr->ip_p));
+		break;
+	default:
+		logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n", sport, PROTO(ip_hdr->ip_p));
+		return;
+	}
+
+	logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", sport, PROTO(ip_hdr->ip_p));
+	start_dynamic_server(ip_hdr->ip_dst, htons(dport), ip_hdr->ip_src, htons(sport), ip_hdr->ip_p);
 	return;
 }
 
@@ -96,8 +150,8 @@ int start_pcap_mon(void) {
 
 	/* sniff RST packets */
 	logmsg(LOG_DEBUG, 1, "Starting pcap sniffer on %s.\n", dev);
-	if ((tcp_sniffer = pcap_open_live(dev, BUFSIZ, promisc_mode, 10, errbuf)) != NULL) {
-		switch (pcap_datalink(tcp_sniffer)) {
+	if ((packet_sniffer = pcap_open_live(dev, BUFSIZ, promisc_mode, 10, errbuf)) != NULL) {
+		switch (pcap_datalink(packet_sniffer)) {
 #ifdef DLT_RAW
 			case DLT_RAW:
 				pcap_offset = 0;
@@ -158,14 +212,14 @@ int start_pcap_mon(void) {
 				break;
 		}
 		logmsg(LOG_DEBUG, 1, "Using a %d bytes offset for %s.\n",
-			pcap_offset, pcap_datalink_val_to_name(pcap_datalink(tcp_sniffer)));
+			pcap_offset, pcap_datalink_val_to_name(pcap_datalink(packet_sniffer)));
 
 		/* compile bpf for tcp RST fragments */
-		if (pcap_compile(tcp_sniffer, &filter, bpf_filter_string, 1, net) == -1) {
+		if (pcap_compile(packet_sniffer, &filter, bpf_filter_string, 1, net) == -1) {
                 	logmsg(LOG_ERR, 1, "Pcap error - Invalid BPF string: %s.\n", errbuf);
                 	clean_exit(0);
         	}
-		if (pcap_setfilter(tcp_sniffer, &filter) == -1) {
+		if (pcap_setfilter(packet_sniffer, &filter) == -1) {
 			logmsg(LOG_ERR, 1, "Pcap error - Unable to start tcp sniffer: %s\n", errbuf);
 			clean_exit(0);
 		}
@@ -173,9 +227,9 @@ int start_pcap_mon(void) {
 
 		logmsg(LOG_NOTICE, 1, "---- Trapping attacks on %s. ----\n", dev);
 
-		pcap_loop(tcp_sniffer, -1, (void *) tcp_server_wrapper, NULL);
+		pcap_loop(packet_sniffer, -1, (void *) server_wrapper, NULL);
 
-		pcap_close(tcp_sniffer);
+		pcap_close(packet_sniffer);
 	} else {
 		logmsg(LOG_ERR, 1, "Error - Could not open %s for sniffing: %s.\n", dev, errbuf);
 		logmsg(LOG_ERR, 1, "Do you have root privileges?\n");
@@ -212,7 +266,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 	}
 
 	/* assemble filter string */
-	bpf_filter_string = strdup("(tcp[13] & 0x04 != 0) and (tcp[4:2] == 0)");
+	bpf_filter_string = strdup("((tcp[13] & 0x04 != 0 and tcp[4:4] == 0) or (icmp[0] == 3 and icmp[1] == 3))");
 
 	/* add ip addresses for chosen devices */
 	dev_found = 0;
@@ -281,7 +335,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 		snprintf(bpf_filter_string+strlen(bpf_filter_string), strlen(bpf_cmd_ext)+8,
 			" and (%s)%c", bpf_cmd_ext, 0);
 	}
-	fprintf(stdout, "  BPF string is '%s'.\n", bpf_filter_string);
+	DEBUG_FPRINTF(stdout, "  BPF string is '%s'.\n", bpf_filter_string);
 
 	return(bpf_filter_string);
 }

@@ -41,9 +41,10 @@ struct ip_header {
 	#define ip_v ip_vers
 #endif
 
-#define UDP		17
+#define ICMP		1
 #define TCP		6
-#define PROTO(p)	(p == TCP ? "tcp" : (p == UDP ? "udp" : "unknown"))
+#define UDP		17
+#define PROTO(p)	(p == ICMP ? "icmp" : (p == TCP ? "tcp" : (p == UDP ? "udp" : "unknown")))
 
 const struct ip_header *ip;
 

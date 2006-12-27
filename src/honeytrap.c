@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
 
 #ifdef USE_PCAP_MON
 	dev		= NULL;	/* network device pointer */
-	tcp_sniffer	= NULL;	/* pcap device pointer */
+	packet_sniffer	= NULL;	/* pcap device pointer */
 #endif
 
 

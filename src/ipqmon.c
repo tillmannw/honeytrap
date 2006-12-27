@@ -40,18 +40,20 @@ static void die(struct ipq_handle *h) {
 
 int start_ipq_mon(void) {
 	int status, process;
+	u_int8_t port_mode;
 	uint16_t sport, dport;
 	unsigned char buf[BUFSIZE];
 	struct ip_header *ip;
 	struct tcp_header *tcp;
 	struct udp_header *udp;
 
-	sport	= 0;
-	dport	= 0;
-	packet	= NULL;
-	ip	= NULL;
-	tcp	= NULL;
-	udp	= NULL;
+	sport		= 0;
+	dport		= 0;
+	packet		= NULL;
+	ip		= NULL;
+	tcp		= NULL;
+	udp		= NULL;
+	port_mode	= PORTCONF_IGNORE;
 
 	logmsg(LOG_DEBUG, 1, "Creating ipq connection monitor.\n");
 	if ((h = ipq_create_handle(0, PF_INET)) == NULL) {
@@ -81,17 +83,22 @@ int start_ipq_mon(void) {
 				packet	= ipq_get_packet(buf);
 				ip	= (struct ip_header*) packet->payload;
 				if (ip->ip_p == TCP) {
-					tcp	= (struct tcp_header*) (packet->payload + (4 * ip->ip_hlen));
-					sport	= ntohs(tcp->th_sport);
-					dport	= ntohs(tcp->th_dport);
+					tcp		= (struct tcp_header*) (packet->payload + (4 * ip->ip_hlen));
+					sport		= ntohs(tcp->th_sport);
+					dport		= ntohs(tcp->th_dport);
+					port_mode	= port_flags[dport].tcp;
 				} else if (ip->ip_p == UDP) {
-					udp	= (struct udp_header*) (packet->payload + (4 * ip->ip_hlen));
-					sport	= ntohs(udp->uh_sport);
-					dport	= ntohs(udp->uh_dport);
+					udp		= (struct udp_header*) (packet->payload + (4 * ip->ip_hlen));
+					sport		= ntohs(udp->uh_sport);
+					dport		= ntohs(udp->uh_dport);
+					port_mode	= port_flags[dport].udp;
+				} else {
+					logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip->ip_p);
+					break;
 				}
 
 				/* Got a connection request, fork handler and pass it back to the kernel */
-				switch (port_flags[dport]) {
+				switch (port_mode) {
 				case PORTCONF_NONE:
 					logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n",
 							dport, PROTO(ip->ip_p));

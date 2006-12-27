@@ -22,6 +22,7 @@
 
 struct default_resp {
 	uint16_t port;
+	uint16_t proto;
 	uint32_t size;
 	u_char *response;
 	struct default_resp *next;
@@ -29,8 +30,8 @@ struct default_resp {
 
 
 void unload_default_responses(void);
-int prepare_default_response(char *filename, uint16_t port);
+int prepare_default_response(char *filename, uint16_t port, uint16_t proto);
 int load_default_responses(char *dir);
-int send_default_response(int connection_fd, uint16_t port, u_char timeout);
+int send_default_response(int connection_fd, uint16_t port, uint16_t proto, u_char timeout);
 
 #endif

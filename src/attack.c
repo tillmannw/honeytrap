@@ -33,7 +33,7 @@
 #include "plughook.h"
 #include "ipqmon.h"
 
-Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port) {
+Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto) {
 	Attack *a;
 
 	/* mem for attack record */
@@ -44,6 +44,7 @@ Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port
 	a->a_conn.r_addr	= r_addr;
 	a->a_conn.l_port	= l_port;
 	a->a_conn.r_port	= r_port;
+	a->a_conn.protocol	= proto;
 	if (time(&(a->start_time)) == ((time_t)-1)) 
 		logmsg(LOG_WARN, 1, "Warning - Could not set attack start time: %s.\n", strerror(errno));
 

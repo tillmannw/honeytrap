@@ -26,11 +26,20 @@
 
 #include "honeytrap.h"
 #include "logging.h"
+#include "ipqmon.h"
 #include "udp.h"
+
+#ifdef USE_IPQ_MON
+#include <linux/netfilter.h>
+#endif
 
 
 int udpsock(struct sockaddr_in *server_addr, uint16_t port) {
 	int fd, sockopt;
+#ifdef USE_IPQ_MON
+	int status;
+#endif
+fprintf(stdout, "---> in udpsock().\n");
 
 	if (!(fd = socket(AF_INET, SOCK_DGRAM, 0))) {
 	    logmsg(LOG_ERR, 1, "Error - Could not create udp socket: %s\n", strerror(errno));
@@ -46,12 +55,23 @@ int udpsock(struct sockaddr_in *server_addr, uint16_t port) {
 	server_addr->sin_addr.s_addr	= htonl(INADDR_ANY);
 	server_addr->sin_port		= port;
 	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) < 0) {
+#ifdef USE_IPQ_MON
+	    /* hand packet processing back to the kernel */
+	    if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+		logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+		logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
+		ipq_destroy_handle(h);
+		exit(1);
+	    }
+	    return(-1);
+#else
 	    if (errno != 98)
 		    logmsg(LOG_NOISY, 1, "Warning - Could not bind to port %u/udp: %s.\n", ntohs(port), strerror(errno));
 	    else
 		    logmsg(LOG_DEBUG, 1, "Warning - Could not bind to port %u/udp: %s.\n", ntohs(port), strerror(errno));
 	    close(fd);
 	    return(-1);
+#endif
 	}
 	return(fd);
 }

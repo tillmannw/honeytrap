@@ -18,7 +18,7 @@
 #endif
 
 const char module_name[]="htm_aSaveFile";
-const char module_version[]="0.1.1";
+const char module_version[]="0.1.2";
 
 void plugin_init(void);
 void plugin_unload(void);
