@@ -157,18 +157,17 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 						strerror(error));
 				return(-1);
 			}
-	} else if (proto == UDP) {
-fprintf(stdout, "---> connecting.\n");
-			if ((retval = connect(proxy_sock_fd, (struct sockaddr *) &proxy_socket, sizeof(proxy_socket))) <0) {
-				if (errno != EINPROGRESS) {
-					logmsg(LOG_DEBUG, 1,
-						"%s %u\t  Error - Unable to establish mirror connection to %s:%d.\n",
-						logpre, l_port, inet_ntoa(ipaddr), port);
-					return(-1);
+			} else if (proto == UDP) {
+				if ((retval = connect(proxy_sock_fd,
+					(struct sockaddr *) &proxy_socket, sizeof(proxy_socket))) <0) {
+					if (errno != EINPROGRESS) {
+						logmsg(LOG_DEBUG, 1,
+							"%s %u\t  Error - Unable to establish mirror connection to %s:%d.\n",
+							logpre, l_port, inet_ntoa(ipaddr), port);
+						return(-1);
+					}
 				}
 			}
-fprintf(stdout, "---> connected.\n");
-	}
 		}
 		
 		local_addr_len = 0;
@@ -177,13 +176,10 @@ fprintf(stdout, "---> connected.\n");
 				logpre, port, logact, strerror(errno));
 			return(-1);
 		}
-		attack->p_conn.l_addr	= local_socket.sin_addr; 
-		attack->p_conn.r_addr	= proxy_socket.sin_addr;
+		memcpy(&(attack->p_conn.l_addr), &local_socket.sin_addr, sizeof(uint32_t));
+		memcpy(&(attack->p_conn.r_addr), &proxy_socket.sin_addr, sizeof(uint32_t));
 		attack->p_conn.l_port	= local_socket.sin_port;
 		attack->p_conn.r_port	= proxy_socket.sin_port;
 	}
-//fprintf(stdout, "---> writing test pattern.\n");
-//write(proxy_sock_fd, "back\n", 5);
-//fprintf(stdout, "---> done.\n");
 	return(proxy_sock_fd);
 }

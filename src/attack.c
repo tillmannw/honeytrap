@@ -40,8 +40,8 @@ Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port
 	if ((a = (Attack *) calloc(1, sizeof(Attack))) == NULL) return(NULL);
 
 	/* store attack connection data in attack record */
-	a->a_conn.l_addr	= l_addr;
-	a->a_conn.r_addr	= r_addr;
+	memcpy(&(a->a_conn.l_addr), &l_addr, sizeof(uint32_t));
+	memcpy(&(a->a_conn.r_addr), &r_addr, sizeof(uint32_t));
 	a->a_conn.l_port	= l_port;
 	a->a_conn.r_port	= r_port;
 	a->a_conn.protocol	= proto;
@@ -54,6 +54,7 @@ Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port
 
 /* process attack - call plugins registered for hook 'process_attack' */
 int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_size, uint16_t port, Attack *a) {
+	struct in_addr *addr = NULL;
 
 	if (a == NULL) {
 		logmsg(LOG_ERR, 1, "Error - Could not process data: No attack record given.\n");
@@ -83,11 +84,13 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 
 
 	if (!a_size) {
+		addr = (struct in_addr *) &(a->a_conn.r_addr);
 		logmsg(LOG_NOTICE, 1, " * %u\t  No bytes received from %s:%u.\n",
-		(uint16_t) a->a_conn.l_port, inet_ntoa(a->a_conn.r_addr), a->a_conn.r_port);
+		(uint16_t) a->a_conn.l_port, inet_ntoa(*addr), a->a_conn.r_port);
 	} else {
+		addr = (struct in_addr *) &(a->a_conn.r_addr);
 		logmsg(LOG_NOTICE, 1, " * %u\t  %d bytes attack string from %s:%u.\n",
-			(uint16_t) a->a_conn.l_port, a_size, inet_ntoa(a->a_conn.r_addr), a->a_conn.r_port);
+			(uint16_t) a->a_conn.l_port, a_size, inet_ntoa(*addr), a->a_conn.r_port);
 	}
 
 	/* call plugins */

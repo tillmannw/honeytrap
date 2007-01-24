@@ -27,6 +27,6 @@ int cmd_parse_for_ftp(Attack *attack);
 int read_ftp_line(int control_sock_fd, char *rline, int timeout);
 int ftp_quit(int control_sock_fd, int data_sock_fd, int dumpfile_fd);
 int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost, struct in_addr *rhost, const int port, const char *save_file);
-int get_ftpcmd(char *attack_string, int string_size, struct in_addr lhost);
+int get_ftpcmd(char *attack_string, uint32_t string_size, struct in_addr lhost);
 
 #endif

@@ -54,6 +54,7 @@ void plugin_register_hooks(void) {
 int cmd_parse_for_ftp(Attack *attack) {
 	int i=0;
 	char *string_for_processing;
+	struct in_addr *addr = NULL;
 
 	logmsg(LOG_DEBUG, 1, "Parsing attack string (%d bytes) for ftp commands.\n", attack->a_conn.payload.size);
 
@@ -67,14 +68,15 @@ int cmd_parse_for_ftp(Attack *attack) {
 			logmsg(LOG_DEBUG, 1, "FTP command found.\n");
 
 			/* do ftp download */
-			return(get_ftpcmd(string_for_processing, attack->a_conn.payload.size, (struct in_addr) attack->a_conn.l_addr));
+			addr = (struct in_addr *) &(attack->a_conn.l_addr);
+			return(get_ftpcmd(string_for_processing, attack->a_conn.payload.size, *addr));
 		}
 	}
 	logmsg(LOG_DEBUG, 1, "No ftp command found.\n");
 	return(0);
 }
 
-int get_ftpcmd(char *attack_string, int string_size, struct in_addr lhost) {
+int get_ftpcmd(char *attack_string, uint32_t string_size, struct in_addr lhost) {
 	char *parse_string=NULL, port[6], *user=NULL, *pass=NULL, *file=NULL;
 	struct hostent *host=NULL;
 	struct strtk token;
