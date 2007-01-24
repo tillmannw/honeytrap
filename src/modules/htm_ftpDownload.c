@@ -67,7 +67,7 @@ int cmd_parse_for_ftp(Attack *attack) {
 			logmsg(LOG_DEBUG, 1, "FTP command found.\n");
 
 			/* do ftp download */
-			return(get_ftpcmd(string_for_processing, attack->a_conn.payload.size, attack->a_conn.l_addr));
+			return(get_ftpcmd(string_for_processing, attack->a_conn.payload.size, (struct in_addr) attack->a_conn.l_addr));
 		}
 	}
 	logmsg(LOG_DEBUG, 1, "No ftp command found.\n");

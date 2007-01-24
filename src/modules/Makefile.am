@@ -1,5 +1,7 @@
 AUTOMAKE_OPTIONS = foreign no-dependencies
 
+AM_YFLAGS = -d
+
 INCLUDES = -I../
 
 libdir=$(DESTDIR)/$(sysconfdir)/honeytrap/plugins

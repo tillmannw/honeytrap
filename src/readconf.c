@@ -1,5 +1,5 @@
 /* readconf.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -484,9 +484,9 @@ int process_config_option(char *opt, char* val, const int line_number, const cha
 		if ((((portconf = get_value(val, ':')) != NULL)) &&
 			((proto = get_value(val, '/')) != NULL)) {
 			if (strcmp(portconf, "normal") == 0) {
-				if (strncmp(proto, "tcp", strlen(proto)) == NULL)
+				if (strncmp(proto, "tcp", strlen(proto)) == 0)
 					port_flags[atoi(val)].tcp = PORTCONF_NORMAL;
-				else if (strncmp(proto, "udp", strlen(proto)) == NULL)
+				else if (strncmp(proto, "udp", strlen(proto)) == 0)
 					port_flags[atoi(val)].udp = PORTCONF_NORMAL;
 				else {
 					fprintf(stderr, "  Protocol '%s' not supported (%s line %u.\n",
@@ -496,10 +496,10 @@ int process_config_option(char *opt, char* val, const int line_number, const cha
 				fprintf(stdout, "  Connections to port %u/%s will be handled in normal mode.\n",
 					atoi(val), proto);
 			} else if (strcmp(portconf, "ignore") == 0) {
-				if (strncmp(proto, "tcp", strlen(proto)) == NULL) {
+				if (strncmp(proto, "tcp", strlen(proto)) == 0) {
 					port_flags[atoi(val)].tcp = PORTCONF_IGNORE;
 					port_flags[atoi(val)].tcp = PORTCONF_IGNORE;
-				} else if (strncmp(proto, "udp", strlen(proto)) == NULL) {
+				} else if (strncmp(proto, "udp", strlen(proto)) == 0) {
 					port_flags[atoi(val)].udp = PORTCONF_IGNORE;
 				} else {
 					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
@@ -509,9 +509,9 @@ int process_config_option(char *opt, char* val, const int line_number, const cha
 				fprintf(stdout, "  Connections to port %u/%s will be ignored.\n", atoi(val), proto);
 				return(0);
 			} else if (strcmp(portconf, "mirror") == 0) {
-				if (strncmp(proto, "tcp", strlen(proto)) == NULL)
+				if (strncmp(proto, "tcp", strlen(proto)) == 0)
 					port_flags[atoi(val)].tcp = PORTCONF_MIRROR;
-				else if (strncmp(proto, "udp", strlen(proto)) == NULL)
+				else if (strncmp(proto, "udp", strlen(proto)) == 0)
 					port_flags[atoi(val)].udp = PORTCONF_MIRROR;
 				else {
 					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
@@ -521,9 +521,9 @@ int process_config_option(char *opt, char* val, const int line_number, const cha
 				fprintf(stdout, "  Connections to port %u/%s will be handled in mirror mode.\n",
 					atoi(val), proto);
 			} else if (strncmp(portconf, "proxy", 5) == 0) {
-				if (strncmp(proto, "tcp", strlen(proto)) == NULL)
+				if (strncmp(proto, "tcp", strlen(proto)) == 0)
 					port_flags[atoi(val)].tcp = PORTCONF_PROXY;
-				else if (strncmp(proto, "udp", strlen(proto)) == NULL)
+				else if (strncmp(proto, "udp", strlen(proto)) == 0)
 					port_flags[atoi(val)].udp = PORTCONF_PROXY;
 				else {
 					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
@@ -540,7 +540,7 @@ int process_config_option(char *opt, char* val, const int line_number, const cha
 				}
 
 				/* create new proxy destination list entry */
-				if ((pd_new = (struct s_proxy_dest*) malloc(sizeof(struct s_proxy_dest))) == NULL) {
+				if ((pd_new = (struct s_proxy_dest*) malloc(sizeof(struct s_proxy_dest))) == 0) {
 					logmsg(LOG_ERR, 1, "    Error - Unable to allocate memory: %s\n", strerror(errno));
 					return(-1);
 				}

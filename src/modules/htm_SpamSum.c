@@ -1,5 +1,5 @@
 /* htm_SpamSum.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -657,8 +657,8 @@ int edit_distn(char *from, register int from_len, char *to, register int to_len)
 #ifdef TRN_SPEEDUP
 #define ins 1
 #define del 1
-#define ch 3
-#define swap_cost 5
+#define ch 1
+#define swap_cost 1
 #else
     ins  = insert_cost;
     del  = delete_cost;

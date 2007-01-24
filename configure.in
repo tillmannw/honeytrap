@@ -432,7 +432,7 @@ AC_PROG_INSTALL
 AC_CONFIG_FILES([Makefile
 		doc/Makefile
 		src/Makefile
-		src/modules/Makefile]) 
+		src/modules/Makefile])
 
 AC_OUTPUT
 

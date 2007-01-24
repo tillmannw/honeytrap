@@ -22,8 +22,8 @@ struct s_payload {
 };
 
 struct s_conn {
-	struct in_addr		l_addr;		/* local ip address */
-	struct in_addr		r_addr;		/* remote ip address */
+	uint32_t		l_addr;		/* local ip address */
+	uint32_t		r_addr;		/* remote ip address */
 	uint16_t		l_port;		/* local (tcp/udp) port */
 	uint16_t		r_port;		/* remote (tcp/udp) port */
 	uint32_t		protocol;	/* protocol id (tcp/udp) */

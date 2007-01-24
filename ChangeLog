@@ -4,7 +4,7 @@ Version 0.6.4
   when using the ip_queue connection monitor
 - Fixed a segfault in the bpf filter string assembling routine
 - Failed mirror connections did not fall back to normal mode sometimes
-  due to wrong return value handling for a non-blocking connect().
+  due to wrong return value handling for a non-blocking connect(). Fixed.
 - The dynamic server code was redesigned.
 - UDP support added.
 Version 0.6.3.1

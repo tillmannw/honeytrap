@@ -1,5 +1,5 @@
 /* udp.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -39,7 +39,6 @@ int udpsock(struct sockaddr_in *server_addr, uint16_t port) {
 #ifdef USE_IPQ_MON
 	int status;
 #endif
-fprintf(stdout, "---> in udpsock().\n");
 
 	if (!(fd = socket(AF_INET, SOCK_DGRAM, 0))) {
 	    logmsg(LOG_ERR, 1, "Error - Could not create udp socket: %s\n", strerror(errno));
