@@ -104,8 +104,6 @@ int b64_decode(Attack *attack) {
 	struct dec *decoded;
 	Attack dec_attack;
 
-int i;
-
 	logmsg(LOG_DEBUG, 1, "Base64 decoder - Searching for base64 encoded attack string.\n");
 
 	/* no data, nothing to do */

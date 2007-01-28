@@ -115,8 +115,7 @@ int load_default_responses(char *dir) {
 	full_path = NULL;
 
 	if ((respdir = opendir(dir)) == NULL) {
-		closedir(respdir);
-		fprintf(stderr, "  Error - Responses directory is not readable.\n");
+		fprintf(stderr, "  Error - Unable to open responses directory: %s.\n", strerror(errno));
 		return(-1);
 	}
 	

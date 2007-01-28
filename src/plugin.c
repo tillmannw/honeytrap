@@ -38,8 +38,7 @@ int load_plugins(char *dir) {
 	init_plugin_hooks();
 
 	if ((plugindir = opendir(dir)) == NULL) {
-		closedir(plugindir);
-		fprintf(stderr, "  Error - Plugin directory is not readable.\n");
+		fprintf(stderr, "  Error - Unable to open plugin directory: %s.\n", strerror(errno));
 		return(-1);
 	}
 	
