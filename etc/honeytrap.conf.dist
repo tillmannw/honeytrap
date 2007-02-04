@@ -36,6 +36,13 @@ dlsave_dir = /var/spool/honeytrap/downloads
 read_limit = 10485760
 
 
+
+# hash signature files for htm_SpamSum plugin
+# you'll get errors if you define them and don't load this plugin
+md5_sigfile
+ss_sigfile
+
+
 # run in mirror mode - mirror connections back to the initiator (use with caution!)
 mirror
 

@@ -371,16 +371,18 @@ AC_DEFUN(FAIL_MESSAGE,[
 
 AC_CHECK_LIB(dl, dlsym,, DLLIB="no")
 if test "$DLLIB" != "no"; then
-	LIBS="$LIBS -ldl"
-	LDFLAGS="$LDFLAGS -Wl,--export-dynamic"
+	AC_CHECK_LIB(dl, dlsym,, DLLIB="no")
+	if test "$DLLIB" != "no"; then
+		LIBS="$LIBS -ldl"
 	else
-	AC_CHECK_LIB(c, dlsym,, DLCLIB="no")
-	if test "$DLCLIB" = "no"; then
-		echo
-		echo "   ERROR!  programmatic interface to dynamic link loader"
-		echo "   not found.  Cannot use dynamic plugin libraries."
-		echo
-		exit 1
+		AC_CHECK_LIB(c, dlsym,, DLCLIB="no")
+		if test "$DLCLIB" = "no"; then
+			echo
+			echo "   ERROR!  programmatic interface to dynamic link loader"
+			echo "   not found.  Cannot use dynamic plugin libraries."
+			echo
+			exit 1
+		fi
 	fi
 fi
 

@@ -477,10 +477,10 @@ uninstall-am: uninstall-info-am uninstall-libLTLIBRARIES
 
 install-exec-am:
 	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/plugins
-	for module in `find .libs -name 'htm_*.so'`; do \
+	for module in `find .libs -name 'htm_*.so | grep -v SpamSum'`; do \
 		[ -h $$module ] || $(INSTALL_DATA) "$$module" $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/ ; \
 	done
-	for module in `find . -name 'htm_*.*a'`; do \
+	for module in `find . -name 'htm_*.*a | grep -v SpamSum'`; do \
 		rm -f $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/`basename "$$module"` ; \
 	done
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
