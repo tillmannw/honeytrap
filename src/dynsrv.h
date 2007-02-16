@@ -13,8 +13,10 @@
 #ifndef __HONEYTRAP_DYNSRV_H
 #define __HONEYTRAP_DYNSRV_H 1
 
-#include <pcap.h>
 #include <netinet/in.h>
+#ifdef USE_PCAP_MON
+#  include <pcap.h>
+#endif
 
 #include "ip.h"
 #include "tcp.h"

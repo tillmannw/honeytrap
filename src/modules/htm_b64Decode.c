@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <strings.h>
+#include <stdio.h>
 
 #include <honeytrap.h>
 #include <logging.h>

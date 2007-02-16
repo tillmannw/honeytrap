@@ -15,10 +15,12 @@
 
 #include <sys/types.h>
 #include <netinet/in.h>
-#include <pcap.h>
 #include <pwd.h>
 #include <grp.h>
 #include <dlfcn.h>
+#ifdef USE_PCAP_MON
+#  include <pcap.h>
+#endif
 
 #if HAVE_CONFIG_H
 # include <config.h>
@@ -82,15 +84,17 @@ struct s_proxy_dest *proxy_dest;
 // end of global config variables
 
 int pidfile_fd, first_init;
+pid_t parent_pid;
 char old_cwd[1024];
+
+#ifdef USE_PCAP_MON
 char *bpf_filter_string;
 bpf_u_int32 mask;
 bpf_u_int32 net;
 
 pcap_t *packet_sniffer;
-struct in_addr this_host;
-pid_t parent_pid;
 u_char pcap_offset;
+#endif
 
 
 #endif

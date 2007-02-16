@@ -19,6 +19,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <stdio.h>
 
 #include <logging.h>
 #include <plughook.h>

@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <netdb.h>
 #include <sys/socket.h>
+#include <stdio.h>
 
 #include <honeytrap.h>
 #include <logging.h>

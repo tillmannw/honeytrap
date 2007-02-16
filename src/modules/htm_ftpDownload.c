@@ -25,6 +25,7 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <ctype.h>
+#include <stdio.h>
 
 #include <honeytrap.h>
 #include <logging.h>

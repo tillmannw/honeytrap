@@ -56,8 +56,10 @@ void usage(char *progname) {
 
 
 void clean_exit(int status) {
+#ifdef USE_PCAP_MON
 	/* free bpf filter string */
 	free(bpf_filter_string);
+#endif
 
 	logmsg(LOG_DEBUG, 1, "Unloading default responses.\n");
 	unload_default_responses();
