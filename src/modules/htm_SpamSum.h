@@ -24,7 +24,7 @@ void plugin_init(void);
 void plugin_unload(void);
 void plugin_register_hooks(void);
 int calc_spamsum(Attack *attack);
-char *spamsum(const u_char *in, size_t length, u_int32_t flags, u_int32_t bsize);
+char *spamsum(const u_char *in, size_t length, u_int32_t bsize);
 static inline u_int32_t roll_hash(u_char c);
 static u_int32_t roll_reset(void);
 static inline u_int32_t sum_hash(u_char c, u_int32_t h);

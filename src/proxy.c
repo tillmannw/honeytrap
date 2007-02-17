@@ -171,7 +171,7 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 		}
 		
 		local_addr_len = 0;
-		if (getsockname(proxy_sock_fd, (struct sockaddr *) &local_socket, &local_addr_len) != 0) {
+		if (getsockname(proxy_sock_fd, (struct sockaddr *) &local_socket, (socklen_t *) &local_addr_len) != 0) {
 			logmsg(LOG_ERR, 1, "%s %u\t  Error - Unable to get local address from %s socket: %s\n",
 				logpre, port, logact, strerror(errno));
 			return(-1);

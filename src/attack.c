@@ -68,7 +68,7 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 	/* attack string */
 	a->a_conn.payload.size = a_size;
 	if (a_size) {
-		a->a_conn.payload.data = (char *) malloc(a_size);
+		a->a_conn.payload.data = (u_char *) malloc(a_size);
 		memcpy(a->a_conn.payload.data, a_data, a_size);
 	}
 
@@ -76,7 +76,7 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 	/* mirror string */
 	a->p_conn.payload.size = p_size;
 	if (p_size) {
-		a->p_conn.payload.data = (char *) malloc(p_size);
+		a->p_conn.payload.data = (u_char *) malloc(p_size);
 		memcpy(a->p_conn.payload.data, p_data, p_size);
 	}
 	memcpy((char *) &(a->p_conn.payload.chksum),

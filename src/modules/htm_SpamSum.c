@@ -71,12 +71,11 @@ void plugin_register_hooks(void) {
 
 int calc_spamsum(Attack *attack) {
 	u_char sig_match;
-	u_int32_t flags, block_size, threshold, score;
+	u_int32_t block_size, threshold, score;
 	char *sum, sig[BUFSIZ];
 	FILE* sigfile, *hashfile;
 
 	sig_match	= 0;
-	flags		= 0;
 	block_size	= 0;
 	threshold	= 90;
 	score		= 0;
@@ -136,7 +135,7 @@ int calc_spamsum(Attack *attack) {
 
 	/* calculate spamsum */
 	logmsg(LOG_NOISY, 1, "Calculating spamsum.\n");
-	sum = spamsum(attack->a_conn.payload.data, attack->a_conn.payload.size, flags, block_size);
+	sum = spamsum(attack->a_conn.payload.data, attack->a_conn.payload.size, block_size);
 	logmsg(LOG_DEBUG, 1, "Spamsum is %s.\n", sum);
 
 	logmsg(LOG_DEBUG, 1, "Searching signature file for exact match.\n");
@@ -186,34 +185,16 @@ int calc_spamsum(Attack *attack) {
 
 
 /* take a message of length 'length' and return a spamsum of that message, prefixed by the selected blocksize */
-char *spamsum(const u_char *in, size_t length, u_int32_t flags, u_int32_t bsize) {
+char *spamsum(const u_char *in, size_t length, u_int32_t bsize) {
 	const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 	char *ret, *p;
 	u_int32_t total_chars;
 	u_int32_t h, h2, h3;
-	u_int32_t j, n, i, k;
+	u_int32_t i, j, k;
 	u_int32_t block_size;
-	u_char ret2[SPAMSUM_LENGTH/2 + 1];
+	char ret2[SPAMSUM_LENGTH/2 + 1];
 
-	/* if we are ignoring email headers then skip past them now */
-	if (flags & FLAG_IGNORE_HEADERS) {
-		const u_char *s = strstr(in, "\n\n");
-		if (s) {
-			length -= (s+2 - in);
-			in = s+2;
-		}
-	}
-
-	if (flags & FLAG_IGNORE_WHITESPACE) {
-		/* count the non-ignored chars */
-		for (n=0, i=0; i<length; i++) {
-			if (isspace(in[i])) continue;
-			n++;
-		}
-		total_chars = n;
-	} else {
-		total_chars = length;
-	}
+	total_chars = length;
 
 	if (bsize == 0) {
 	/* guess a reasonable block size */
@@ -241,9 +222,6 @@ again:
 	h = roll_reset();
 
 	for (i=0; i<length; i++) {
-		if ((flags & FLAG_IGNORE_WHITESPACE) && 
-		    isspace(in[i])) continue;
-
 		/* 
 		   at each character we update the rolling hash and
 		   the normal hash. When the rolling hash hits the
