@@ -233,7 +233,7 @@ int get_tftp_ressource(struct in_addr* host, const char *save_file) {
 
 	/* read incoming data from socket */
 	while (!received_last_packet&& ((errno == EINTR) || FD_ISSET(data_sock_fd, &rfds))) {
-		if ((bytes_read = recvfrom(data_sock_fd, rbuf, 516, 0, (struct sockaddr *) &from, &fromlen)) == -1) {
+		if ((bytes_read = recvfrom(data_sock_fd, rbuf, 516, 0, (struct sockaddr *) &from, (socklen_t *) &fromlen)) == -1) {
 			logmsg(LOG_ERR, 1, "TFTP download error - Receiving data from remote host failed.\n");
 			return(-1);
 		}

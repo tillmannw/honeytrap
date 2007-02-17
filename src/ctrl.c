@@ -123,7 +123,7 @@ int do_daemonize(void) {
 		exit(1);
 	} else if (pid != 0) {
 		DEBUG_FPRINTF(stdout, "  Successfully changed into daemon environment.\n");
-		fprintf(stdout, "\nhoneytrap v%s Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
+		fprintf(stdout, "\nhoneytrap v%s Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
 		fflush(stdout);
 		exit(0);
 	}

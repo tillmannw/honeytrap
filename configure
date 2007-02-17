@@ -20423,8 +20423,7 @@ _ACEOF
 #define BROKEN_SIOCGIFMTU 1
 _ACEOF
 
-    LDFLAGS="${LDFLAGS} -L/sw/lib"
-    extra_incl=-I/sw/include
+    LDFLAGS="${LDFLAGS} -undefined suppress"
 esac
 
 # any sparc platform has to have this one defined.

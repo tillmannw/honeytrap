@@ -321,7 +321,7 @@ int configure(int my_argc, char *my_argv[]) {
 
 
 	fprintf(stdout, "  Initialization complete.\n");
-	logmsg(LOG_ERR, 0, "\nhoneytrap v%s Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
+	logmsg(LOG_ERR, 0, "\nhoneytrap v%s Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
 
 	first_init = 0;
 	return(1);

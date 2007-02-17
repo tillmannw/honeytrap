@@ -1,4 +1,4 @@
-Version 0.6.4.1
+Version 0.6.5
 - Some compile errors fixed
 - Configure script changed to run on MacOS X
 - htm_SpamSum gets not installed by default

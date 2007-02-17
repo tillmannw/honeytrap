@@ -125,8 +125,7 @@ case "$host" in
   *-apple*)
     AC_DEFINE(MACOS,,[Define if MACOS])
     AC_DEFINE(BROKEN_SIOCGIFMTU)
-    LDFLAGS="${LDFLAGS} -L/sw/lib"
-    extra_incl=-I/sw/include
+    LDFLAGS="${LDFLAGS} -undefined suppress"
 esac
 
 # any sparc platform has to have this one defined.
