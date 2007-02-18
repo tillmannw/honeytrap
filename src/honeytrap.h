@@ -18,9 +18,11 @@
 #include <pwd.h>
 #include <grp.h>
 #include <dlfcn.h>
-#ifdef USE_PCAP_MON
-#  include <pcap.h>
-#endif
+
+/*
+#include "pcapmon.h"
+#include "ipqmon.h"
+*/
 
 #if HAVE_CONFIG_H
 # include <config.h>
@@ -86,15 +88,6 @@ struct s_proxy_dest *proxy_dest;
 int pidfile_fd, first_init;
 pid_t parent_pid;
 char old_cwd[1024];
-
-#ifdef USE_PCAP_MON
-char *bpf_filter_string;
-bpf_u_int32 mask;
-bpf_u_int32 net;
-
-pcap_t *packet_sniffer;
-u_char pcap_offset;
-#endif
 
 
 #endif

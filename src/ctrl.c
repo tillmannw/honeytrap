@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 
 #include "honeytrap.h"
+#include "pcapmon.h"
 #include "logging.h"
 #include "ctrl.h"
 #include "plugin.h"

@@ -1,8 +1,8 @@
 # $Id$ 
 AC_PREREQ(02.50)
-AC_INIT([honeytrap], [0.6.4], [tillmann.werner@gmx.de])
+AC_INIT([honeytrap], [0.6.3], [tillmann.werner@gmx.de])
 AM_CONFIG_HEADER(config.h)
-AM_INIT_AUTOMAKE(honeytrap,0.6.4)
+AM_INIT_AUTOMAKE(honeytrap,0.6.3)
 
 # Since we get -O2 from configure defaults, which doesn't work in 64bit
 # mode, let's make some changes here before calling _CC macros.
@@ -125,7 +125,8 @@ case "$host" in
   *-apple*)
     AC_DEFINE(MACOS,,[Define if MACOS])
     AC_DEFINE(BROKEN_SIOCGIFMTU)
-    LDFLAGS="${LDFLAGS} -undefined suppress"
+    LDFLAGS="${LDFLAGS} -L/sw/lib"
+    extra_incl=-I/sw/include
 esac
 
 # any sparc platform has to have this one defined.
@@ -370,18 +371,16 @@ AC_DEFUN(FAIL_MESSAGE,[
 
 AC_CHECK_LIB(dl, dlsym,, DLLIB="no")
 if test "$DLLIB" != "no"; then
-	AC_CHECK_LIB(dl, dlsym,, DLLIB="no")
-	if test "$DLLIB" != "no"; then
-		LIBS="$LIBS -ldl"
+	LIBS="$LIBS -ldl"
+	LDFLAGS="$LDFLAGS -Wl,--export-dynamic"
 	else
-		AC_CHECK_LIB(c, dlsym,, DLCLIB="no")
-		if test "$DLCLIB" = "no"; then
-			echo
-			echo "   ERROR!  programmatic interface to dynamic link loader"
-			echo "   not found.  Cannot use dynamic plugin libraries."
-			echo
-			exit 1
-		fi
+	AC_CHECK_LIB(c, dlsym,, DLCLIB="no")
+	if test "$DLCLIB" = "no"; then
+		echo
+		echo "   ERROR!  programmatic interface to dynamic link loader"
+		echo "   not found.  Cannot use dynamic plugin libraries."
+		echo
+		exit 1
 	fi
 fi
 
@@ -433,7 +432,7 @@ AC_PROG_INSTALL
 AC_CONFIG_FILES([Makefile
 		doc/Makefile
 		src/Makefile
-		src/modules/Makefile])
+		src/modules/Makefile]) 
 
 AC_OUTPUT
 

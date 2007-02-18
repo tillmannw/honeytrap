@@ -10,11 +10,10 @@
  * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#ifdef USE_IPQ_MON
 
 #ifndef __HONEYTRAP_IPQMON_H
 #define __HONEYTRAP_IPQMON_H 1
-
-#ifdef USE_IPQ_MON
 
 #include <libipq.h>
 #include <linux/netfilter.h>
