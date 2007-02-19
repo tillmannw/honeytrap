@@ -94,7 +94,7 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		return(0);
 	}
 
-	logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", sport, PROTO(ip->ip_p));
+	logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
 	start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 	
 	/* nfq_set_verdict()'s return value is really confusing and documented nowhere */
