@@ -1056,6 +1056,8 @@ Optional Packages:
   --with-libipq-includes=DIR  libipq include directory
   --with-libipq-libraries=DIR  libipq library directory
   --with-nfq-mon           Use nfqueue to catch connection requests
+  --with-libnetfilter_queue-includes=DIR  libnetfilter_queue include directory
+  --with-libnetfilter_queue-libraries=DIR  libnetfilter_queue library directory
   --with-ipfw-mon          Use ipfw to catch connection requests
   --with-efence           link with electric fence
 
@@ -4606,7 +4608,7 @@ ia64-*-hpux*)
   ;;
 *-*-irix6*)
   # Find out which ABI we are using.
-  echo '#line 4609 "configure"' > conftest.$ac_ext
+  echo '#line 4611 "configure"' > conftest.$ac_ext
   if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
@@ -6170,7 +6172,7 @@ fi
 
 
 # Provide some information about the compiler.
-echo "$as_me:6173:" \
+echo "$as_me:6175:" \
      "checking for Fortran 77 compiler version" >&5
 ac_compiler=`set X $ac_compile; echo $2`
 { (eval echo "$as_me:$LINENO: \"$ac_compiler --version </dev/null >&5\"") >&5
@@ -7202,11 +7204,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:7205: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:7207: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:7209: \$? = $ac_status" >&5
+   echo "$as_me:7211: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -7435,11 +7437,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:7438: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:7440: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:7442: \$? = $ac_status" >&5
+   echo "$as_me:7444: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -7495,11 +7497,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:7498: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:7500: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:7502: \$? = $ac_status" >&5
+   echo "$as_me:7504: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -9683,7 +9685,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 9686 "configure"
+#line 9688 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -9781,7 +9783,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 9784 "configure"
+#line 9786 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -11958,11 +11960,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:11961: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:11963: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:11965: \$? = $ac_status" >&5
+   echo "$as_me:11967: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -12018,11 +12020,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:12021: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:12023: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:12025: \$? = $ac_status" >&5
+   echo "$as_me:12027: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -13387,7 +13389,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 13390 "configure"
+#line 13392 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -13485,7 +13487,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 13488 "configure"
+#line 13490 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -14312,11 +14314,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:14315: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:14317: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:14319: \$? = $ac_status" >&5
+   echo "$as_me:14321: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -14372,11 +14374,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:14375: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:14377: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:14379: \$? = $ac_status" >&5
+   echo "$as_me:14381: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -16417,11 +16419,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:16420: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:16422: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:16424: \$? = $ac_status" >&5
+   echo "$as_me:16426: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -16650,11 +16652,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:16653: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:16655: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:16657: \$? = $ac_status" >&5
+   echo "$as_me:16659: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -16710,11 +16712,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:16713: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:16715: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:16717: \$? = $ac_status" >&5
+   echo "$as_me:16719: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -18898,7 +18900,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 18901 "configure"
+#line 18903 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -18996,7 +18998,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 18999 "configure"
+#line 19001 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -22896,8 +22898,260 @@ if test "${with_nfq_mon+set}" = set; then
 
 fi;
 if test "$with_nfq_mon" = "yes"; then
-  echo "nfq connection monitor is currently not supported."
-  exit 1
+
+# Check whether --with-libnetfilter_queue_includes or --without-libnetfilter_queue_includes was given.
+if test "${with_libnetfilter_queue_includes+set}" = set; then
+  withval="$with_libnetfilter_queue_includes"
+  with_libnetfilter_queue_includes="$withval"
+else
+  with_libnetfilter_queue_includes=no
+fi;
+
+
+# Check whether --with-libnetfilter_queue_libraries or --without-libnetfilter_queue_libraries was given.
+if test "${with_libnetfilter_queue_libraries+set}" = set; then
+  withval="$with_libnetfilter_queue_libraries"
+  with_libnetfilter_queue_libraries="$withval"
+else
+  with_libnetfilter_queue_libraries=no
+fi;
+
+  if test "$with_libnetfilter_queue_includes" != "no"; then
+    CPPFLAGS="${CPPFLAGS} -I${with_libnetfilter_queue_includes}"
+  fi
+  if test "${ac_cv_header_libnetfilter_queue_libnetfilter_queue_h+set}" = set; then
+  echo "$as_me:$LINENO: checking for libnetfilter_queue/libnetfilter_queue.h" >&5
+echo $ECHO_N "checking for libnetfilter_queue/libnetfilter_queue.h... $ECHO_C" >&6
+if test "${ac_cv_header_libnetfilter_queue_libnetfilter_queue_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" >&5
+echo "${ECHO_T}$ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" >&6
+else
+  # Is the header compilable?
+echo "$as_me:$LINENO: checking libnetfilter_queue/libnetfilter_queue.h usability" >&5
+echo $ECHO_N "checking libnetfilter_queue/libnetfilter_queue.h usability... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+#include <libnetfilter_queue/libnetfilter_queue.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_header_compiler=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_header_compiler=no
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
+echo "${ECHO_T}$ac_header_compiler" >&6
+
+# Is the header present?
+echo "$as_me:$LINENO: checking libnetfilter_queue/libnetfilter_queue.h presence" >&5
+echo $ECHO_N "checking libnetfilter_queue/libnetfilter_queue.h presence... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <libnetfilter_queue/libnetfilter_queue.h>
+_ACEOF
+if { (eval echo "$as_me:$LINENO: \"$ac_cpp conftest.$ac_ext\"") >&5
+  (eval $ac_cpp conftest.$ac_ext) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } >/dev/null; then
+  if test -s conftest.err; then
+    ac_cpp_err=$ac_c_preproc_warn_flag
+    ac_cpp_err=$ac_cpp_err$ac_c_werror_flag
+  else
+    ac_cpp_err=
+  fi
+else
+  ac_cpp_err=yes
+fi
+if test -z "$ac_cpp_err"; then
+  ac_header_preproc=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+  ac_header_preproc=no
+fi
+rm -f conftest.err conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
+echo "${ECHO_T}$ac_header_preproc" >&6
+
+# So?  What about this header?
+case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
+  yes:no: )
+    { echo "$as_me:$LINENO: WARNING: libnetfilter_queue/libnetfilter_queue.h: accepted by the compiler, rejected by the preprocessor!" >&5
+echo "$as_me: WARNING: libnetfilter_queue/libnetfilter_queue.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
+    { echo "$as_me:$LINENO: WARNING: libnetfilter_queue/libnetfilter_queue.h: proceeding with the compiler's result" >&5
+echo "$as_me: WARNING: libnetfilter_queue/libnetfilter_queue.h: proceeding with the compiler's result" >&2;}
+    ac_header_preproc=yes
+    ;;
+  no:yes:* )
+    { echo "$as_me:$LINENO: WARNING: libnetfilter_queue/libnetfilter_queue.h: present but cannot be compiled" >&5
+echo "$as_me: WARNING: libnetfilter_queue/libnetfilter_queue.h: present but cannot be compiled" >&2;}
+    { echo "$as_me:$LINENO: WARNING: libnetfilter_queue/libnetfilter_queue.h:     check for missing prerequisite headers?" >&5
+echo "$as_me: WARNING: libnetfilter_queue/libnetfilter_queue.h:     check for missing prerequisite headers?" >&2;}
+    { echo "$as_me:$LINENO: WARNING: libnetfilter_queue/libnetfilter_queue.h: see the Autoconf documentation" >&5
+echo "$as_me: WARNING: libnetfilter_queue/libnetfilter_queue.h: see the Autoconf documentation" >&2;}
+    { echo "$as_me:$LINENO: WARNING: libnetfilter_queue/libnetfilter_queue.h:     section \"Present But Cannot Be Compiled\"" >&5
+echo "$as_me: WARNING: libnetfilter_queue/libnetfilter_queue.h:     section \"Present But Cannot Be Compiled\"" >&2;}
+    { echo "$as_me:$LINENO: WARNING: libnetfilter_queue/libnetfilter_queue.h: proceeding with the preprocessor's result" >&5
+echo "$as_me: WARNING: libnetfilter_queue/libnetfilter_queue.h: proceeding with the preprocessor's result" >&2;}
+    { echo "$as_me:$LINENO: WARNING: libnetfilter_queue/libnetfilter_queue.h: in the future, the compiler will take precedence" >&5
+echo "$as_me: WARNING: libnetfilter_queue/libnetfilter_queue.h: in the future, the compiler will take precedence" >&2;}
+    (
+      cat <<\_ASBOX
+## ------------------------------------- ##
+## Report this to tillmann.werner@gmx.de ##
+## ------------------------------------- ##
+_ASBOX
+    ) |
+      sed "s/^/$as_me: WARNING:     /" >&2
+    ;;
+esac
+echo "$as_me:$LINENO: checking for libnetfilter_queue/libnetfilter_queue.h" >&5
+echo $ECHO_N "checking for libnetfilter_queue/libnetfilter_queue.h... $ECHO_C" >&6
+if test "${ac_cv_header_libnetfilter_queue_libnetfilter_queue_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_header_libnetfilter_queue_libnetfilter_queue_h=$ac_header_preproc
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" >&5
+echo "${ECHO_T}$ac_cv_header_libnetfilter_queue_libnetfilter_queue_h" >&6
+
+fi
+if test $ac_cv_header_libnetfilter_queue_libnetfilter_queue_h = yes; then
+  :
+else
+  { { echo "$as_me:$LINENO: error: libnetfilter_queue.h not found." >&5
+echo "$as_me: error: libnetfilter_queue.h not found." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+
+
+  if test "$with_libnetfilter_queue_libraries" != "no"; then
+    LDFLAGS="${LDFLAGS}  -L${with_libnetfilter_queue_libraries}"
+  fi
+  LNFQ=""
+
+echo "$as_me:$LINENO: checking for nfq_open in -lnetfilter_queue" >&5
+echo $ECHO_N "checking for nfq_open in -lnetfilter_queue... $ECHO_C" >&6
+if test "${ac_cv_lib_netfilter_queue_nfq_open+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lnetfilter_queue  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char nfq_open ();
+int
+main ()
+{
+nfq_open ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_netfilter_queue_nfq_open=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_cv_lib_netfilter_queue_nfq_open=no
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_netfilter_queue_nfq_open" >&5
+echo "${ECHO_T}$ac_cv_lib_netfilter_queue_nfq_open" >&6
+if test $ac_cv_lib_netfilter_queue_nfq_open = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBNETFILTER_QUEUE 1
+_ACEOF
+
+  LIBS="-lnetfilter_queue $LIBS"
+
+else
+  LNFQ="no"
+fi
+
+
+  if test "$LNFQ" = "no"; then
+    echo
+    echo "   ERROR!  Libnetfilter_queue library/headers not found, go get it from http://www.netfilter.org"
+    echo "   or use the --with-libnetfilter_queue-* options, if you have it installed in unusual place."
+    echo
+    exit
+  fi
 
 cat >>confdefs.h <<\_ACEOF
 #define USE_NFQ_MON

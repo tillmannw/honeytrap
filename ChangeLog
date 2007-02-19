@@ -1,7 +1,8 @@
 Version 0.6.5
+- Introduced an nfnetlink_queue-based connection monitor
 - Some compile errors fixed
 - Configure script changed to run on MacOS X
-- htm_SpamSum gets not installed by default
+- Do not install htm_SpamSum by default
 Version 0.6.4
 - PoC plugin for locality sensitive hashing
 - Clean solution for giving packet control back to the kernel

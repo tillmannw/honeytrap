@@ -1,5 +1,5 @@
 /* connectmon.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -20,6 +20,7 @@
 #include "ctrl.h"
 #include "pcapmon.h"
 #include "ipqmon.h"
+#include "nfqmon.h"
 
 
 int start_connection_monitor(void) {
@@ -31,6 +32,7 @@ int start_connection_monitor(void) {
 	start_pcap_mon();
 #else
 #ifdef USE_NFQ_MON
+	start_nfq_mon();
 #else
 #ifdef USE_IPFW_MON
 #endif

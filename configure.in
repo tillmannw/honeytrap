@@ -338,8 +338,32 @@ fi
 AC_ARG_WITH(nfq-mon,
 	[  --with-nfq-mon           Use nfqueue to catch connection requests])
 if test "$with_nfq_mon" = "yes"; then
-  echo "nfq connection monitor is currently not supported."
-  exit 1
+  AC_ARG_WITH(libnetfilter_queue_includes,
+    [  --with-libnetfilter_queue-includes=DIR  libnetfilter_queue include directory],
+    [with_libnetfilter_queue_includes="$withval"],[with_libnetfilter_queue_includes=no])
+
+  AC_ARG_WITH(libnetfilter_queue_libraries,
+    [  --with-libnetfilter_queue-libraries=DIR  libnetfilter_queue library directory],
+    [with_libnetfilter_queue_libraries="$withval"],[with_libnetfilter_queue_libraries=no])
+
+  if test "$with_libnetfilter_queue_includes" != "no"; then
+    CPPFLAGS="${CPPFLAGS} -I${with_libnetfilter_queue_includes}"
+  fi
+  AC_CHECK_HEADER(libnetfilter_queue/libnetfilter_queue.h,,[AC_ERROR(libnetfilter_queue.h not found.)])
+
+  if test "$with_libnetfilter_queue_libraries" != "no"; then
+    LDFLAGS="${LDFLAGS}  -L${with_libnetfilter_queue_libraries}"
+  fi
+  LNFQ=""
+  AC_CHECK_LIB(netfilter_queue, nfq_open,, LNFQ="no")
+
+  if test "$LNFQ" = "no"; then
+    echo
+    echo "   ERROR!  Libnetfilter_queue library/headers not found, go get it from http://www.netfilter.org"
+    echo "   or use the --with-libnetfilter_queue-* options, if you have it installed in unusual place."
+    echo
+    exit
+  fi
   AC_DEFINE([USE_NFQ_MON], [], [Define if netfilter_queue connection monitor is used])
 else with_nfq_mon="no"
 fi

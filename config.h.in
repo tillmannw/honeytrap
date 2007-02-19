@@ -30,6 +30,10 @@
 /* Define to 1 if you have the `ipq' library (-lipq). */
 #undef HAVE_LIBIPQ
 
+/* Define to 1 if you have the `netfilter_queue' library (-lnetfilter_queue).
+   */
+#undef HAVE_LIBNETFILTER_QUEUE
+
 /* Define to 1 if you have the `nsl' library (-lnsl). */
 #undef HAVE_LIBNSL
 

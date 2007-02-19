@@ -1,5 +1,5 @@
 /* dynsrv.c
- * Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -34,6 +34,7 @@
 #include "proxy.h"
 #include "plughook.h"
 #include "ipqmon.h"
+#include "nfqmon.h"
 #include "tcp.h"
 #include "udp.h"
 #include "attack.h"
@@ -138,6 +139,18 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	    ipq_destroy_handle(h);
 	    exit(1);
 	}
+
+	/* don't need root privs any more */
+	drop_privileges(); 
+	logmsg(LOG_DEBUG, 1, "Server is now running with user id %d and group id %d.\n", getuid(), getgid());
+#endif
+#ifdef USE_NFQ_MON
+	/* hand packet processing back to the kernel
+	 *
+	 * cannot set verdict here - it won't work for unknown reasons
+	 * Just do it in the stream monitor
+	 */
+	// nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
 
 	/* don't need root privs any more */
 	drop_privileges(); 

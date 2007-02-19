@@ -55,8 +55,9 @@ am_honeytrap_OBJECTS = honeytrap.$(OBJEXT) logging.$(OBJEXT) \
 	ctrl.$(OBJEXT) signals.$(OBJEXT) readconf.$(OBJEXT) \
 	plugin.$(OBJEXT) plughook.$(OBJEXT) util.$(OBJEXT) \
 	connectmon.$(OBJEXT) pcapmon.$(OBJEXT) ipqmon.$(OBJEXT) \
-	response.$(OBJEXT) dynsrv.$(OBJEXT) attack.$(OBJEXT) \
-	tcp.$(OBJEXT) udp.$(OBJEXT) proxy.$(OBJEXT) md5.$(OBJEXT)
+	nfqmon.$(OBJEXT) response.$(OBJEXT) dynsrv.$(OBJEXT) \
+	attack.$(OBJEXT) tcp.$(OBJEXT) udp.$(OBJEXT) proxy.$(OBJEXT) \
+	md5.$(OBJEXT)
 honeytrap_OBJECTS = $(am_honeytrap_OBJECTS)
 honeytrap_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -196,6 +197,7 @@ honeytrap_SOURCES = honeytrap.c honeytrap.h \
 			connectmon.c connectmon.h \
  			pcapmon.c pcapmon.h \
 			ipqmon.c ipqmon.h \
+			nfqmon.c nfqmon.h \
 			response.c response.h \
 			dynsrv.c dynsrv.h \
 			attack.c attack.h \

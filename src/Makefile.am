@@ -14,6 +14,7 @@ honeytrap_SOURCES = 	honeytrap.c honeytrap.h \
 			connectmon.c connectmon.h \
  			pcapmon.c pcapmon.h \
 			ipqmon.c ipqmon.h \
+			nfqmon.c nfqmon.h \
 			response.c response.h \
 			dynsrv.c dynsrv.h \
 			attack.c attack.h \
