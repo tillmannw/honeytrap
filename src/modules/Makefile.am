@@ -28,9 +28,9 @@ htm_SpamSum_la_LDFLAGS = -module -no-undefined -avoid-version
 
 install-exec-am:
 	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/plugins
-	for module in `find .libs -name 'htm_*.so | grep -v SpamSum'`; do \
+	for module in `find .libs -name htm_*.so | grep -v SpamSum`; do \
 		[ -h $$module ] || $(INSTALL_DATA) "$$module" $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/ ; \
 	done
-	for module in `find . -name 'htm_*.*a | grep -v SpamSum'`; do \
+	for module in `find . -name htm_*.*a | grep -v SpamSum`; do \
 		rm -f $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/`basename "$$module"` ; \
 	done
