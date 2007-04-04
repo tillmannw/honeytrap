@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS=foreign no-dependencies
 
-AM_CFLAGS=-export-dynamic
+AM_CFLAGS=-export-dynamic -Wall -Werror 
 
 sbin_PROGRAMS = honeytrap
 honeytrap_SOURCES = 	honeytrap.c honeytrap.h \
@@ -22,6 +22,7 @@ honeytrap_SOURCES = 	honeytrap.c honeytrap.h \
 			tcp.c tcp.h \
 			udp.c udp.h \
 			proxy.c proxy.h \
+			sha512.c sha512.h \
 			md5.c md5.h
 
 SUBDIRS = modules

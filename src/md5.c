@@ -277,7 +277,7 @@ void MD5_Final(unsigned char *result, MD5_CTX *ctx)
 	memset(ctx, 0, sizeof(*ctx));
 }
 
-char *mem_md5sum(u_char *mempos, u_int32_t size)
+char *mem_md5sum(u_char *msg, u_int32_t size)
 {
         unsigned char digest[16];
         MD5_CTX ctx;
@@ -289,8 +289,8 @@ char *mem_md5sum(u_char *mempos, u_int32_t size)
 	/* calculate md5 checksum */
 	while (size > 0) {
 		bytes = (size < 8192) ? size : 8192;
-		MD5_Update(&ctx, mempos, bytes);
-		mempos += bytes;
+		MD5_Update(&ctx, msg, bytes);
+		msg += bytes;
 		size -= bytes;
 	}
 

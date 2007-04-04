@@ -45,7 +45,7 @@ void handle_signal(int sig) {
 			}
 			break;
 		case SIGSEGV:
-			logmsg(LOG_DEBUG, 1, "SIGSEGV received.\n");
+			logmsg(LOG_ERR, 1, "Error - Segmentation fault (SIGSEGV received).\n");
 			_exit(0);
 		case SIGINT:
 			logmsg(LOG_DEBUG, 1, "SIGINT received.\n");

@@ -129,7 +129,7 @@ int get_tftpcmd(char *attack_string, int string_size) {
 	logmsg(LOG_DEBUG, 1, "TFTP download - Filename found: %s\n", file);
 
 	/* Do TFTP download */
-	return(get_tftp_ressource((struct in_addr *) host->h_addr_list[0], file));
+	return(get_tftp_resource((struct in_addr *) host->h_addr_list[0], file));
 }
 
 
@@ -140,7 +140,7 @@ int tftp_quit(int data_sock_fd, int dumpfile_fd) {
 }
 
 
-int get_tftp_ressource(struct in_addr* host, const char *save_file) {
+int get_tftp_resource(struct in_addr* host, const char *save_file) {
 	struct sockaddr_in data_socket, from;
 	int data_sock_fd, dumpfile_fd,
 	    fromlen, select_return, bytes_sent,

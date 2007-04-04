@@ -116,7 +116,7 @@ struct strtk extract_token(char *parse_string) {
 	while(isspace(*parse_string)) {
 		retval.string++;
 		retval.offset++;
-		*parse_string++;
+		parse_string++;
 	}
 
 	while (	(retval.offset < length) &&
@@ -125,7 +125,7 @@ struct strtk extract_token(char *parse_string) {
 		(*parse_string != '&') &&
 		(*parse_string != '\n')) {
 		retval.offset++;
-		*parse_string++;
+		parse_string++;
 	}
 	*parse_string = 0;
 	retval.offset++;

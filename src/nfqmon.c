@@ -98,7 +98,7 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 	start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 	
 	/* nfq_set_verdict()'s return value is really confusing and documented nowhere */
-	nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
+//	nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
 
 	return(1);
 }

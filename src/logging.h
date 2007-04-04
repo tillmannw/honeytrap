@@ -27,12 +27,10 @@
 
 #define LOGLINE_SIZE	256	/* truncates longer lines */
 
-char ltime[20];
 u_char log_level;
 
 int logfile_fd;
 
-char *log_time(char ltime[20]);
 void logmsg(int level, int add_time, const char * format, ...) __attribute__ ((format (printf, 3, 4)));
 
 #endif

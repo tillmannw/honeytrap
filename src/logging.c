@@ -21,25 +21,18 @@
 #include "logging.h"
 
 
-char *log_time(char ltime[20]) {
-	time_t timeval;
-
-	time(&timeval);
-	strftime(ltime, 50, "%F %T", localtime(&timeval));
-	return(ltime);
-}
-
-
 void logmsg(int level, int add_time, const char *format, ...) {
 	char logline[LOGLINE_SIZE];
 	va_list ap;
 	int bytes_written, logline_size;
+	time_t timeval;
 	
 	if(level <= log_level) { 
 		bzero(&logline, LOGLINE_SIZE);
 		va_start(ap, format);
 		if (add_time) {
-			snprintf(logline, 24, "[%s]  ", log_time(ltime));
+			time(&timeval);
+			strftime(logline, 23, "[%F %T] ", localtime(&timeval));
 			if (log_level == LOG_DEBUG)
 				snprintf(logline + strlen(logline), LOGLINE_SIZE - strlen(logline), "%5d  ", getpid());
 		}

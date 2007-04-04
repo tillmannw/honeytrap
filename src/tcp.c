@@ -28,6 +28,7 @@
 #include "honeytrap.h"
 #include "logging.h"
 #include "ipqmon.h"
+#include "nfqmon.h"
 #include "tcp.h"
 
 #ifdef USE_IPQ_MON
@@ -66,12 +67,18 @@ int tcpsock(struct sockaddr_in *server_addr, uint16_t port) {
 	    }
 	    return(-1);
 #else
+#ifdef USE_NFQ_MON
+	    /* hand packet processing back to the kernel */
+	    nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
+	    return(-1);
+#else
 	    if (errno != 98)
 		    logmsg(LOG_NOISY, 1, "Warning - Could not bind to port %u/tcp: %s.\n", ntohs(port), strerror(errno));
 	    else
 		    logmsg(LOG_DEBUG, 1, "Warning - Could not bind to port %u/tcp: %s.\n", ntohs(port), strerror(errno));
 	    close(fd);
 	    return(-1);
+#endif
 #endif
 	}
 	return(fd);

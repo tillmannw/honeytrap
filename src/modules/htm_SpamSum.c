@@ -108,7 +108,7 @@ int calc_spamsum(Attack *attack) {
 		if ((sig) && (!feof(hashfile))) {
 			if (sig[32] == '\n') sig[32] = 0;
 			logmsg(LOG_DEBUG, 1, "Comparing with %s.\n", sig);
-			if (strcmp(attack->a_conn.payload.chksum, sig) == 0) sig_match = 1;
+			if (strcmp(attack->a_conn.payload.md5sum, sig) == 0) sig_match = 1;
 		}
 	}
 	fclose(hashfile);
@@ -120,7 +120,7 @@ int calc_spamsum(Attack *attack) {
 			logmsg(LOG_ERR, 1, "Error - Could not open MD5 hash signature file: %s.\n", strerror(errno));
 			return(0);
 		}
-		if (fprintf(hashfile, "%s\n", attack->a_conn.payload.chksum) != 33) {
+		if (fprintf(hashfile, "%s\n", attack->a_conn.payload.md5sum) != 33) {
 			logmsg(LOG_ERR, 1, "Error - Could not append MD5 hash to signature file: %s.\n", strerror(errno));
 			fclose(hashfile);
 			return(0);

@@ -18,7 +18,7 @@
 #endif
 
 const char module_name[]="htm_SpamSum";
-const char module_version[]="0.2.1";
+const char module_version[]="0.3.0";
 
 void plugin_init(void);
 void plugin_unload(void);

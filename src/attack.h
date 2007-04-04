@@ -16,9 +16,10 @@
 #include <netinet/in.h>
 
 struct s_payload {
-	uint32_t	size;
-	char		chksum[33];	/* md5 checksum */
-	u_char		*data;
+	uint32_t		size;		/* length of attack string */
+	char			md5sum[33];	/* md5 checksum */
+	char			sha512sum[129];	/* sha512 checksum */
+	u_char			*data;		/* attack string */
 };
 
 struct s_conn {
@@ -30,17 +31,31 @@ struct s_conn {
 	struct s_payload	payload;	/* payload read from fd */
 };
 
+struct s_download {
+	char			*dl_type;	/* (FTP, TFTP, VNC, ...) */
+	uint32_t		r_addr;		/* remote IP address */
+	uint16_t		r_port;		/* remote port */
+	uint16_t		protocol;	/* protocol as in IP header */
+	char			*user;		/* username for download connection */
+	char			*pass;		/* user's password */
+	char			*filename;	/* filename of download */
+	struct s_payload	dl_payload;	/* downloaded data */
+};
+
 typedef struct s_attack {
-	time_t		start_time;	/* time of attack start */
-	time_t		end_time;	/* time of attack end */
-	struct s_conn	a_conn;		/* attack connection */
-	struct s_conn	p_conn;		/* proxy/mirror connection */
-	u_char		op_mode;	/* mode of operation (none, ignore, normal, proxy, mirror) */
+	time_t			start_time;	/* time of attack start */
+	time_t			end_time;	/* time of attack end */
+	struct s_conn		a_conn;		/* attack connection */
+	struct s_conn		p_conn;		/* proxy/mirror connection */
+	u_char			op_mode;	/* mode of operation (none, ignore, normal, proxy, mirror) */
+	uint16_t		dl_count;	/* number of downloads */
+//	struct s_download	download[];	/* array of download structs */
+	struct s_download	*download;	/* array of download structs */
 } Attack;
 
 
 Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto);
 int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_size, uint16_t port, Attack *a);
-
+int add_download(const char *dl_type, const uint32_t r_addr, const uint16_t r_port, const char *user, const char *pass, const char *filename, const u_char *data, const u_int32_t size, Attack *a);
 
 #endif

@@ -314,7 +314,7 @@ int configure(int my_argc, char *my_argv[]) {
 
 	/* open logfile */
 	if((logfile_fd = open(logfile_name, EXCL_FILE_RW, 0644)) == -1) {
-		fprintf(stderr, "  Error - Unable to open logfile.\n");
+		fprintf(stderr, "  Error - Unable to open logfile %s: %s.\n", logfile_name, strerror(errno));
 		exit(1);
 	}
 	fprintf(stdout, "  Logging to %s.\n", logfile_name);

@@ -1,3 +1,9 @@
+Version 0.7.0
+- PostgreSQL module for commits into mwcollect database
+- SHA512 hash support
+- Performance improvements
+- Improved connection request handling in the nfq stream monitor
+- FTP download plugin is now source-based routing safe
 Version 0.6.5
 - Introduced an nfnetlink_queue-based connection monitor
 - Some compile errors fixed

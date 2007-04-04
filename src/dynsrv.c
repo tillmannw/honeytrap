@@ -86,7 +86,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
     mirror_sock_fd	= -1;
     proxy_sock_fd	= -1;
     proxy_this		= 0;
-    mirror_this		= 1;
+    mirror_this		= 0;
     established		= 0;
     port_mode		= PORTCONF_IGNORE;
 
@@ -117,9 +117,11 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	}
 
 #ifndef USE_IPQ_MON
+#ifndef USE_NFQ_MON
 	/* don't need root privs any more */
 	drop_privileges(); 
 	logmsg(LOG_DEBUG, 1, "Server is now running with user id %d and group id %d.\n", getuid(), getgid());
+#endif
 #endif
 
 	/* create listener when handling tcp connection request */
@@ -150,7 +152,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	 * cannot set verdict here - it won't work for unknown reasons
 	 * Just do it in the stream monitor
 	 */
-	// nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
+	nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
 
 	/* don't need root privs any more */
 	drop_privileges(); 

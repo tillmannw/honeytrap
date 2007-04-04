@@ -25,7 +25,6 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #include <ctype.h>
-#include <stdio.h>
 
 #include <honeytrap.h>
 #include <logging.h>
@@ -70,14 +69,14 @@ int cmd_parse_for_ftp(Attack *attack) {
 
 			/* do ftp download */
 			addr = (struct in_addr *) &(attack->a_conn.l_addr);
-			return(get_ftpcmd(string_for_processing, attack->a_conn.payload.size, *addr));
+			get_ftpcmd(string_for_processing, attack->a_conn.payload.size, *addr,attack);
 		}
 	}
 	logmsg(LOG_DEBUG, 1, "No ftp command found.\n");
 	return(0);
 }
 
-int get_ftpcmd(char *attack_string, uint32_t string_size, struct in_addr lhost) {
+int get_ftpcmd(char *attack_string, uint32_t string_size, struct in_addr lhost, Attack *attack) {
 	char *parse_string=NULL, port[6], *user=NULL, *pass=NULL, *file=NULL;
 	struct hostent *host=NULL;
 	struct strtk token;
@@ -199,8 +198,8 @@ int get_ftpcmd(char *attack_string, uint32_t string_size, struct in_addr lhost) 
 			}
 
 			/* Do FTP transaction */
-			return(get_ftp_ressource(user, pass, (struct in_addr *) &lhost,
-						(struct in_addr *) host->h_addr_list[0], atoi(port), file));
+			return(get_ftp_resource(user, pass, (struct in_addr *) &lhost,
+						(struct in_addr *) host->h_addr_list[0], atoi(port), file, attack));
 		}
 	}
 	return(0);
@@ -249,7 +248,7 @@ int ftp_quit(int control_sock_fd, int data_sock_fd, int dumpfile_fd) {
 }
 
 
-int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost, struct in_addr *rhost, const int port, const char *save_file) {
+int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, struct in_addr *rhost, const int port, const char *save_file, Attack *attack) {
 	struct sockaddr_in control_socket, local_data_socket, remote_data_socket;
 	int control_sock_fd, data_sock_listen_fd, data_sock_fd, dumpfile_fd,
 	    local_data_port, bytes_read, total_bytes, addr_len, select_return, timeout, retval;
@@ -392,11 +391,41 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 		return(-1);
 	}
 
+	/* set local IP address for data connection */
+	if (ftp_host) {
+		/* use this ip address (host) for data connection */
+		logmsg(LOG_DEBUG, 1, "FTP download - Accept data connections on %s.\n", ftp_host);
+		if ((data_host = gethostbyname(ftp_host)) == NULL) {
+			logmsg(LOG_ERR, 1, "FTP download error - Unable to resolve %s.\n", ftp_host);
+			return(-1);
+		}
+		logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s.\n", ftp_host,
+			inet_ntoa(*(struct in_addr*)data_host->h_addr_list[0]));
+
+		if (!valid_ipaddr((uint32_t) *(data_host->h_addr_list[0]))) {
+			logmsg(LOG_INFO, 1, "FTP download error - %s is not a valid ip address.\n",
+				inet_ntoa(*(struct in_addr*)data_host->h_addr_list[0]));
+			return(-1);
+		}
+		lhost = (struct in_addr*)data_host->h_addr_list[0];
+		memcpy(ip_octet, lhost, 4);
+	} else {
+		/* determine local IP address of control connection socket */
+		addr_len = sizeof(struct sockaddr_in);
+		if (getsockname(control_sock_fd, (struct sockaddr *) &control_socket, (socklen_t *) &addr_len) != 0) {
+			logmsg(LOG_ERR, 1, "FTP download error - Unable to get local address from FTP control connection socket: %s\n", strerror(errno));
+			return(-1);
+		}
+		memcpy(ip_octet, &control_socket.sin_addr.s_addr, 4);
+	}
+	memcpy(&ftp_port, &local_data_socket.sin_port, sizeof(local_data_socket.sin_port));
+
 	/* listen on data channel socket */
 	memset(&local_data_socket, 0, sizeof(local_data_socket));
 	local_data_socket.sin_family = AF_INET;
-	local_data_socket.sin_addr.s_addr = htonl(INADDR_ANY);
+	local_data_socket.sin_addr.s_addr = control_socket.sin_addr.s_addr;
 	local_data_socket.sin_port = htons(local_data_port);
+
 	/* TODO: Check if errno == EINVAL (socket in use) */
 	while(((bind(data_sock_listen_fd, (struct sockaddr *) &local_data_socket,
 		sizeof(local_data_socket))) < 0) && (local_data_port < 65535)) {
@@ -426,25 +455,6 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 		ntohs(local_data_socket.sin_port));
 
 	/* send PORT */
-	if (ftp_host) {
-		/* use this ip address (host) for data connection */
-		logmsg(LOG_DEBUG, 1, "FTP download - Accept data connections on %s.\n", ftp_host);
-		if ((data_host = gethostbyname(ftp_host)) == NULL) {
-			logmsg(LOG_ERR, 1, "FTP download error - Unable to resolve %s.\n", ftp_host);
-			return(-1);
-		}
-		logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s.\n", ftp_host,
-			inet_ntoa(*(struct in_addr*)data_host->h_addr_list[0]));
-
-		if (!valid_ipaddr((uint32_t) *(data_host->h_addr_list[0]))) {
-			logmsg(LOG_INFO, 1, "FTP download error - %s is not a valid ip address.\n",
-				inet_ntoa(*(struct in_addr*)data_host->h_addr_list[0]));
-			return(-1);
-		}
-		lhost = (struct in_addr*)data_host->h_addr_list[0];
-	}
-	memcpy(ip_octet, lhost, 4);
-	memcpy(&ftp_port, &local_data_socket.sin_port, sizeof(local_data_socket.sin_port));
 	logmsg(LOG_NOISY, 1, "FTP download - Sending 'PORT %u,%u,%u,%u,%u,%u.\n",
 		ip_octet[0], ip_octet[1], ip_octet[2], ip_octet[3],
 		ftp_port.first_half, ftp_port.second_half);
@@ -518,7 +528,7 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 		ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
 		return(-1);
 	} else if (FD_ISSET(data_sock_listen_fd, &rfds)) { 
-		if ((data_sock_fd = accept(data_sock_listen_fd, (struct sockaddr *) &remote_data_socket, &addr_len)) < 0) {
+		if ((data_sock_fd = accept(data_sock_listen_fd, (struct sockaddr *) &remote_data_socket, (u_int *) &addr_len)) < 0) {
 			logmsg(LOG_ERR, 1, "FTP download error - Unable to accept FTP data connection: %s\n",
 				strerror(errno));
 			ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
@@ -578,9 +588,13 @@ int get_ftp_ressource(const char *user, const char* pass, struct in_addr *lhost,
 			close(dumpfile_fd);
 			logmsg(LOG_NOTICE, 1, "FTP download - %s saved.\n", save_file);
 		} else logmsg(LOG_NOISY, 1, "FTP download - No data received.\n");
+
+		/* add download struct to attack struct*/
+		logmsg(LOG_DEBUG, 1, "(htm_ftp) Adding download to attack struct.\n");
+		add_download("ftp", rhost->s_addr, port, user, pass, (const char *) save_file, binary_stream, total_bytes, attack);
+//		return(0);
 		close(data_sock_fd);
-	} else logmsg(LOG_DEBUG, 1, "FTP download - Select on FTP data channel returned but socket is not set: %s\n",
-		strerror(errno));
+	} else logmsg(LOG_DEBUG, 1, "FTP download - Select on FTP data channel returned but socket is not set: %s\n", strerror(errno));
 	
 	/* close open descriptors and return */
 	while((read_ftp_line(control_sock_fd, rline, 5) && strstr(rline, "226") != rline));

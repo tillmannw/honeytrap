@@ -8,8 +8,5 @@ o  Dump attack payload and responses in tcpdump format for future
    deep packet analysis
 
 -- Future plans -------------------------------------------------------
-o  optional syslog support
 o  dump attack data into MySQL and Postgres databases
-o  support approximate string matching (i.e. via edit distance) for
-   new records (command line tool is included, port it into a module?)
-o  add nfqueue and ipfw connection monitors
+o  add ipfw connection monitors

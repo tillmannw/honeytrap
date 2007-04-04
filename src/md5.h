@@ -31,6 +31,6 @@ typedef struct {
 extern void MD5_Init(MD5_CTX *ctx);
 extern void MD5_Update(MD5_CTX *ctx, void *data, unsigned long size);
 extern void MD5_Final(unsigned char *result, MD5_CTX *ctx);
-char *mem_md5sum(u_char *mempos, u_int32_t size);
+char *mem_md5sum(u_char *msg, u_int32_t size);
 
 #endif

@@ -29,6 +29,7 @@
 #include "dynsrv.h"
 #include "response.h"
 #include "md5.h"
+#include "sha512.h"
 #include "proxy.h"
 #include "plughook.h"
 #include "ipqmon.h"
@@ -45,6 +46,9 @@ Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port
 	a->a_conn.l_port	= l_port;
 	a->a_conn.r_port	= r_port;
 	a->a_conn.protocol	= proto;
+	a->dl_count		= 0;
+//	memset(a->download, 0, sizeof(struct s_download));
+	a->download		= NULL;
 	if (time(&(a->start_time)) == ((time_t)-1)) 
 		logmsg(LOG_WARN, 1, "Warning - Could not set attack start time: %s.\n", strerror(errno));
 
@@ -72,14 +76,15 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 		memcpy(a->a_conn.payload.data, a_data, a_size);
 	}
 
-	memcpy(a->a_conn.payload.chksum, (char*)mem_md5sum(a->a_conn.payload.data, a->a_conn.payload.size), 33);
+	memcpy(a->a_conn.payload.sha512sum, mem_sha512sum(a->a_conn.payload.data, a->a_conn.payload.size), 129);
+	memcpy(a->a_conn.payload.md5sum, mem_md5sum(a->a_conn.payload.data, a->a_conn.payload.size), 33);
 	/* mirror string */
 	a->p_conn.payload.size = p_size;
 	if (p_size) {
 		a->p_conn.payload.data = (u_char *) malloc(p_size);
 		memcpy(a->p_conn.payload.data, p_data, p_size);
 	}
-	memcpy((char *) &(a->p_conn.payload.chksum),
+	memcpy((char *) &(a->p_conn.payload.md5sum),
 		(char *) mem_md5sum(a->p_conn.payload.data, a->p_conn.payload.size), 32);
 
 
@@ -98,4 +103,45 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 	plughook_process_attack(*a);
 
 	return(1);
+}
+
+/* add a downloaded file to the attack instance */
+int add_download(const char *dl_type, const uint32_t r_addr, const uint16_t r_port, const char *user, const char *pass, const char *filename, const u_char *data, const u_int32_t size, Attack *a) {
+	if ((data == NULL) || (!size))  return(0);
+
+	if (a == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Could not add download: No attack record given.\n");
+		return(-1);
+	}
+
+	if ((a->download = realloc(a->download, a->dl_count + 1)) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		return(-1);
+	}
+
+	if (((a->download[a->dl_count].dl_type = strdup(dl_type)) == NULL) ||
+	    ((a->download[a->dl_count].user = strdup(user)) == NULL) ||
+	    ((a->download[a->dl_count].pass = strdup(pass)) == NULL) ||
+	    ((a->download[a->dl_count].filename = strdup(filename)) == NULL) ||
+	    ((a->download[a->dl_count].dl_payload.data = (u_char *) malloc(size)) == NULL)) { 
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		free(a->download[a->dl_count].dl_type);
+		free(a->download[a->dl_count].user);
+		free(a->download[a->dl_count].pass);
+		free(a->download[a->dl_count].filename);
+		free(a->download[a->dl_count].dl_payload.data);
+		return(-1);
+	}
+	memcpy(a->download[a->dl_count].dl_payload.data, data, size);
+	memcpy(a->download[a->dl_count].dl_payload.md5sum, mem_md5sum(a->download->dl_payload.data, size), 33);
+	memcpy(a->download[a->dl_count].dl_payload.sha512sum, mem_sha512sum(a->download->dl_payload.data, size), 129);
+
+	a->download[a->dl_count].dl_payload.size	= size;
+	a->download[a->dl_count].r_addr			= r_addr;
+	a->download[a->dl_count].r_port			= r_port;
+	a->dl_count++;
+
+	logmsg(LOG_DEBUG, 1, "%d. malware download added to attack record.\n", a->dl_count);
+
+	return(0);
 }
