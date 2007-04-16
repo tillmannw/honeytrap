@@ -44,14 +44,14 @@ void plugin_init(void) {
 
 
 void plugin_unload(void) {
-	unhook(&pluginlist_process_attack, module_name, "db_submit");
+	unhook(PPRIO_SAVEDATA, module_name, "db_submit");
 	return;
 }
 
 
 void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
-	add_attack_func_to_list(module_name, "db_submit", (void *) db_submit);
+	add_attack_func_to_list(PPRIO_SAVEDATA, module_name, "db_submit", (void *) db_submit);
 
 	return;
 }

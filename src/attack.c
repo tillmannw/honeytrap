@@ -100,7 +100,10 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 
 	/* call plugins */
 	/* do calls even if no data received, i.e. to update connection statistics */
-	plughook_process_attack(*a);
+	plughook_process_attack(funclist_attack_preproc, *a);
+	plughook_process_attack(funclist_attack_analyze, *a);
+	plughook_process_attack(funclist_attack_savedata, *a);
+	plughook_process_attack(funclist_attack_postproc, *a);
 
 	return(1);
 }

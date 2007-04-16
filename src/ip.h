@@ -13,6 +13,8 @@
 #ifndef __HONEYTRAP_IP_H
 #define __HONEYTRAP_IP_H 1
 
+#include <netinet/in.h>
+
 
 /* IP header */
 struct ip_header {

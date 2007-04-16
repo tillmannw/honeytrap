@@ -39,13 +39,13 @@ void plugin_init(void) {
 }
 
 void plugin_unload(void) {
-	unhook(&pluginlist_process_attack, module_name, "b64_decode");
+	unhook(PPRIO_PREPROC, module_name, "b64_decode");
 	return;
 }
 
 void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
-	add_attack_func_to_list(module_name, "b64_decode", (void *) b64_decode);
+	add_attack_func_to_list(PPRIO_PREPROC, module_name, "b64_decode", (void *) b64_decode);
 
 	return;
 }
@@ -134,7 +134,10 @@ int b64_decode(Attack *attack) {
 			logmsg(LOG_INFO, 1, "Calling plugins for decoded attack.\n");
 			dec_attack.a_conn.payload.data = decoded->str;
 			dec_attack.a_conn.payload.size = decoded->len;
-			plughook_process_attack(dec_attack);
+//			plughook_process_attack(funclist_attack_preproc, dec_attack);
+			plughook_process_attack(funclist_attack_analyze, dec_attack);
+			plughook_process_attack(funclist_attack_savedata, dec_attack);
+			plughook_process_attack(funclist_attack_postproc, dec_attack);
 
 
 			free(decoded->str);

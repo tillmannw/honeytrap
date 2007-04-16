@@ -40,13 +40,13 @@ void plugin_init(void) {
 }
 
 void plugin_unload(void) {
-	unhook(&pluginlist_process_attack, module_name, "cmd_parse_for_ftp");
+	unhook(PPRIO_ANALYZE, module_name, "cmd_parse_for_ftp");
 	return;
 }
 
 void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
-	add_attack_func_to_list(module_name, "cmd_parse_for_ftp", (void *) cmd_parse_for_ftp);
+	add_attack_func_to_list(PPRIO_ANALYZE, module_name, "cmd_parse_for_ftp", (void *) cmd_parse_for_ftp);
 
 	return;
 }

@@ -1,4 +1,5 @@
 Version 0.7.0
+- Plugins can be priotizized
 - PostgreSQL module for commits into mwcollect database
 - SHA512 hash support
 - Performance improvements

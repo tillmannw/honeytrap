@@ -32,8 +32,8 @@ int load_plugins(char *dir) {
 	char *full_path;
 	DIR *plugindir;
 
-	full_path = NULL;
-	plugin_list = NULL;
+	full_path	= NULL;
+	plugin_list	= NULL;
 
 	init_plugin_hooks();
 

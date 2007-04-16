@@ -86,7 +86,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
     mirror_sock_fd	= -1;
     proxy_sock_fd	= -1;
     proxy_this		= 0;
-    mirror_this		= 0;
+    mirror_this		= mirror_mode;
     established		= 0;
     port_mode		= PORTCONF_IGNORE;
 

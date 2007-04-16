@@ -13,7 +13,6 @@
 #ifndef __HONEYTRAP_PLUGIN_H
 #define __HONEYTRAP_PLUGIN_H 1
 
-
 typedef struct plugin_struct {
 	void *handle;
 	char *name;
@@ -24,6 +23,7 @@ typedef struct plugin_struct {
 
 
 char *plugin_error_str;
+
 Plugin *plugin_list;
 
 int load_plugins(char *dir);

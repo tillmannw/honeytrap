@@ -65,6 +65,7 @@ void clean_exit(int status) {
 	logmsg(LOG_DEBUG, 1, "Unloading default responses.\n");
 	unload_default_responses();
 
+	/* unloading plugins */
 	logmsg(LOG_DEBUG, 1, "Unloading plugins.\n");
 	unload_plugins();
 	

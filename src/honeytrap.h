@@ -19,27 +19,18 @@
 #include <grp.h>
 #include <dlfcn.h>
 
-/*
-#include "pcapmon.h"
-#include "ipqmon.h"
-*/
-
 #if HAVE_CONFIG_H
 # include <config.h>
 #endif
 
 
 #define EXCL_FILE_RW	O_CREAT | O_NOCTTY | O_APPEND | O_WRONLY
-#define DEBUG_FPRINTF if (log_level == LOG_DEBUG) fprintf
 
 #define PORTCONF_NONE	0
 #define PORTCONF_NORMAL	1
 #define PORTCONF_IGNORE	2
 #define PORTCONF_MIRROR	4
 #define PORTCONF_PROXY	8
-
-#define TCP 	6
-#define UDP	17
 
 char *conffile_name, **arg_v;
 int arg_c;

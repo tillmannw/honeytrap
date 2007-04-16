@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include <ip.h>
 #include <logging.h>
 #include <honeytrap.h>
 #include <attack.h>
@@ -37,13 +38,13 @@ void plugin_init(void) {
 }
 
 void plugin_unload(void) {
-	unhook(&pluginlist_process_attack, module_name, "save_to_file");
+	unhook(PPRIO_SAVEDATA, module_name, "save_to_file");
 	return;
 }
 
 void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
-	add_attack_func_to_list(module_name, "save_to_file", (void *) save_to_file);
+	add_attack_func_to_list(PPRIO_SAVEDATA, module_name, "save_to_file", (void *) save_to_file);
 
 	return;
 }
