@@ -418,7 +418,6 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		}
 		memcpy(ip_octet, &control_socket.sin_addr.s_addr, 4);
 	}
-	memcpy(&ftp_port, &local_data_socket.sin_port, sizeof(local_data_socket.sin_port));
 
 	/* listen on data channel socket */
 	memset(&local_data_socket, 0, sizeof(local_data_socket));
@@ -441,6 +440,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 			return(-1);
 		}
 	}
+	memcpy(&ftp_port, &local_data_socket.sin_port, sizeof(local_data_socket.sin_port));
 	logmsg(LOG_DEBUG, 1, "FTP download - FTP data channel on port %d initialized.\n",
 		ntohs(local_data_socket.sin_port));
 
