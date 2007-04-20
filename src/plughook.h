@@ -40,7 +40,7 @@ PlugFuncList *funclist_attack_postproc;
 
 
 PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plugname, const char *funcname, int (*func)(struct s_attack));
-void plughook_process_attack(PlugFuncList *func_list, Attack attack);
+void plughook_process_attack(PlugFuncList *func_list, Attack *attack);
 
 PlugFuncList *add_unload_func_to_list(const char *plugname, const char *funcname, void (*func)(void));
 void plughook_unload_plugins(void);

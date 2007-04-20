@@ -92,7 +92,7 @@ PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plug
 }
 
 
-void plughook_process_attack(PlugFuncList *func_list, Attack attack) {
+void plughook_process_attack(PlugFuncList *func_list, Attack *attack) {
 	PlugFuncList *func_tmp = NULL;
 
 	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'process_attack'.\n");
@@ -106,7 +106,7 @@ void plughook_process_attack(PlugFuncList *func_list, Attack attack) {
 	while(func_tmp) {
 		if (func_tmp->func) {
 			logmsg(LOG_DEBUG, 1, "Calling %s::%s().\n", func_tmp->plugnam, func_tmp->funcnam);
-			func_tmp->func((void *)&attack);
+			func_tmp->func((void *)attack);
 		} else logmsg(LOG_ERR, 1, "Error - Function %s::%s is not registered.\n",
 			func_tmp->plugnam, func_tmp->funcnam);
 		func_tmp = func_tmp->next;
@@ -145,13 +145,6 @@ void plughook_unload_plugins(void) {
 	PlugFuncList *func_del, *func_tmp = NULL;
 
 	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'unload_plugins'.\n");
-
-/*
-	if (funclist_process_attack == NULL) {
-		logmsg(LOG_DEBUG, 1, "No plugins registered for hook 'unload_plugins'.\n");
-		return;
-	}
-*/
 
 	func_tmp = funclist_unload_plugins;
 	while(func_tmp) {

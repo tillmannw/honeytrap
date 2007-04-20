@@ -2,11 +2,13 @@ AUTOMAKE_OPTIONS = foreign no-dependencies
 
 AM_YFLAGS = -d
 
+AM_CFLAGS=-Wall -Werror
+
 INCLUDES = -I../
 
 libdir=$(DESTDIR)/$(sysconfdir)/honeytrap/plugins
 
-lib_LTLIBRARIES = htm_aSaveFile.la htm_ftpDownload.la htm_tftpDownload.la htm_vncDownload.la htm_b64Decode.la htm_SpamSum.la
+lib_LTLIBRARIES = htm_aSaveFile.la htm_ftpDownload.la htm_tftpDownload.la htm_vncDownload.la htm_b64Decode.la htm_SpamSum.la htm_aSavePostgres.la
 
 htm_aSaveFile_la_SOURCES = htm_aSaveFile.c htm_aSaveFile.h
 htm_aSaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
@@ -25,6 +27,9 @@ htm_b64Decode_la_LDFLAGS = -module -no-undefined -avoid-version
 
 htm_SpamSum_la_SOURCES = htm_SpamSum.c htm_SpamSum.h
 htm_SpamSum_la_LDFLAGS = -module -no-undefined -avoid-version
+
+htm_aSavePostgres_la_SOURCES = htm_aSavePostgres.c htm_aSavePostgres.h
+htm_aSavePostgres_la_LDFLAGS = -module -no-undefined -avoid-version -lpq
 
 install-exec-am:
 	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/plugins

@@ -33,6 +33,7 @@
 #include <ip.h>
 #include <plughook.h>
 #include <md5.h>
+#include <sha512.h>
 
 #include "htm_aSavePostgres.h"
 
@@ -99,11 +100,11 @@ char *build_url(struct s_download *download) {
 		return(NULL);
 	}
 	logmsg(LOG_DEBUG, 1, "(Build URL): Typ: %s.\n",download->dl_type);
-	snprintf(url + strlen(url), strlen(download->dl_type) + 3, "%s://", download->dl_type);
+	snprintf(url + strlen(url), strlen(download->dl_type) + 4, "%s://", download->dl_type);
 
 	if(strlen(download->user)) {
 		logmsg(LOG_NOISY,1,"(Build URL): User: %s Pass: %s.\n", download->user, download->pass);
-		snprintf(url + strlen(url), strlen(download->user) + strlen(download->pass) + 2, "%s:%s@", download->user, download->pass);
+		snprintf(url + strlen(url), strlen(download->user) + strlen(download->pass) + 3, "%s:%s@", download->user, download->pass);
 	}
 
 	logmsg(LOG_NOISY, 1, "(Build URL): URL: %s.\n", inet_ntoa(*(struct in_addr*)&download->r_addr));
@@ -111,13 +112,13 @@ char *build_url(struct s_download *download) {
 
 	if (download->r_port) {
 		logmsg(LOG_NOISY, 1, "(Build URL): Port: %d.\n", download->r_port);
-		snprintf(url + strlen(url), 6, ":%d/", download->r_port);
+		snprintf(url + strlen(url), 7, ":%d/", download->r_port);
 		strcat(url + strlen(url), PROTO(download->protocol));
 	}
 
 	if (download->filename) {
 		logmsg(LOG_NOISY, 1, "(Build URL): Filename: %s.\n", download->filename);
-		snprintf(url + strlen(url), strlen(download->filename) + 1, "/%s", download->filename);
+		snprintf(url + strlen(url), strlen(download->filename) + 2, "/%s", download->filename);
 	}
 
 	return(url);
@@ -177,11 +178,16 @@ int db_submit(Attack *attack) {
 			free(url);
 			return(-1);
 		}
-		if (snprintf(query, MAX_SQL_BUFFER, "SELECT malware.sensor_honeytrap_add_sample('%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s')",
-			mem_md5sum(attack->download->dl_payload.data, attack->download->dl_payload.size),
-			"mysensor", "malware", url, inet_ntoa(*(struct in_addr*)&(attack->a_conn.l_addr)),
-			inet_ntoa(*(struct in_addr*)&(attack->a_conn.r_addr)), attack->a_conn.l_port,
-			attack->download->r_port, esc_bytea) >= MAX_SQL_BUFFER) {
+		if (snprintf(query, MAX_SQL_BUFFER, "SELECT attacks.sensor_honeytrap_add_sample('%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s')",
+			mem_sha512sum(attack->download->dl_payload.data, attack->download->dl_payload.size),
+			"honeytrap-default",
+			"dynamic-generic",
+			url,
+			inet_ntoa(*(struct in_addr*)&(attack->a_conn.l_addr)),
+			inet_ntoa(*(struct in_addr*)&(attack->a_conn.r_addr)),
+			attack->a_conn.l_port,
+			attack->download->r_port,
+			esc_bytea) >= MAX_SQL_BUFFER) {
 			logmsg(LOG_ERR, 1, "Error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
 				free(url);
 				free(query);
@@ -228,6 +234,9 @@ int db_submit(Attack *attack) {
 		strftime(starttime, 40, "%Y-%m-%d %T %Z", localtime(&attack->start_time));
 		strftime(endtime, 40, "%Y-%m-%d %T %Z", localtime(&attack->end_time));
 
+
+/* FIXME: link samples to attacks */
+/*
 		if(attack->dl_count) {
 			if (snprintf(query, MAX_SQL_BUFFER,
 				"SELECT attacks.honeytrap_add_attack_string('%s'::varchar, %d::integer, '%s'::timestamptz, '%s'::timestamptz, " \
@@ -251,6 +260,7 @@ int db_submit(Attack *attack) {
 					return(-1);
 				}
 		} else {
+*/
 			if (snprintf(query, MAX_SQL_BUFFER,
 				"SELECT attacks.honeytrap_add_attack_string('%s'::varchar, %d::integer, '%s'::timestamptz, '%s'::timestamptz, " \
 				"'%s'::inet, %d::integer, '%s'::inet, %d::integer, %d, %d::smallint, '%s'::inet, %d::integer, '%s'::bytea)",
@@ -272,7 +282,7 @@ int db_submit(Attack *attack) {
 					free(query);
 					return(-1);
 				}
-		}
+//		}
 
 		if (PQresultStatus(res = PQexec(db_connection, query)) != PGRES_TUPLES_OK) {
 			logmsg(LOG_ERR, 1, "Database error - Attack submission failed: %s.\n", PQerrorMessage(db_connection));

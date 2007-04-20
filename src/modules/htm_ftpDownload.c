@@ -70,6 +70,7 @@ int cmd_parse_for_ftp(Attack *attack) {
 			/* do ftp download */
 			addr = (struct in_addr *) &(attack->a_conn.l_addr);
 			get_ftpcmd(string_for_processing, attack->a_conn.payload.size, *addr,attack);
+			return(0);
 		}
 	}
 	logmsg(LOG_DEBUG, 1, "No ftp command found.\n");
@@ -586,14 +587,17 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 				return(-1);
 			}
 			close(dumpfile_fd);
+
+			/* add download struct to attack struct*/
+			logmsg(LOG_DEBUG, 1, "(htm_ftp) Adding download to attack struct.\n");
+			add_download("ftp", 6, rhost->s_addr, port, user, pass, (const char *) save_file, binary_stream, total_bytes, attack);
+
 			logmsg(LOG_NOTICE, 1, "FTP download - %s saved.\n", save_file);
 		} else logmsg(LOG_NOISY, 1, "FTP download - No data received.\n");
 
-		/* add download struct to attack struct*/
-		logmsg(LOG_DEBUG, 1, "(htm_ftp) Adding download to attack struct.\n");
-		add_download("ftp", rhost->s_addr, port, user, pass, (const char *) save_file, binary_stream, total_bytes, attack);
-//		return(0);
 		close(data_sock_fd);
+printf("---> returning.\n");
+		return(0);
 	} else logmsg(LOG_DEBUG, 1, "FTP download - Select on FTP data channel returned but socket is not set: %s\n", strerror(errno));
 	
 	/* close open descriptors and return */
