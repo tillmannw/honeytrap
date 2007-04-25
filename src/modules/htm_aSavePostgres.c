@@ -61,13 +61,13 @@ void plugin_register_hooks(void) {
 int db_connect(void) {
 	/* connect to database */
 	if (PQstatus(db_connection = PQconnectdb(db_info)) != CONNECTION_OK) {
-		logmsg(LOG_ERR, 1, "Error - Could not connect to database: %s.\n", PQerrorMessage(db_connection));
+		logmsg(LOG_ERR, 1, "Postgres client error - Could not connect to database: %s.\n", PQerrorMessage(db_connection));
 		PQfinish(db_connection);
 		return(-1);
 	}
-	logmsg(LOG_NOISY, 1, "Attack database (Postgres) - Connection established.\n");
+	logmsg(LOG_NOISY, 1, "Postgres client - Database connection established.\n");
 	if (PQsetClientEncoding(db_connection, "UTF8") != 0) {
-		logmsg(LOG_ERR, 1, "Error - Could not set database character encoding to UTF8: %s.\n", PQerrorMessage(db_connection));
+		logmsg(LOG_ERR, 1, "Postgres client error - Could not set database character encoding to UTF8: %s.\n", PQerrorMessage(db_connection));
 		PQfinish(db_connection);
 		return(-1);
 	}
@@ -78,56 +78,57 @@ int db_connect(void) {
 void db_disconnect(void) {
 	/* disconnect from database */
 	PQfinish(db_connection);
-	logmsg(LOG_NOISY, 1, "Attack database (Postgres) - Connection closed.\n");
+	logmsg(LOG_NOISY, 1, "Postgres client - Connection closed.\n");
 	return;
 }
 
 
-char *build_url(struct s_download *download) {
-	char		*url;		// generic malware URL format 'type://user:pass@path/to/file:port/protocol'
+char *build_uri(struct s_download *download) {
+	char		*uri;		// generic malware URI format 'type://user:pass@path/to/file:port/protocol'
 
-	if ((url = malloc(MAX_URL_SIZE + 1)) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+	if ((uri = malloc(MAX_URI_SIZE + 1)) == NULL) {
+		logmsg(LOG_ERR, 1, "Postgres client error - Unable to allocate memory: %s.\n", strerror(errno));
 		return(NULL);
 	}
-	memset(url, 0, MAX_URL_SIZE+1);
+	memset(uri, 0, MAX_URI_SIZE+1);
 
-	logmsg(LOG_DEBUG, 1, "Building generic malware resource URL.\n");
+	logmsg(LOG_DEBUG, 1, "Postgres client - Building generic malware resource URI.\n");
 
 	/* should check for supported protocol types */
 	if (!strlen(download->dl_type)) {
-		logmsg(LOG_WARN, 1, "Database warning - Could not build URL: Unknown protocol type.\n");
+		logmsg(LOG_WARN, 1, "Postgres client - Warning: Could not build URI: Unknown protocol type.\n");
 		return(NULL);
 	}
-	logmsg(LOG_DEBUG, 1, "(Build URL): Typ: %s.\n",download->dl_type);
-	snprintf(url + strlen(url), strlen(download->dl_type) + 4, "%s://", download->dl_type);
+	logmsg(LOG_DEBUG, 1, "Postgres client - Adding Type to URI: %s\n",download->dl_type);
+	snprintf(uri + strlen(uri), strlen(download->dl_type) + 4, "%s://", download->dl_type);
 
 	if(strlen(download->user)) {
-		logmsg(LOG_NOISY,1,"(Build URL): User: %s Pass: %s.\n", download->user, download->pass);
-		snprintf(url + strlen(url), strlen(download->user) + strlen(download->pass) + 3, "%s:%s@", download->user, download->pass);
+		logmsg(LOG_NOISY,1,"Postgres client - Adding user and pass to URI: %s:%s\n", download->user, download->pass);
+		snprintf(uri + strlen(uri), strlen(download->user) + strlen(download->pass) + 3, "%s:%s@", download->user, download->pass);
 	}
 
-	logmsg(LOG_NOISY, 1, "(Build URL): URL: %s.\n", inet_ntoa(*(struct in_addr*)&download->r_addr));
-	strncat(url, inet_ntoa(*(struct in_addr*)&download->r_addr), strlen(inet_ntoa(*(struct in_addr*)&download->r_addr)));
-
-	if (download->r_port) {
-		logmsg(LOG_NOISY, 1, "(Build URL): Port: %d.\n", download->r_port);
-		snprintf(url + strlen(url), 7, ":%d/", download->r_port);
-		strcat(url + strlen(url), PROTO(download->protocol));
-	}
+	logmsg(LOG_NOISY, 1, "Postgres client - Adding host to URI: %s\n", inet_ntoa(*(struct in_addr*)&download->r_addr));
+	strncat(uri, inet_ntoa(*(struct in_addr*)&download->r_addr), strlen(inet_ntoa(*(struct in_addr*)&download->r_addr)));
 
 	if (download->filename) {
-		logmsg(LOG_NOISY, 1, "(Build URL): Filename: %s.\n", download->filename);
-		snprintf(url + strlen(url), strlen(download->filename) + 2, "/%s", download->filename);
+		logmsg(LOG_NOISY, 1, "Postgres client - Adding filename to URI: %s\n", download->filename);
+		snprintf(uri + strlen(uri), strlen(download->filename) + 2, "/%s", download->filename);
 	}
 
-	return(url);
+	if (download->r_port) {
+		logmsg(LOG_NOISY, 1, "Postgres client - Adding port to URI: %d\n", download->r_port);
+		snprintf(uri + strlen(uri), 7, ":%d/", download->r_port);
+		strcat(uri + strlen(uri), PROTO(download->protocol));
+	}
+
+
+	return(uri);
 }
 
 
 int db_submit(Attack *attack) {
 	PGresult	*res;
-	char		*query, *starttime, *endtime, *url, *l_ip, *r_ip;
+	char		*query, *starttime, *endtime, *uri, *l_ip, *r_ip;
 	u_char		*esc_bytea;
 	int		mw_inst = -1;
 	size_t		length;
@@ -135,12 +136,12 @@ int db_submit(Attack *attack) {
 	/* we only need to connect if we have data */
 	if ((!attack->a_conn.payload.size) && (!attack->dl_count)) return(0); 
 
-	logmsg(LOG_DEBUG, 1, "Attack database (Postgres) - Connecting to database.\n");
+	logmsg(LOG_DEBUG, 1, "Postgres client - Connecting to database.\n");
 	if (db_connect() != 0) return(-1);
 
 	/* Start a transaction block */
 	if (PQresultStatus(res = PQexec(db_connection, "BEGIN")) != PGRES_COMMAND_OK) {
-		logmsg(LOG_ERR, 1, "Database error - BEGIN command failed: %s.\n", PQerrorMessage(db_connection));
+		logmsg(LOG_ERR, 1, "Postgres client error - BEGIN command failed: %s.\n", PQerrorMessage(db_connection));
 		PQclear(res);
 		db_disconnect();
 		return(-1);
@@ -151,14 +152,14 @@ int db_submit(Attack *attack) {
 	/* upload malware */
 	if (attack->dl_count) {
 		if ((query = malloc(MAX_SQL_BUFFER + 1)) == NULL) {
-			logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Postgres client error - Unable to allocate memory: %s.\n", strerror(errno));
 			return(-1);
 		}
 		memset(query, 0, MAX_SQL_BUFFER + 1);
 
 		/* escape byte data to prevent sql injection */
 		if ((esc_bytea = PQescapeByteaConn(db_connection, attack->download->dl_payload.data, attack->download->dl_payload.size, &length)) == NULL) {
-			logmsg(LOG_ERR, 1, "Database error - Could not escape attack string: %s.\n", PQerrorMessage(db_connection));
+			logmsg(LOG_ERR, 1, "Postgres client error - Could not escape attack string: %s.\n", PQerrorMessage(db_connection));
 			PQclear(res);
 			db_disconnect();
 			free(query);
@@ -167,36 +168,36 @@ int db_submit(Attack *attack) {
 
 		mem_md5sum(attack->download->dl_payload.data,attack->download->dl_payload.size);
 
-		if ((url = build_url(attack->download)) == NULL) {
-			logmsg(LOG_WARN, 1, "Warning - Unable to build generic malware URL.\n");
-			free(url);
-		} else logmsg(LOG_NOISY, 1, "Generic malware URL assembled: %s\n", url);
+		if ((uri = build_uri(attack->download)) == NULL) {
+			logmsg(LOG_WARN, 1, "Postgres client warning - Unable to build generic malware URI.\n");
+			free(uri);
+		} else logmsg(LOG_NOISY, 1, "Postgres client - Generic malware URI assembled: %s\n", uri);
 
 		if (((l_ip = strdup(inet_ntoa(*(struct in_addr*)&(attack->a_conn.l_addr)))) == NULL) ||
 		    ((r_ip = strdup(inet_ntoa(*(struct in_addr*)&(attack->a_conn.r_addr)))) == NULL)) {
-			logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
-			free(url);
+			logmsg(LOG_ERR, 1, "Postgres client error - Unable to allocate memory: %s.\n", strerror(errno));
+			free(uri);
 			return(-1);
 		}
 		if (snprintf(query, MAX_SQL_BUFFER, "SELECT attacks.sensor_honeytrap_add_sample('%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s')",
 			mem_sha512sum(attack->download->dl_payload.data, attack->download->dl_payload.size),
 			"honeytrap-default",
 			"dynamic-generic",
-			url,
+			uri,
 			inet_ntoa(*(struct in_addr*)&(attack->a_conn.l_addr)),
 			inet_ntoa(*(struct in_addr*)&(attack->a_conn.r_addr)),
 			attack->a_conn.l_port,
 			attack->download->r_port,
 			esc_bytea) >= MAX_SQL_BUFFER) {
-			logmsg(LOG_ERR, 1, "Error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
-				free(url);
+			logmsg(LOG_ERR, 1, "Postgres client error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
+				free(uri);
 				free(query);
 				return(-1);
 			}
-		free(url);
+		free(uri);
 
 		if (PQresultStatus(res = PQexec(db_connection, query)) != PGRES_TUPLES_OK) {
-			logmsg(LOG_ERR, 1, "Database error - Malware submission failed: %s.\n", PQerrorMessage(db_connection));
+			logmsg(LOG_ERR, 1, "Postgres client error - Malware submission failed: %s.\n", PQerrorMessage(db_connection));
 			PQclear(res);
 			db_disconnect();
 			free(query);
@@ -204,7 +205,7 @@ int db_submit(Attack *attack) {
 		}
 		free(query);
 		PQfreemem(esc_bytea);
-		logmsg(LOG_NOISY, 1, "Attack database (Postgres) - Malware saved.\n");
+		logmsg(LOG_NOISY, 1, "Postgres client - Malware saved.\n");
 
 		/* get instance number for reference within attack_string record */
 		mw_inst = atoi(PQgetvalue(res, 0, PQfnumber(res, "sensor_honeytrap_add_sample")));
@@ -216,14 +217,14 @@ int db_submit(Attack *attack) {
 	/* upload attack */
 	if (attack->a_conn.payload.size > 0) {
 		if ((query = malloc(MAX_SQL_BUFFER + 1)) == NULL) {
-			logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Postgres client error - Unable to allocate memory: %s.\n", strerror(errno));
 			return(-1);
 		}
 		memset(query, 0, MAX_SQL_BUFFER + 1);
 
 		/* escape byte data to prevent sql injection */    
 		if ((esc_bytea = PQescapeByteaConn(db_connection, attack->a_conn.payload.data, attack->a_conn.payload.size, &length)) == NULL) {
-			logmsg(LOG_ERR, 1, "Database error - Could not escape malware binary string: %s.\n", PQerrorMessage(db_connection));
+			logmsg(LOG_ERR, 1, "Postgres client error - Could not escape malware binary string: %s.\n", PQerrorMessage(db_connection));
 			db_disconnect();
 			free(query);
 			return(-1);
@@ -255,7 +256,7 @@ int db_submit(Attack *attack) {
 				inet_ntoa(*(struct in_addr*)&(attack->p_conn.r_addr)),
 				attack->p_conn.r_port,
 				esc_bytea) >= MAX_SQL_BUFFER) {
-					logmsg(LOG_ERR, 1, "Error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
+					logmsg(LOG_ERR, 1, "Postgres client error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
 					free(query);
 					return(-1);
 				}
@@ -278,21 +279,21 @@ int db_submit(Attack *attack) {
 				inet_ntoa(*(struct in_addr*)&(attack->p_conn.r_addr)),
 				attack->p_conn.r_port,
 				esc_bytea) >= MAX_SQL_BUFFER) {
-					logmsg(LOG_ERR, 1, "Error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
+					logmsg(LOG_ERR, 1, "Postgres client error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
 					free(query);
 					return(-1);
 				}
 //		}
 
 		if (PQresultStatus(res = PQexec(db_connection, query)) != PGRES_TUPLES_OK) {
-			logmsg(LOG_ERR, 1, "Database error - Attack submission failed: %s.\n", PQerrorMessage(db_connection));
+			logmsg(LOG_ERR, 1, "Postgres client error - Attack submission failed: %s.\n", PQerrorMessage(db_connection));
 			PQclear(res);
 			db_disconnect();
 			free(query);
 			return(-1);
 		}
 
-		logmsg(LOG_NOISY, 1, "Attack database (Postgres) - Attack saved.\n");
+		logmsg(LOG_NOISY, 1, "Postgres client - Attack saved.\n");
 		free(starttime);
 		free(endtime);
 
@@ -303,7 +304,7 @@ int db_submit(Attack *attack) {
 
 	/* end transaction and disconnect */
 	if (PQresultStatus(res = PQexec(db_connection, "END")) != PGRES_COMMAND_OK) {
-		logmsg(LOG_ERR, 1, "Database error - END command failed: %s.\n", PQerrorMessage(db_connection));
+		logmsg(LOG_ERR, 1, "Postgres client error - END command failed: %s.\n", PQerrorMessage(db_connection));
 		PQclear(res);
 		db_disconnect();
 		return(-1);

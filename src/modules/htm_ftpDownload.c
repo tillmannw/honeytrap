@@ -596,7 +596,6 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		} else logmsg(LOG_NOISY, 1, "FTP download - No data received.\n");
 
 		close(data_sock_fd);
-printf("---> returning.\n");
 		return(0);
 	} else logmsg(LOG_DEBUG, 1, "FTP download - Select on FTP data channel returned but socket is not set: %s\n", strerror(errno));
 	

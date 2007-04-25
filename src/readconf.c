@@ -292,7 +292,7 @@ int configure(int my_argc, char *my_argv[]) {
 				snprintf(bpf_cmd_ext+strlen(bpf_cmd_ext), strlen(my_argv[optind])+2,
 					" %s%c", my_argv[optind], 0);
 			}
-			my_argv[optind++];
+			optind++;
 		}
 		DEBUG_FPRINTF(stdout, "  Command line bpf expression is '%s'\n", bpf_cmd_ext); 
 	}

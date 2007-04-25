@@ -87,8 +87,8 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 		if ((ip = icmp_dissect(ip)) == NULL) return;
 		ip_hdr	= (struct ip_header *) ip;
 		udp	= (struct udp_header *) (ip + (4 * ip_hdr->ip_hlen));
-		sport	= ntohs(udp->uh_dport);
-		dport	= ntohs(udp->uh_sport);
+		sport	= ntohs(udp->uh_sport);
+		dport	= ntohs(udp->uh_dport);
 		port_mode = port_flags[dport].udp;
 	} else {
 		logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip_hdr->ip_p);
@@ -118,8 +118,13 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 		return;
 	}
 
-	logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", sport, PROTO(ip_hdr->ip_p));
-	start_dynamic_server(ip_hdr->ip_dst, htons(dport), ip_hdr->ip_src, htons(sport), ip_hdr->ip_p);
+	if (ip_hdr->ip_p == UDP) {
+		logmsg(LOG_INFO, 1, "Connection request on port %d/udp.\n", dport);
+		start_dynamic_server(ip_hdr->ip_src, htons(sport), ip_hdr->ip_dst, htons(dport), ip_hdr->ip_p);
+	} else if (ip_hdr->ip_p == TCP) {
+		logmsg(LOG_INFO, 1, "Connection request on port %d/tcp.\n", sport);
+		start_dynamic_server(ip_hdr->ip_dst, htons(dport), ip_hdr->ip_src, htons(sport), ip_hdr->ip_p);
+	}
 	return;
 }
 

@@ -27,6 +27,7 @@
 #include <ip.h>
 #include <logging.h>
 #include <honeytrap.h>
+#include <md5.h>
 #include <attack.h>
 #include <plughook.h>
 
@@ -52,8 +53,12 @@ void plugin_register_hooks(void) {
 int save_to_file(Attack *attack) {
 	struct tm *file_time;
 	time_t loc_time;
-	char *filename = NULL, *proto_str = NULL;
-	int dumpfile_fd;
+	char *filename, *mwfilename, *proto_str;
+	int i, dumpfile_fd;
+
+	filename	= NULL;
+	mwfilename	= NULL;
+	proto_str	= NULL;
 
 	logmsg(LOG_DEBUG, 1, "Dumping attack string into file.\n");
 
@@ -104,5 +109,31 @@ int save_to_file(Attack *attack) {
 	}
 	close(dumpfile_fd);
 	logmsg(LOG_DEBUG, 1, "Plugin aSaveFile: Attack string saved as %s.\n", filename);
+
+	/* save malware */
+	for (i=1; i<=attack->dl_count; i++) {
+		/* save file */
+		/* we need the length of directory + "/" + filename plus md5 checksum */
+		mwfilename = (char *) malloc(strlen(dlsave_dir)+strlen(filename)+35);
+		snprintf(mwfilename, strlen(dlsave_dir)+strlen(mwfilename) + 35, "%s/%s-%s",
+			dlsave_dir, mem_md5sum(attack->download[i].dl_payload.data, attack->download[i].dl_payload.size), mwfilename);
+		logmsg(LOG_DEBUG, 1, "Malware sample dump - File name is %s\n", mwfilename);
+		if (((dumpfile_fd = open(mwfilename, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
+		    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {
+			logmsg(LOG_WARN, 1, "Malware sample dump - Unable to save %s: %s.\n", mwfilename,
+				strerror(errno));
+			close(dumpfile_fd);
+			return(-1);
+		}
+		if (write(dumpfile_fd, attack->download[i].dl_payload.data, attack->download[i].dl_payload.size) != attack->download[i].dl_payload.size) { 
+			logmsg(LOG_ERR, 1, "Malware sample dump error - Unable to write data to file: %s\n",
+				strerror(errno));
+			close(dumpfile_fd);
+			return(-1);
+		}
+		close(dumpfile_fd);
+		logmsg(LOG_NOTICE, 1, "Malware sample dump - %s saved.\n", attack->download[i].filename);
+	}
+
 	return(0);
 }

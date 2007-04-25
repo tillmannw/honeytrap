@@ -21,10 +21,10 @@
 #include <postgresql/libpq-fe.h>
 
 #define MAX_SQL_BUFFER	10485760		// 10 MB
-#define MAX_URL_SIZE	2048
+#define MAX_URI_SIZE	2048
 
 const char	module_name[]		= "htm_aSavePostgres";
-const char	module_version[]	= "0.1";
+const char	module_version[]	= "0.2";
 
 struct pg_conn	*db_connection;
 
