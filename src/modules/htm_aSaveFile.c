@@ -1,5 +1,5 @@
 /* htm_aSaveFile.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -13,6 +13,8 @@
  * Description:
  *   This honeytrap module dumps incoming traffic from incoming
  *   connections to a file.
+ *   Also, all malware/sample entries attached to an attack record
+ *   are dumped into a download directory.
  */
 
 #include <stdio.h>
@@ -111,12 +113,12 @@ int save_to_file(Attack *attack) {
 	logmsg(LOG_DEBUG, 1, "Plugin aSaveFile: Attack string saved as %s.\n", filename);
 
 	/* save malware */
-	for (i=1; i<=attack->dl_count; i++) {
+	for (i=0; i<attack->dl_count; i++) {
 		/* save file */
 		/* we need the length of directory + "/" + filename plus md5 checksum */
 		mwfilename = (char *) malloc(strlen(dlsave_dir)+strlen(filename)+35);
-		snprintf(mwfilename, strlen(dlsave_dir)+strlen(mwfilename) + 35, "%s/%s-%s",
-			dlsave_dir, mem_md5sum(attack->download[i].dl_payload.data, attack->download[i].dl_payload.size), mwfilename);
+		snprintf(mwfilename, strlen(dlsave_dir)+strlen(filename)+35, "%s/%s-%s",
+			dlsave_dir, mem_md5sum(attack->download[i].dl_payload.data, attack->download[i].dl_payload.size), attack->download[i].filename);
 		logmsg(LOG_DEBUG, 1, "Malware sample dump - File name is %s\n", mwfilename);
 		if (((dumpfile_fd = open(mwfilename, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
 		    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {

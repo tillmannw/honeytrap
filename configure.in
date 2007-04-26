@@ -446,7 +446,7 @@ AC_SUBST(INCLUDES)
 
 if test $with_ipq_mon != "yes" -a $with_nfq_mon != "yes" -a $with_ipfw_mon != "yes" -a $with_pcap_mon != "yes"; then
   echo
-  echo "   ERROR! No connection monitor selected. Please reconfigure with --with-pcap-mon or --with-ipq-mon."
+  echo "   ERROR! No connection monitor selected. Please reconfigure with --with-pcap-mon, --with-nfq-mon  or --with-ipq-mon."
   echo
   exit 1
 fi

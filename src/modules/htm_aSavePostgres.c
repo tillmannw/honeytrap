@@ -155,7 +155,27 @@ int db_submit(Attack *attack) {
 			logmsg(LOG_ERR, 1, "Postgres client error - Unable to allocate memory: %s.\n", strerror(errno));
 			return(-1);
 		}
+
+		/* check if sample already exists */
 		memset(query, 0, MAX_SQL_BUFFER + 1);
+		if (snprintf(query, MAX_SQL_BUFFER, "SELECT malware.sensor_exists_sample('%s')", 
+			mem_sha512sum(attack->download->dl_payload.data, attack->download->dl_payload.size)) >= MAX_SQL_BUFFER) {
+			logmsg(LOG_ERR, 1, "Postgres client error - Could not check if sample exists: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
+			free(query);
+			return(-1);
+		}
+
+/*
+		if (PQresultStatus(res = PQexec(db_connection, query)) != PGRES_TUPLES_OK) {
+			printf("---> malware exists.\n");
+		} else printf("---> malware does not exist.\n");
+			logmsg(LOG_ERR, 1, "Postgres client error - Malware submission failed: %s.\n", PQerrorMessage(db_connection));
+			PQclear(res);
+			db_disconnect();
+			free(query);
+			return(-1);
+		}
+*/
 
 		/* escape byte data to prevent sql injection */
 		if ((esc_bytea = PQescapeByteaConn(db_connection, attack->download->dl_payload.data, attack->download->dl_payload.size, &length)) == NULL) {
@@ -179,6 +199,7 @@ int db_submit(Attack *attack) {
 			free(uri);
 			return(-1);
 		}
+		memset(query, 0, MAX_SQL_BUFFER + 1);
 		if (snprintf(query, MAX_SQL_BUFFER, "SELECT attacks.sensor_honeytrap_add_sample('%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s')",
 			mem_sha512sum(attack->download->dl_payload.data, attack->download->dl_payload.size),
 			"honeytrap-default",
@@ -189,11 +210,11 @@ int db_submit(Attack *attack) {
 			attack->a_conn.l_port,
 			attack->download->r_port,
 			esc_bytea) >= MAX_SQL_BUFFER) {
-			logmsg(LOG_ERR, 1, "Postgres client error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
-				free(uri);
-				free(query);
-				return(-1);
-			}
+			logmsg(LOG_ERR, 1, "Postgres client error - Could not save malware: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
+			free(uri);
+			free(query);
+			return(-1);
+		}
 		free(uri);
 
 		if (PQresultStatus(res = PQexec(db_connection, query)) != PGRES_TUPLES_OK) {

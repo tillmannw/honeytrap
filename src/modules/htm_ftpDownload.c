@@ -258,7 +258,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	struct ftp_port_t {
 		uint16_t first_half:8, second_half:8;
 	} ftp_port;
-	char rline[MAX_LINE], rbuf[READ_SIZE], *ftp_command, *dumpfile_name;
+	char rline[MAX_LINE], rbuf[READ_SIZE], *ftp_command;
 	struct timeval r_timeout;
 	fd_set rfds;
 
@@ -567,32 +567,13 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		}
 		logmsg(LOG_NOISY, 1, "FTP download - Successfully downloaded %s.\n", save_file);
 		ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
-		/* save file */
-		if(total_bytes) {
-			/* we need the length of directory + "/" + filename plus md5 checksum */
-			dumpfile_name = (char *) malloc(strlen(dlsave_dir)+strlen(save_file)+35);
-			snprintf(dumpfile_name, strlen(dlsave_dir)+strlen(save_file) + 35, "%s/%s-%s",
-				dlsave_dir, mem_md5sum(binary_stream, total_bytes), save_file);
-			logmsg(LOG_DEBUG, 1, "FTP download - Dumpfile name is %s\n", dumpfile_name);
-			if (((dumpfile_fd = open(dumpfile_name, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
-			    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {
-				logmsg(LOG_WARN, 1, "FTP download - Unable to save %s: %s.\n", save_file,
-					strerror(errno));
-				return(-1);
-			}
-			if (write(dumpfile_fd, binary_stream, total_bytes) != total_bytes) { 
-				logmsg(LOG_ERR, 1, "FTP download error - Unable to write data to file: %s\n",
-					strerror(errno));
-				close(dumpfile_fd);
-				return(-1);
-			}
-			close(dumpfile_fd);
 
-			/* add download struct to attack struct*/
-			logmsg(LOG_DEBUG, 1, "(htm_ftp) Adding download to attack struct.\n");
+		/* add download to attack record */
+		if(total_bytes) {
+			logmsg(LOG_DEBUG, 1, "FTP download - Adding download to attack record.\n");
 			add_download("ftp", 6, rhost->s_addr, port, user, pass, (const char *) save_file, binary_stream, total_bytes, attack);
 
-			logmsg(LOG_NOTICE, 1, "FTP download - %s saved.\n", save_file);
+			logmsg(LOG_NOTICE, 1, "FTP download - %s attached to attack record.\n", save_file);
 		} else logmsg(LOG_NOISY, 1, "FTP download - No data received.\n");
 
 		close(data_sock_fd);
