@@ -116,9 +116,11 @@ int save_to_file(Attack *attack) {
 	for (i=0; i<attack->dl_count; i++) {
 		/* save file */
 		/* we need the length of directory + "/" + filename plus md5 checksum */
-		mwfilename = (char *) malloc(strlen(dlsave_dir)+strlen(filename)+35);
-		snprintf(mwfilename, strlen(dlsave_dir)+strlen(filename)+35, "%s/%s-%s",
-			dlsave_dir, mem_md5sum(attack->download[i].dl_payload.data, attack->download[i].dl_payload.size), attack->download[i].filename);
+		mwfilename = (char *) malloc(strlen(dlsave_dir)+strlen(attack->download[i].filename)+35);
+		snprintf(mwfilename, strlen(dlsave_dir)+strlen(attack->download[i].filename)+35, "%s/%s-%s",
+			dlsave_dir,
+			mem_md5sum(attack->download[i].dl_payload.data, attack->download[i].dl_payload.size),
+			attack->download[i].filename);
 		logmsg(LOG_DEBUG, 1, "Malware sample dump - File name is %s\n", mwfilename);
 		if (((dumpfile_fd = open(mwfilename, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
 		    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {
@@ -127,7 +129,9 @@ int save_to_file(Attack *attack) {
 			close(dumpfile_fd);
 			return(-1);
 		}
-		if (write(dumpfile_fd, attack->download[i].dl_payload.data, attack->download[i].dl_payload.size) != attack->download[i].dl_payload.size) { 
+		if (write(dumpfile_fd,
+			attack->download[i].dl_payload.data,
+			attack->download[i].dl_payload.size) != attack->download[i].dl_payload.size) { 
 			logmsg(LOG_ERR, 1, "Malware sample dump error - Unable to write data to file: %s\n",
 				strerror(errno));
 			close(dumpfile_fd);
