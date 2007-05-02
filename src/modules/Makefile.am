@@ -8,7 +8,20 @@ INCLUDES = -I../
 
 libdir=$(DESTDIR)/$(sysconfdir)/honeytrap/plugins
 
-lib_LTLIBRARIES = htm_aSaveFile.la htm_ftpDownload.la htm_tftpDownload.la htm_vncDownload.la htm_b64Decode.la htm_SpamSum.la htm_aSavePostgres.la
+lib_LTLIBRARIES = \
+	htm_aSaveFile.la \
+	htm_ftpDownload.la \
+	htm_tftpDownload.la \
+	htm_vncDownload.la \
+	htm_b64Decode.la
+
+if BUILD_SPAMSUM_PLUGIN
+lib_LTLIBRARIES += htm_SpamSum.la
+endif
+
+if BUILD_POSTGRES_PLUGIN
+lib_LTLIBRARIES += htm_aSavePostgres.la
+endif
 
 htm_aSaveFile_la_SOURCES = htm_aSaveFile.c htm_aSaveFile.h
 htm_aSaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
@@ -25,17 +38,21 @@ htm_vncDownload_la_LDFLAGS = -module -no-undefined -avoid-version
 htm_b64Decode_la_SOURCES = htm_b64Decode.c htm_b64Decode.h
 htm_b64Decode_la_LDFLAGS = -module -no-undefined -avoid-version
 
+if BUILD_SPAMSUM_PLUGIN
 htm_SpamSum_la_SOURCES = htm_SpamSum.c htm_SpamSum.h
 htm_SpamSum_la_LDFLAGS = -module -no-undefined -avoid-version
+endif
 
+if BUILD_POSTGRES_PLUGIN
 htm_aSavePostgres_la_SOURCES = htm_aSavePostgres.c htm_aSavePostgres.h
 htm_aSavePostgres_la_LDFLAGS = -module -no-undefined -avoid-version -lpq
+endif
 
 install-exec-am:
 	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/plugins
-	for module in `find .libs -name htm_*.so | grep -v SpamSum`; do \
+	for module in `find .libs -name htm_*.so`; do \
 		[ -h $$module ] || $(INSTALL_DATA) "$$module" $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/ ; \
 	done
-	for module in `find . -name htm_*.*a | grep -v SpamSum`; do \
+	for module in `find . -name htm_*.*a`; do \
 		rm -f $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/`basename "$$module"` ; \
 	done

@@ -12,9 +12,11 @@
  *
  *
  * Description:
- *   This honeytrap module submits a recorded attack to a PostgreSQL database.
+ *   This honeytrap module submits recorded attacks to a PostgreSQL database.
  *   
  */
+
+#ifdef USE_POSTGRES
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,7 +160,7 @@ int db_submit(Attack *attack) {
 
 		/* check if sample already exists */
 		memset(query, 0, MAX_SQL_BUFFER + 1);
-		if (snprintf(query, MAX_SQL_BUFFER, "SELECT malware.sensor_exists_sample('%s', '%s');", 
+		if (snprintf(query, MAX_SQL_BUFFER, "SELECT mwcollect.sensor_exists_sample('%s', '%s');", 
 			mem_sha512sum(attack->download->dl_payload.data, attack->download->dl_payload.size),
 			mem_md5sum(attack->download->dl_payload.data, attack->download->dl_payload.size)) >= MAX_SQL_BUFFER) {
 			logmsg(LOG_ERR, 1, "Postgres client error - Could not check if sample exists: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
@@ -176,6 +178,7 @@ int db_submit(Attack *attack) {
 			logmsg(LOG_NOISY, 1, "Postgres client - Malware sample exists in database, increasing counter.\n");
 		} else {
 			/* escape byte data to prevent sql injection */
+logmsg(LOG_DEBUG, 1, "payload is %s.\n", attack->download->dl_payload.data);
 			if ((esc_bytea = PQescapeByteaConn(db_connection, attack->download->dl_payload.data,
 							   attack->download->dl_payload.size, &length)) == NULL) {
 				logmsg(LOG_ERR, 1, "Postgres client error - Could not escape attack string: %s.\n", PQerrorMessage(db_connection));
@@ -184,6 +187,7 @@ int db_submit(Attack *attack) {
 				free(query);
 				return(-1);
 			}
+logmsg(LOG_DEBUG, 1, "esc_bytea is %s.\n", esc_bytea);
 
 			if ((uri = build_uri(attack->download)) == NULL) {
 				logmsg(LOG_WARN, 1, "Postgres client warning - Unable to build generic malware URI.\n");
@@ -197,25 +201,31 @@ int db_submit(Attack *attack) {
 				return(-1);
 			}
 			memset(query, 0, MAX_SQL_BUFFER + 1);
-			if (snprintf(query, MAX_SQL_BUFFER, "SELECT attacks.sensor_honeytrap_add_sample('%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s')",
+//			if (snprintf(query, MAX_SQL_BUFFER, "SELECT attacks.sensor_honeytrap_add_sample('%s', '%s', '%s', '%s', '%s', '%s', %d, %d, '%s')",
+logmsg(LOG_DEBUG, 1, "esc_bytea is %s.\n", esc_bytea);
+			if (snprintf(query, MAX_SQL_BUFFER, "SELECT mwcollect.sensor_add_sample('%s', '%s', '%s', '%s', '%s', '%s')",
+				mem_md5sum(attack->download->dl_payload.data, attack->download->dl_payload.size),
 				mem_sha512sum(attack->download->dl_payload.data, attack->download->dl_payload.size),
-				"honeytrap-default",
-				"dynamic-generic",
-				uri,
+				esc_bytea,
+//				"honeytrap-default",
+//				"dynamic-generic",
 				inet_ntoa(*(struct in_addr*)&(attack->a_conn.l_addr)),
 				inet_ntoa(*(struct in_addr*)&(attack->a_conn.r_addr)),
-				attack->a_conn.l_port,
-				attack->download->r_port,
-				esc_bytea) >= MAX_SQL_BUFFER) {
+				uri
+//				attack->a_conn.l_port,
+//				attack->download->r_port,
+				) >= MAX_SQL_BUFFER) {
 				logmsg(LOG_ERR, 1, "Postgres client error - Could not save malware: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
 				free(uri);
 				free(query);
 				return(-1);
 			}
+logmsg(LOG_DEBUG, 1, "Postgres client - Query is: %s.\n", query);
 			free(uri);
 
 			if (PQresultStatus(res = PQexec(db_connection, query)) != PGRES_TUPLES_OK) {
 				logmsg(LOG_ERR, 1, "Postgres client error - Malware submission failed: %s.\n", PQerrorMessage(db_connection));
+				logmsg(LOG_DEBUG, 1, "Postgres client - Query was: %s.\n", query);
 				PQclear(res);
 				db_disconnect();
 				free(query);
@@ -226,7 +236,8 @@ int db_submit(Attack *attack) {
 			logmsg(LOG_NOISY, 1, "Postgres client - Malware saved.\n");
 
 			/* get instance number for reference within attack_string record */
-			mw_inst = atoi(PQgetvalue(res, 0, PQfnumber(res, "sensor_honeytrap_add_sample")));
+//			mw_inst = atoi(PQgetvalue(res, 0, PQfnumber(res, "sensor_honeytrap_add_sample")));
+			mw_inst = atoi(PQgetvalue(res, 0, PQfnumber(res, "sensor_add_sample")));
 
 			PQclear(res);    
 		}
@@ -333,3 +344,5 @@ int db_submit(Attack *attack) {
 	db_disconnect();
 	return(0);
 }
+
+#endif

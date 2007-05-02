@@ -9,12 +9,17 @@ Installation
 
    The `configure' shell script must be told which connection monitor
 should be used by honeytrap to monitor network interfaces for incoming
-connection requests. Possible values are currently
+connection requests. Currently the following options are possible:
 
-   --with-pcap-mon	monitoring with a PCAP-based sniffer
+   --with-nfq-mon	monitoring via libnetfilter_queue
+			(Linux only, recommended)
 
    --with-ipq-mon	monitoring via netfilter/iptables ip_queue
 			(Linux only)
+
+   --with-pcap-mon	monitoring with a PCAP-based sniffer
+
+To build additional plugins use the --with-[pluginname] options.
 
 Please refer to the generic installation instructions below for further
 information on how to compile honeytrap.

@@ -1,5 +1,5 @@
 /* htm_ftpDownload.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -226,13 +226,12 @@ int read_ftp_line(int control_sock_fd, char *rline, int timeout) {
 }
 
 
-int ftp_quit(int control_sock_fd, int data_sock_fd, int dumpfile_fd) {
+int ftp_quit(int control_sock_fd, int data_sock_fd) {
 	char rline[MAX_LINE+1];		/* MAX_LINE plus one char for \0 */
 	int timeout = 60;
 	int read_result;
 
 	close(data_sock_fd);
-	close(dumpfile_fd);
 
 	logmsg(LOG_NOISY, 1, "FTP download - Sending 'QUIT'.\n");
 	if (write(control_sock_fd, "QUIT\r\n", 6) == 6) {
@@ -251,7 +250,7 @@ int ftp_quit(int control_sock_fd, int data_sock_fd, int dumpfile_fd) {
 
 int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, struct in_addr *rhost, const int port, const char *save_file, Attack *attack) {
 	struct sockaddr_in control_socket, local_data_socket, remote_data_socket;
-	int control_sock_fd, data_sock_listen_fd, data_sock_fd, dumpfile_fd,
+	int control_sock_fd, data_sock_listen_fd, data_sock_fd,
 	    local_data_port, bytes_read, total_bytes, addr_len, select_return, timeout, retval;
 	uint8_t ip_octet[4], *binary_stream;
 	struct hostent *data_host = NULL;
@@ -268,7 +267,6 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	select_return = -1;
 	timeout = 60;
 	data_sock_fd = -1;
-	dumpfile_fd = -1;
 	
 	logmsg(LOG_NOTICE, 1, "FTP download - Requesting '%s' from %s:%u.\n", save_file, inet_ntoa(*rhost), port);
 
@@ -340,9 +338,13 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	
 	/* wait for 200 */
 	while (strstr(rline, "200") != rline) {
-
+		/* read multi-line banner */
+		while ((strlen(rline) > 3) && (rline[3] == '-')) { 
+			if (read_ftp_line(control_sock_fd, rline, timeout) <= 0) return(0);
+		}
 		/* wait for 230 and send SYST and TYPE */
 		if(strstr(rline, "230") == rline) {
+
 			/* Send SYST and switch to binary mode */
 			/* Some buggy servers cannot handle a TYPE after SYST, so check for return value */
 			logmsg(LOG_NOISY, 1, "FTP download - Sending 'SYST'.\n");
@@ -430,7 +432,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	while(((bind(data_sock_listen_fd, (struct sockaddr *) &local_data_socket,
 		sizeof(local_data_socket))) < 0) && (local_data_port < 65535)) {
 		logmsg(LOG_DEBUG, 1,
-			"FTP download - Port %d is already in use. Trying to bind on port %d.\n",
+			"FTP download - Unable to bind port %d. Trying port %d.\n",
 			ntohs(local_data_socket.sin_port), ntohs(local_data_socket.sin_port)+1);
 		/* check if integer was overflowed to 0 */
 		if((local_data_socket.sin_port = htons(++local_data_port)) == 0) {
@@ -450,7 +452,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 			"FTP download error - Unable to create listening socket for data channel: %s.\n",
 			strerror(errno));
 		close(data_sock_listen_fd);
-		ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+		ftp_quit(control_sock_fd, data_sock_fd);
 		return(-1);
 	} else logmsg(LOG_DEBUG, 1, "FTP download - Initialized FTP data channel on port %u/tcp.\n",
 		ntohs(local_data_socket.sin_port));
@@ -477,7 +479,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	/* check if PORT was successful */
 	if(strstr(rline, "4") == rline) {
 		logmsg(LOG_WARN, 1, "FTP download - FTP error code received: %s", rline);
-		ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+		ftp_quit(control_sock_fd, data_sock_fd);
 		return(-1);
 	}
 
@@ -502,7 +504,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		/* close connection on error */
 		if(strstr(rline, "4") == rline) {
 			logmsg(LOG_WARN, 1, "FTP download - FTP error code received: %s", rline);
-			ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+			ftp_quit(control_sock_fd, data_sock_fd);
 			return(-1);
 		}
 		if (read_ftp_line(control_sock_fd, rline, timeout) <= 0) return(0);
@@ -520,19 +522,19 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	if (select_return < 0) {
 		if (errno != EINTR) {
 			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s.\n", strerror(errno));
-			ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+			ftp_quit(control_sock_fd, data_sock_fd);
 			return(-1);
 		}
 	} else if (select_return == 0) {
 		logmsg(LOG_WARN, 1, "FTP download - Transfer timeout, no incoming data connection for %d seconds.\n",
 			timeout);
-		ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+		ftp_quit(control_sock_fd, data_sock_fd);
 		return(-1);
 	} else if (FD_ISSET(data_sock_listen_fd, &rfds)) { 
 		if ((data_sock_fd = accept(data_sock_listen_fd, (struct sockaddr *) &remote_data_socket, (u_int *) &addr_len)) < 0) {
 			logmsg(LOG_ERR, 1, "FTP download error - Unable to accept FTP data connection: %s\n",
 				strerror(errno));
-			ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+			ftp_quit(control_sock_fd, data_sock_fd);
 			return(-1);
 		} else logmsg(LOG_DEBUG, 1, "FTP download - Incoming data connection from %s:%u.\n",
 			inet_ntoa(control_socket.sin_addr), ntohs(remote_data_socket.sin_port));
@@ -549,14 +551,14 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	if (select_return < 0) {
 		if (errno != EINTR) {
 			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s.\n", strerror(errno));
-			ftp_quit(control_sock_fd, data_sock_listen_fd, dumpfile_fd);
+			ftp_quit(control_sock_fd, data_sock_listen_fd);
 			return(-1);
 		}
 	} else if (select_return == 0) {
 		logmsg(LOG_WARN, 1, "FTP download - Transfer timeout, no data to read for 10 seconds.\n");
-		ftp_quit(control_sock_fd, data_sock_listen_fd, dumpfile_fd);
+		ftp_quit(control_sock_fd, data_sock_listen_fd);
 		return(-1);
-	} else if (FD_ISSET(data_sock_fd, &rfds)) { 
+	} else if (FD_ISSET(data_sock_fd, &rfds)) {
 		logmsg(LOG_DEBUG, 1, "FTP download - Data available, retrieving file.\n");
 		/* receive file */
 		total_bytes = 0;
@@ -565,11 +567,16 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 			memcpy(binary_stream + total_bytes, rbuf, bytes_read);
 			total_bytes += bytes_read;
 		}
+		if (bytes_read < 0) {
+			logmsg(LOG_ERR, 1, "FTP download error - Unable to read from data channel: %s.\n", strerror(errno));
+			ftp_quit(control_sock_fd, data_sock_listen_fd);
+			return(-1);
+		}
 		logmsg(LOG_NOISY, 1, "FTP download - Successfully downloaded %s.\n", save_file);
-		ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+		ftp_quit(control_sock_fd, data_sock_fd);
 
 		/* add download to attack record */
-		if(total_bytes) {
+		if (total_bytes) {
 			logmsg(LOG_DEBUG, 1, "FTP download - Adding download to attack record.\n");
 			add_download("ftp", 6, rhost->s_addr, port, user, pass, (const char *) save_file, binary_stream, total_bytes, attack);
 
@@ -582,6 +589,6 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	
 	/* close open descriptors and return */
 	while((read_ftp_line(control_sock_fd, rline, 5) && strstr(rline, "226") != rline));
-	ftp_quit(control_sock_fd, data_sock_fd, dumpfile_fd);
+	ftp_quit(control_sock_fd, data_sock_fd);
 	return(0);
 }

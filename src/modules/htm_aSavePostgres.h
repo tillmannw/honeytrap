@@ -11,6 +11,8 @@
  * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#ifdef USE_POSTGRES
+
 #ifndef __HT_MODULE_ASAVEPOSTGRES_H
 #define __HT_MODULE_ASAVEPOSTGRES_H 1
 
@@ -29,7 +31,7 @@ const char	module_version[]	= "0.2";
 struct pg_conn	*db_connection;
 
 /* use static values for now. should be taken from configuration file */
-const char	*db_info = "port=5432 host=127.0.0.1 user=mwcollect password=mwcollect dbname=mwcollect";
+const char	*db_info = "port=5432 host=127.0.0.1 user=mwcollect password=mwcollect dbname=mwcollect2";
 
 void plugin_init(void);
 void plugin_unload(void);
@@ -39,5 +41,7 @@ int db_submit(Attack *attack);
 int db_connect(void);
 void db_disconnect(void);
 char *build_url(struct s_download *download);
+
+#endif
 
 #endif

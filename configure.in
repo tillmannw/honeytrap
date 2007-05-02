@@ -266,6 +266,7 @@ sn_cv_have___func__=yes, sn_cv__have___func__=no)
    fi
 fi
 
+#----------------------- network stream monitors ---------------------------
 
 AC_ARG_WITH(pcap-mon,
 	[  --with-pcap-mon          Use libpcap to catch connection requests])
@@ -377,6 +378,58 @@ if test "$with_ipfw_mon" = "yes"; then
 else with_ipfw_mon="no"
 fi
 
+
+#----------------------- optional plugins ---------------------------
+
+
+AC_ARG_WITH(spamsum,
+	[  --with-spamsum           Perform SpamSum similarity analysis for recorded attacks])
+AM_CONDITIONAL(BUILD_SPAMSUM_PLUGIN, test x$with_spamsum = xyes)
+if test "$with_spamsum" != "yes"; then
+	with_spamsum="no"
+fi
+
+
+
+AC_ARG_WITH(postgres,
+	[  --with-postgres          Store attack data in PostgreSQL database])
+AM_CONDITIONAL(BUILD_POSTGRES_PLUGIN, test x$with_postgres = xyes)
+if test "$with_postgres" = "yes"; then
+  AC_ARG_WITH(libpq_includes,
+    [  --with-libpq-includes=DIR  libpq include directory],
+    [with_libpq_includes="$withval"],[with_libpq_includes=no])
+
+  AC_ARG_WITH(libpq_libraries,
+    [  --with-libpq-libraries=DIR  libpq library directory],
+    [with_libpq_libraries="$withval"],[with_libpq_libraries=no])
+
+  if test "$with_libpq_includes" != "no"; then
+    CPPFLAGS="${CPPFLAGS} -I${with_libpq_includes}"
+  fi
+  AC_CHECK_HEADER(postgresql/libpq-fe.h,,[AC_ERROR(libpq-fe.h not found.)])
+
+  if test "$with_libpq_libraries" != "no"; then
+    LDFLAGS="${LDFLAGS}  -L${with_libpq_libraries}"
+  fi
+  LIPQ=""
+  AC_CHECK_LIB(pq, PQconnectdb,, LPQ="no")
+
+  if test "$LPQ" = "no"; then
+    echo
+    echo "   ERROR!  Libpq library/headers not found. Install it or use the"
+    echo "   --with-libpq-* options, if you have it installed in unusual place."
+    echo
+    exit
+  fi
+
+  AC_DEFINE([USE_POSTGRES_DB], [], [Define to store attacks in PostgreSQL database])
+else with_postgres="no"
+fi
+
+#-------------------------------------------------------------
+
+
+
 default_directory="/usr /usr/local"
 
 AC_DEFUN(FAIL_MESSAGE,[
@@ -462,12 +515,16 @@ AC_OUTPUT
 
 echo
 echo "--- honeytrap configuration ---"
-echo "Debugging options:             $enable_debug"
-echo "Profiling options:             $enable_profile"
-echo "Electric Fence:                $with_efence"
+echo "Debugging options:                  $enable_debug"
+echo "Profiling options:                  $enable_profile"
+echo "Electric Fence:                     $with_efence"
 echo
 echo "Connection monitor"
-echo "  Linux ip_queue (ipq):        $with_ipq_mon"
-echo "  Linux nfnetlink_queue (nfq): $with_nfq_mon"
-echo "  FreeBSD ipfw (ipfw):         $with_ipfw_mon"
-echo "  Libpcap (pcap):              $with_pcap_mon"
+echo "  Linux ip_queue (ipq):             $with_ipq_mon"
+echo "  Linux libnetfilter_queue (nfq):   $with_nfq_mon"
+echo "  FreeBSD ipfw (ipfw):              $with_ipfw_mon"
+echo "  Libpcap (pcap):                   $with_pcap_mon"
+echo
+echo "Optional plugins"
+echo "  PostgeSQL:                        $with_postgres"
+echo "  SpamSum:                          $with_spamsum"

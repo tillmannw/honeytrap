@@ -1,10 +1,11 @@
 Version 0.7.0
-- Plugins can be priotizized
+- Plugins can be prioritized
 - PostgreSQL module for commits into mwcollect database
 - SHA512 hash support
 - Performance improvements
 - Improved connection request handling in the nfq stream monitor
 - FTP download plugin is now source-based routing safe
+- Changed autotools process to make module builts optional
 Version 0.6.5
 - Introduced an nfnetlink_queue-based connection monitor
 - Some compile errors fixed
