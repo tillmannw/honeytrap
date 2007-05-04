@@ -1,5 +1,7 @@
 Version 0.7.0
 - Plugins can be prioritized
+- x86 CPU emulation module for generic shellcode analysis
+  based on libemu by Markus and Paul
 - PostgreSQL module for commits into mwcollect database
 - SHA512 hash support
 - Performance improvements
