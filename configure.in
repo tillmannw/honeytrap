@@ -406,7 +406,7 @@ if test "$with_postgres" = "yes"; then
   if test "$with_libpq_includes" != "no"; then
     CPPFLAGS="${CPPFLAGS} -I${with_libpq_includes}"
   fi
-  AC_CHECK_HEADER(postgresql/libpq-fe.h,,[AC_ERROR(libpq-fe.h not found.)])
+  AC_CHECK_HEADER(libpq-fe.h,,[AC_ERROR(libpq-fe.h not found.)])
 
   if test "$with_libpq_libraries" != "no"; then
     LDFLAGS="${LDFLAGS}  -L${with_libpq_libraries}"

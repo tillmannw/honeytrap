@@ -20,7 +20,7 @@
 # include <config.h>
 #endif
 
-#include <postgresql/libpq-fe.h>
+#include <libpq-fe.h>
 
 #define MAX_SQL_BUFFER	10485760		// 10 MB
 #define MAX_URI_SIZE	2048
