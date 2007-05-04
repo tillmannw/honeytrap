@@ -23,6 +23,10 @@ if BUILD_POSTGRES_PLUGIN
 lib_LTLIBRARIES += htm_aSavePostgres.la
 endif
 
+if BUILD_CPUEMU_PLUGIN
+lib_LTLIBRARIES += htm_cpuEmu.la
+endif
+
 htm_aSaveFile_la_SOURCES = htm_aSaveFile.c htm_aSaveFile.h
 htm_aSaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
 
@@ -46,6 +50,11 @@ endif
 if BUILD_POSTGRES_PLUGIN
 htm_aSavePostgres_la_SOURCES = htm_aSavePostgres.c htm_aSavePostgres.h
 htm_aSavePostgres_la_LDFLAGS = -module -no-undefined -avoid-version -lpq
+endif
+
+if BUILD_CPUEMU_PLUGIN
+htm_cpuEmu_la_SOURCES = htm_cpuEmu.c htm_cpuEmu.h
+htm_cpuEmu_la_LDFLAGS = -module -no-undefined -avoid-version -lemu
 endif
 
 install-exec-am:
