@@ -46,6 +46,7 @@ PlugFuncList *add_unload_func_to_list(const char *plugname, const char *funcname
 void plughook_unload_plugins(void);
 
 void init_plugin_hooks(void);
+void register_plugin_confopts(const char *plugname, const char **keywords, int num);
 void unhook(const func_prio priority, const char *plugname, const char *funcname);
 void unhook_from_list(PlugFuncList **hook_func_list, const char *plugname, const char *funcname);
 

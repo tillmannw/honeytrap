@@ -1,60 +1,76 @@
-# /etc/honeytrap/honeytrap.conf
-#
-# This is a sample honeytrap configuration file.
-# However, the default values below should work in most installations.
-#
-# Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
-#
-#
-# allowed keywords are:
-#
-# keyword	values		description
-# ----------------------------------------------------------------------------------
-# pidfile	path		full pid file path (defaults to /var/run/honeytrap.pid if not given)
-# logfile	path		full logfile path (defaults to /var/log/honeytrap.log if not given)
-# user		username	user from /etc/passwd under which honeytrap should run
-# group		groupname	group from /etc/group under which honeytrap should run
-# promisc	-		tells honeytrap to sniff in promiscuous mode
-# mirror	-		tells honeytrap to run in mirror mode
-# response_dir	path		path to directory with default responses (defaults to /etc/honeytrap/responses)
-# plugin_dir	path		path to directory with honeytrap plugins (defaults to /etc/honeytrap/plugins)
-# attacks_dir	path		where to save attack strings (default is /var/spool/honeytrap)
-# dlsave_dir	path		where to save downloaded files (default is /var/spool/honeytrap)
-# read_limt     number          max. bytes to read from a socket - prevents honeytrap from memory exhaustion
+/* 
+ * honeytrap 1.0 configuration file template -- please adjust
+ * (c) Tillmann Werner <tillmann.werner@gmx.de>
+*/
+
+/* log to this file */
+logfile		= "/opt/honeytrap/honeytrap.log"
+
+/* PID file */
+pidfile		= "/var/run/honeytrap.pid"
+
+/* where to look for default responses
+   these are sent for connections handled in "normal mode" */
+response_dir	= "/opt/honeytrap/etc/honeytrap/responses"
+
+/* where to look for plugins
+   need to be set before loading plugins */
+plugin_dir	= "/opt/honeytrap/etc/honeytrap/plugins"
+
+/* run in mirror mode - mirror connections back to the initiator
+   use with caution! */
+//mirror = "on"
+
+/* put network interface into promiscuous mode
+   (only availabel when compiled with --with-pcap-mon) */
+//promisc = "on"
+
+/* the user and group under which honeytrap should run */
+user	= "nobody"
+group	= "nogroup"
+
+/* include a file */
+//include = "ports.conf"
 
 
-pidfile	= /var/run/honeytrap.pid
-logfile	= /etc/honeytrap/honeytrap.log
+/* ----- plugin stuff below ----- */
 
-response_dir = /etc/honeytrap/responses
-plugin_dir = /etc/honeytrap/plugins
+/* include a plugin via plugin-[ModuleName] = "" */
 
-attacks_dir = /var/spool/honeytrap/attacks
-dlsave_dir = /var/spool/honeytrap/downloads
+plugin-ftpDownload = ""
+plugin-tftpDownload = ""
+plugin-b64Decode = ""
+plugin-vncDownload = ""
 
-# max bytes to read from an attack connection (10MB = 10485760)
-read_limit = 10485760
+/* store attacks on disk */
+plugin-SaveFile = {
+	attacks_dir	= "/opt/honeytrap/attacks"
+	downloads_dir	= "/opt/honeytrap/downloads"
+}
+
+/* calculate locality sensitive hashes */
+plugin-SpamSum = {
+	md5sum_sigfile	= "/opt/honeytrap/md5sum.sigs"
+	spamsum_sigfile	= "/opt/honeytrap/spamsum.sigs"
+}
+
+/* store attacks in PostgeSQL database */
+/*
+plugin-SavePostgres = {
+	db_host	= "localhost"
+	db_name	= "some_db"
+	db_user	= "some_user"
+	db_pass	= "some_pass"
+//	db_port = "some_port"	// if not set, use the default (5432/tcp)
+}
+*/
 
 
-
-# hash signature files for htm_SpamSum plugin
-# you'll get errors if you define them and don't load this plugin
-md5_sigfile
-ss_sigfile
-
-
-# run in mirror mode - mirror connections back to the initiator (use with caution!)
-mirror
-
-# put network interface into promiscuous mode - only available when using the pcap connection monitor
-#promisc
-
-# run as the following user and group
-user	= nobody
-group	= nogroup
-
-# use this host (ip address) to listen for FTP data connections (you would need the htm_ftpDownload plugin version 3)
-#ftp_host = example.com
-
-#include explicit port configuration
-#include = ./ports.conf
+/* ----- explicit port modes below ----- */
+portconf = {
+	/* ignore these ports */
+	ignore = {
+		protocol	= "tcp"
+		port		= "22"
+	}
+}

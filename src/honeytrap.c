@@ -1,5 +1,5 @@
 /* honeytrap.c
- * Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -71,10 +71,6 @@ int main(int argc, char **argv) {
 	logfile_name	= strdup("/var/log/honeytrap.log");
 	response_dir	= strdup("/etc/honeytrap/responses");
 	plugin_dir	= strdup("/etc/honeytrap/plugins");
-	attacks_dir	= strdup("/var/spool/honeytrap");
-	dlsave_dir	= strdup("/var/spool/honeytrap");
-
-	ftp_host	= NULL;		/* Explicit ip address (hostname) for FTP data connections */
 
 #ifdef USE_PCAP_MON
 	dev		= NULL;	/* network device pointer */
@@ -95,7 +91,7 @@ int main(int argc, char **argv) {
 
 	
 	/* watch out for incoming connection requests */
-	if (start_connection_monitor() < 0) clean_exit(0);
+	if (start_connection_monitor() < 0) clean_exit(EXIT_SUCCESS);
 	
 	return(0);
 }

@@ -1,5 +1,5 @@
 /* plughook.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -19,6 +19,7 @@
 #include "plugin.h"
 #include "logging.h"
 #include "plughook.h"
+#include "conftree.h"
 
 
 void init_plugin_hooks(void) {
@@ -27,6 +28,45 @@ void init_plugin_hooks(void) {
 	funclist_attack_analyze		= NULL;
 	funclist_attack_savedata	= NULL;
 	funclist_attack_postproc	= NULL;
+	return;
+}
+
+
+void register_plugin_confopts(const char *plugname, const char **keywords, int num) {
+	int	i;
+	char	full_name[264], *confopt;
+
+	/* assemble plugin config key */
+	memset(full_name, 0, 264);
+	strncpy(full_name, "plugin-", 7);
+	strncpy(&full_name[7], plugname, 256 < strlen(plugname) ? 256 : strlen(plugname));
+
+	if (add_keyword(&config_keywords_tree, full_name, NULL, 0) == NULL) {
+		fprintf(stderr, "  Error - Unable to add configuration keyword to tree.\n");
+		exit(EXIT_FAILURE);
+	}	
+
+	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", plugname);
+	/* build tree of allowed configuration keywords */
+	for (i=0; i<num; i++) {
+
+		/* assemble full config option path */
+		if ((confopt = malloc(strlen(full_name)+strlen(keywords[i])+2)) == NULL) {
+			fprintf(stderr, "  Error - Unable to allocate memory: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		memset(confopt, 0, strlen(plugname)+strlen(keywords[i])+2);
+		strcat(confopt, plugname);
+		strcat(confopt, ".");
+		strcat(confopt, keywords[i]);
+
+		/* add config option to tree */
+		if (add_keyword(&config_keywords_tree, confopt, NULL, 0) == NULL) {
+			fprintf(stderr, "  Error - Unable to add configuration keyword to tree.\n");
+			exit(EXIT_FAILURE);
+		}	
+		free(confopt);
+	}
 	return;
 }
 

@@ -31,8 +31,15 @@
 #include <plughook.h>
 #include <util.h>
 #include <md5.h>
+#include <ip.h>
 
 #include "htm_tftpDownload.h"
+
+#define MAX_TRANSMISSION_TRIES  10      /* retransmit 9 times */
+
+const char module_name[]="tftpDownload";
+const char module_version[]="0.4";
+
 
 void plugin_init(void) {
 	plugin_register_hooks();
@@ -68,7 +75,7 @@ int cmd_parse_for_tftp(Attack *attack) {
 			logmsg(LOG_DEBUG, 1, "Found TFTP command in attack string.\n");
 
 			/* do tftp download */
-			return(get_tftpcmd(string_for_processing, attack->a_conn.payload.size));
+			return(get_tftpcmd(string_for_processing, attack->a_conn.payload.size, attack));
 		}
 	}
 	logmsg(LOG_DEBUG, 1, "No tftp command found.\n");
@@ -76,7 +83,7 @@ int cmd_parse_for_tftp(Attack *attack) {
 }
 
 
-int get_tftpcmd(char *attack_string, int string_size) {
+int get_tftpcmd(char *attack_string, int string_size, Attack *attack) {
 	char *parse_string=NULL, *file=NULL;
 	struct hostent *host=NULL;
 	struct strtk token;
@@ -129,7 +136,7 @@ int get_tftpcmd(char *attack_string, int string_size) {
 	logmsg(LOG_DEBUG, 1, "TFTP download - Filename found: %s\n", file);
 
 	/* Do TFTP download */
-	return(get_tftp_resource((struct in_addr *) host->h_addr_list[0], file));
+	return(get_tftp_resource((struct in_addr *) host->h_addr_list[0], file, attack));
 }
 
 
@@ -140,7 +147,7 @@ int tftp_quit(int data_sock_fd, int dumpfile_fd) {
 }
 
 
-int get_tftp_resource(struct in_addr* host, const char *save_file) {
+int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attack) {
 	struct sockaddr_in data_socket, from;
 	int data_sock_fd, dumpfile_fd,
 	    fromlen, select_return, bytes_sent,
@@ -149,7 +156,7 @@ int get_tftp_resource(struct in_addr* host, const char *save_file) {
 	uint16_t tftp_opcode, tftp_errcode, tftp_blockcode, max_blockcode;
 	int32_t bytes_read;
 	uint32_t total_bytes;
-	char rbuf[516], *tftp_command, *dumpfile_name;
+	char rbuf[516], *tftp_command;
 
 	struct timeval snd_timeout;
 	fd_set rfds;
@@ -333,27 +340,12 @@ int get_tftp_resource(struct in_addr* host, const char *save_file) {
 				break;
 		}
 	}
-	/* store data in local file */
+	/* add download to attack record */
 	if (total_bytes) {
-		/* we need the length of directory + "/" + filename plus md5 checksum */
-		dumpfile_name = (char *) malloc(strlen(dlsave_dir)+strlen(save_file)+35);
-		snprintf(dumpfile_name, strlen(dlsave_dir)+strlen(save_file) + 35, "%s/%s-%s",
-			dlsave_dir, mem_md5sum(binary_stream, total_bytes), save_file);
-		logmsg(LOG_DEBUG, 1, "TFTP download - Dumpfile name is %s\n", dumpfile_name);
-		if (((dumpfile_fd = open(dumpfile_name, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
-		    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {
-			logmsg(LOG_ERR, 1, "TFTP download error - Unable to save %s: %s.\n", save_file,
-				strerror(errno));
-			tftp_quit(data_sock_fd, dumpfile_fd);
-			return(-1);
-		}
-		if (write(dumpfile_fd, binary_stream, total_bytes) != total_bytes) { 
-			logmsg(LOG_ERR, 1, "TFTP download error - Unable to save data in local file.\n");
-			tftp_quit(data_sock_fd, dumpfile_fd);
-			return(-1);
-		}
-		if (dumpfile_fd) close(dumpfile_fd);
-		logmsg(LOG_NOTICE, 1, "TFTP download - %s saved.\n", save_file);
+		logmsg(LOG_DEBUG, 1, "TFTP download - Adding download to attack record.\n");
+		add_download("tftp", UDP, host->s_addr, 69, NULL, NULL, (const char *) save_file, binary_stream, total_bytes, attack);
+
+		logmsg(LOG_NOTICE, 1, "TFTP download - %s attached to attack record.\n", save_file);
 	} else logmsg(LOG_NOISY, 1, "TFTP download - No data received.\n");
 	
 	/* close open descriptors and return */

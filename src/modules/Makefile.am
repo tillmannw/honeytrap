@@ -9,7 +9,7 @@ INCLUDES = -I../
 libdir=$(DESTDIR)/$(sysconfdir)/honeytrap/plugins
 
 lib_LTLIBRARIES = \
-	htm_aSaveFile.la \
+	htm_SaveFile.la \
 	htm_ftpDownload.la \
 	htm_tftpDownload.la \
 	htm_vncDownload.la \
@@ -20,15 +20,15 @@ lib_LTLIBRARIES += htm_SpamSum.la
 endif
 
 if BUILD_POSTGRES_PLUGIN
-lib_LTLIBRARIES += htm_aSavePostgres.la
+lib_LTLIBRARIES += htm_SavePostgres.la
 endif
 
 if BUILD_CPUEMU_PLUGIN
 lib_LTLIBRARIES += htm_cpuEmu.la
 endif
 
-htm_aSaveFile_la_SOURCES = htm_aSaveFile.c htm_aSaveFile.h
-htm_aSaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
+htm_SaveFile_la_SOURCES = htm_SaveFile.c htm_SaveFile.h
+htm_SaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
 
 htm_ftpDownload_la_SOURCES = htm_ftpDownload.c htm_ftpDownload.h
 htm_ftpDownload_la_LDFLAGS = -module -no-undefined -avoid-version
@@ -48,8 +48,8 @@ htm_SpamSum_la_LDFLAGS = -module -no-undefined -avoid-version
 endif
 
 if BUILD_POSTGRES_PLUGIN
-htm_aSavePostgres_la_SOURCES = htm_aSavePostgres.c htm_aSavePostgres.h
-htm_aSavePostgres_la_LDFLAGS = -module -no-undefined -avoid-version -lpq
+htm_SavePostgres_la_SOURCES = htm_SavePostgres.c htm_SavePostgres.h
+htm_SavePostgres_la_LDFLAGS = -module -no-undefined -avoid-version -lpq
 endif
 
 if BUILD_CPUEMU_PLUGIN

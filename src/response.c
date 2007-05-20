@@ -1,5 +1,5 @@
 /* response.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -54,7 +54,7 @@ int prepare_default_response(char *filename, uint16_t port, uint16_t proto) {
 
 	/* allocate memory for new response */
 	if ((new_response = (struct default_resp *) malloc(sizeof(struct default_resp))) == NULL) {
-		fprintf(stderr, "  Error - Unable to allocate memory: %s\n", strerror(errno));
+		perror("  Error - Unable to allocate memory");
 		return(-1);
 	} else {
 		new_response->port	= port;
@@ -83,10 +83,8 @@ int prepare_default_response(char *filename, uint16_t port, uint16_t proto) {
 	} else {
 		ccopy		= 0;
 		while((ccopy = fread(buffer, 1, 100, answer_file))) {
-			if (!(new_response->response =
-				(u_char *) realloc(new_response->response, new_response->size + ccopy))) {
-				fprintf(stderr, "  Error - Not enough memory for %u/%s response string.",
-					port, PROTO(proto));
+			if ((new_response->response = (u_char *) realloc(new_response->response, new_response->size + ccopy)) == NULL) {
+				perror("  Error - Unable to allocate memory");
 				return(-1);
 			} else {
 				memcpy(new_response->response + new_response->size, buffer, ccopy);
@@ -115,20 +113,20 @@ int load_default_responses(char *dir) {
 	full_path = NULL;
 
 	if ((respdir = opendir(dir)) == NULL) {
-		fprintf(stderr, "  Error - Unable to open responses directory: %s.\n", strerror(errno));
+		perror("  Error - Unable to open response directory");
 		return(-1);
 	}
 	
 	DEBUG_FPRINTF(stdout, "  Searching for response files in %s\n", dir);
 	if ((n = scandir(dir, &namelist, 0, alphasort)) < 0) {
-		fprintf(stderr, "  Error - Unable to scan responses directory: %s\n", strerror(errno));
+		perror("  Error - Unable to scan response directory");
 		return(-1);
 	} else while(n--) {
 		stat(namelist[n]->d_name, &statbuf);
 		if ((fnmatch("*_tcp", namelist[n]->d_name, 0) == 0) || (fnmatch("*_udp", namelist[n]->d_name, 0) == 0)) {
 			/* found a default response file */
 			if ((full_path = (char *) malloc(strlen(dir) + strlen(namelist[n]->d_name) + 2)) == NULL) {
-				fprintf(stderr, "  Error - Unable to allocate memory: %s\n", strerror(errno));
+				perror("  Error - Unable to allocate memory");
 				return(-1);
 			}
 			snprintf(full_path, strlen(dir)+strlen(namelist[n]->d_name)+2, "%s/%s", dir, namelist[n]->d_name);

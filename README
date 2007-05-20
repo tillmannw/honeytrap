@@ -21,28 +21,6 @@ README
   recognized  and  logged.  A http download routine may be added in
   future releases.
 
-  Version 0.5.0 introduces the mirror mode (option '-m'). When run-
-  ning in this mode, whenever a connection request is handled, hon-
-  eytrap tries to establish a so called mirror connection  back  to
-  the  remote  host  requesting the same port. All data received on
-  one of the two connections is copied to the other one. Thus, hon-
-  eytrap is acting as a tcp proxy for a connection of a remote host
-  with itself. If no mirror connection can be  established,  honey-
-  trap falls back to normal mode.
-
-  A  plugin  interface  was  added in Version 0.6.0. Plugins can be
-  loaded as dynamic shared objects. Also, honeytrap can now be con-
-  figured  via a configuration file. The file is reprocessed when a
-  SIGHUP is received so changes can be  made  available  with  zero
-  downtime.
-
-  Version  0.6.2  comes  with  lots  of new features. Using the new
-  proxy mode, Connections can not only be mirrored back to the ini-
-  tiator,  but proxied to other systems and other ports. The appro-
-  priate mode can optionally be configured per TCP port. A new, li-
-  bipq-based  connection  monitor  was introduced (idea stolen from
-  the nepenthes honeytrap module).
-
 INSTALLATION
 
   Installation of honeytrap should be pretty straight forward. Just
@@ -63,12 +41,6 @@ WARNINGS
   processes to well-known ports. Use the -u and -g command line op-
   tions to drop privileges and switch to another user and group  as
   early as possible.
-
-THANKS
-
-  Many thanks to Steve, Gary to help me debugging compile errors on
-  FreeBSD and OpenBSD and to lots of others who  helped  me  fixing
-  bugs.
 
 CONTACT
 

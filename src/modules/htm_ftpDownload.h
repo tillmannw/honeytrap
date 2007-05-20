@@ -17,12 +17,10 @@
 # include <config.h>
 #endif
 
-const char module_name[]="htm_ftpDownload";
-const char module_version[]="0.4.1";
-
 void plugin_init(void);
 void plugin_unload(void);
 void plugin_register_hooks(void);
+void plugin_register_confopts(void);
 int cmd_parse_for_ftp(Attack *attack);
 int read_ftp_line(int control_sock_fd, char *rline, int timeout);
 int ftp_quit(int control_sock_fd, int data_sock_fd);

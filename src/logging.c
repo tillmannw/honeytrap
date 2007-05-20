@@ -1,5 +1,5 @@
 /* logging.c
- * Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -40,7 +40,7 @@ void logmsg(int level, int add_time, const char *format, ...) {
 		logline_size = strlen(logline);
 
 		if ((bytes_written = write(logfile_fd, logline, logline_size)) != logline_size)
-			perror("Error while writing into honeytrap logfile");
+			perror("Error while writing logfile");
 
 		/* log to stdout as well if we are not running as daemon */
 		if ((STDOUT_FILENO != logfile_fd) && (daemonize != 1) &&

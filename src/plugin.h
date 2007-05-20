@@ -1,5 +1,5 @@
 /* plugin.h
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -26,7 +26,7 @@ char *plugin_error_str;
 
 Plugin *plugin_list;
 
-int load_plugins(char *dir);
+int load_plugin(const char *dir, const char *plugname);
 int init_plugin(char *plugin_name);
 void unload_plugins(void);
 void unload_at_err(Plugin *plugin);

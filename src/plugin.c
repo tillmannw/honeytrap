@@ -1,5 +1,5 @@
 /* plugin.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -25,45 +25,62 @@
 #include "logging.h"
 
 
-int load_plugins(char *dir) {
+int load_plugin(const char *dir, const char* plugname) {
 	struct stat statbuf;
 	struct dirent **namelist;
-	int n;
-	char *full_path;
+	int n, ret;
+	char *full_path, full_name[264];
 	DIR *plugindir;
 
+	ret		= 0;
 	full_path	= NULL;
 	plugin_list	= NULL;
 
-	init_plugin_hooks();
+	if (strlen(plugname) > 265) {
+		logmsg(LOG_ERR, 1, "  Error - Plugin name exceeds maximum length of 256 charakters: %s\n", plugname);
+		return(-1);
+	}
 
 	if ((plugindir = opendir(dir)) == NULL) {
 		fprintf(stderr, "  Error - Unable to open plugin directory: %s.\n", strerror(errno));
 		return(-1);
 	}
 	
-	DEBUG_FPRINTF(stdout, "  Searching for plugins in %s\n", dir);
+	DEBUG_FPRINTF(stdout, "  Looking for plugin %s in %s\n", plugname, dir);
 	if ((n = scandir(dir, &namelist, 0, alphasort)) < 0) {
 		fprintf(stderr, "  Error - Unable to scan plugin directory: %s\n", strerror(errno));
 		return(-1);
 	} else while(n--) {
 		stat(namelist[n]->d_name, &statbuf);
-		if (fnmatch("htm_*.so*", namelist[n]->d_name, 0) == 0) {
-			/* found a plugin */
+
+		/* assemble full name */
+		memset(full_name, 0, 264);
+		strncpy(full_name, "htm_", 4);
+		strncpy(&full_name[4], plugname, strlen(plugname));
+		strncpy(&full_name[4+strlen(plugname)], ".so", 3);
+
+		if ((ret = fnmatch(full_name, namelist[n]->d_name, 0)) == 0) {
+			/* found the plugin */
 			if ((full_path = (char *) malloc(strlen(dir) + strlen(namelist[n]->d_name) + 2)) == NULL) {
-				fprintf(stderr, "  Error - Unable to allocate memory: %s\n", strerror(errno));
-				return(-1);
+				perror("  Error - Unable to allocate memory");
+				exit(EXIT_FAILURE);
 			}
 			snprintf(full_path, strlen(dir)+strlen(namelist[n]->d_name)+2, "%s/%s", dir, namelist[n]->d_name);
 			DEBUG_FPRINTF(stdout, "  Plugin found: %s\n", full_path);
 			init_plugin(full_path);
 			free(full_path);
+			free(namelist[n]);
+			break;
 		}
 		free(namelist[n]);
 	}
+	if (ret != 0) {
+		fprintf(stderr, "  Error - Unable to load plugin %s: %s.\n", full_name, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
 	free(namelist);
 	
-	return(0);
+	return(1);
 }
 
 int init_plugin(char *plugin_name) {
@@ -99,7 +116,7 @@ int init_plugin(char *plugin_name) {
 	    ((plugin_error_str = (char *) dlerror()) != NULL)) {
 		fprintf(stderr, "  Unable to initialize plugin: %s\n", plugin_error_str);
 		unload_at_err(new_plugin);
-		return(-1);
+		exit(EXIT_FAILURE);
 	}
 
 	/* determin internal module name and version string */

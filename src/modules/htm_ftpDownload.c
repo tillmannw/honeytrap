@@ -28,16 +28,30 @@
 
 #include <honeytrap.h>
 #include <logging.h>
+#include <conftree.h>
 #include <plughook.h>
 #include <util.h>
 #include <md5.h>
+#include <ip.h>
 
 #include "htm_ftpDownload.h"
 
+const char module_name[]="ftpDownload";
+const char module_version[]="0.5.0";
+
+char *ftp_host = NULL;
+
+static const char *plugin_config_keywords[] = {
+	"ftp_host"
+};
+
+
 void plugin_init(void) {
 	plugin_register_hooks();
+	plugin_register_confopts();
 	return;
 }
+
 
 void plugin_unload(void) {
 	unhook(PPRIO_ANALYZE, module_name, "cmd_parse_for_ftp");
@@ -48,6 +62,43 @@ void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_ANALYZE, module_name, "cmd_parse_for_ftp", (void *) cmd_parse_for_ftp);
 
+	return;
+}
+
+void plugin_register_confopts(void) {
+	int	i;
+	char	full_name[264], *confopt;
+
+	/* assemble plugin config key */
+	memset(full_name, 0, 264);
+	strncpy(full_name, "plugin-", 7);
+	strncpy(&full_name[7], module_name, 256 < strlen(module_name) ? 256 : strlen(module_name));
+	if (add_keyword(&config_keywords_tree, full_name, NULL, 0) == NULL) {
+		fprintf(stderr, "  Error - Unable to add configuration keyword to tree.\n");
+		exit(EXIT_FAILURE);
+	}	
+
+	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	/* build tree of allowed configuration keywords */
+	for (i=0; i<sizeof(plugin_config_keywords)/sizeof(char *); i++) {
+
+		/* assemble full config option path */
+		if ((confopt = malloc(strlen(full_name)+strlen(plugin_config_keywords[i])+2)) == NULL) {
+			fprintf(stderr, "  Error - Unable to allocate memory: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		memset(confopt, 0, strlen(full_name)+strlen(plugin_config_keywords[i])+2);
+		strcat(confopt, full_name);
+		strcat(confopt, ".");
+		strcat(confopt, plugin_config_keywords[i]);
+
+		/* add config option to tree */
+		if (add_keyword(&config_keywords_tree, confopt, NULL, 0) == NULL) {
+			fprintf(stderr, "  Error - Unable to add configuration keyword to tree.\n");
+			exit(EXIT_FAILURE);
+		}	
+		free(confopt);
+	}
 	return;
 }
 
@@ -578,7 +629,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		/* add download to attack record */
 		if (total_bytes) {
 			logmsg(LOG_DEBUG, 1, "FTP download - Adding download to attack record.\n");
-			add_download("ftp", 6, rhost->s_addr, port, user, pass, (const char *) save_file, binary_stream, total_bytes, attack);
+			add_download("ftp", TCP, rhost->s_addr, port, user, pass, (const char *) save_file, binary_stream, total_bytes, attack);
 
 			logmsg(LOG_NOTICE, 1, "FTP download - %s attached to attack record.\n", save_file);
 		} else logmsg(LOG_NOISY, 1, "FTP download - No data received.\n");

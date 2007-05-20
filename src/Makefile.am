@@ -8,6 +8,8 @@ honeytrap_SOURCES = 	honeytrap.c honeytrap.h \
 			ctrl.c ctrl.h \
 			signals.c signals.h \
 			readconf.c readconf.h \
+			parseconf.c parseconf.h \
+			conftree.c conftree.h \
 			plugin.c plugin.h \
 			plughook.c plughook.h \
 			util.c util.h \

@@ -1,13 +1,15 @@
-Version 0.7.0
-- Plugins can be prioritized
-- x86 CPU emulation module for generic shellcode analysis
-  based on libemu by Markus and Paul
-- PostgreSQL module for commits into mwcollect database
-- SHA512 hash support
-- Performance improvements
+Version 1.0.0
+- New configuration concept with hierarchically organized file format
+- New plugin: PostgreSQL module for commits into mwcollect database
+- New plugin: Saving attack data in files is performed by a module now
+- New plugin: x86 CPU emulation module for generic shellcode analysis
+              based on libemu by Markus and Paul
 - Improved connection request handling in the nfq stream monitor
+- Plugins can be prioritized
+- SHA512 hashing support
 - FTP download plugin is now source-based routing safe
 - Changed autotools process to make module builts optional
+- Performance improvements
 Version 0.6.5
 - Introduced an nfnetlink_queue-based connection monitor
 - Some compile errors fixed

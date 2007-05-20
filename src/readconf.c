@@ -26,6 +26,8 @@
 #include <sys/file.h>
 
 #include "readconf.h"
+#include "parseconf.h"
+#include "conftree.h"
 #include "honeytrap.h"
 #include "logging.h"
 #include "response.h"
@@ -33,6 +35,8 @@
 #include "ctrl.h"
 #include "signals.h"
 #include "plugin.h"
+#include "plughook.h"
+#include "ip.h"
 #include "pcapmon.h"
 #include "ipqmon.h"
 
@@ -42,50 +46,104 @@
   #define OPTSTRING	"vh?pDmL:P:C:l:r:u:g:t:"
 #endif
 
-#define OPT_IS(A)	(strcmp(low_opt, (A)) == 0)
+/* global config tree */
+struct lcfg *confkeys_tree;
 
-void *get_value(char *buf, const char delim) {
-	/* find delimiter in string and overwrite it with \0 to terminate keywort,
-	 * skip following whitespaces and return pointer to the found value
-	 * return NULL if delimiter is not found */
 
-	char *retval = NULL;
-	int i;
+conf_node *process_conftree(conf_node *conftree, conf_node *tree, process_confopt_fn proc_opt, void *opt_data) {
+	conf_node	*cur_node = NULL;
 
-	if (buf == NULL) return(NULL);
+	if (!tree) return(NULL);
 
-	/* search for delimiter */
-	if ((retval = strchr(buf, delim)) == NULL) return(NULL);
+	cur_node = tree;
+	while (cur_node) {
+		if (proc_opt(tree, cur_node, opt_data) == NULL) return(NULL);
+		if (cur_node->first_leaf) {
+			// descend to subtree
+			if ((cur_node = process_conftree(tree, cur_node->first_leaf, proc_opt, NULL)) == NULL) {
+				fprintf(stderr, "  Error - Subtree processing failed.\n");
+				return(NULL);
+			} else return(cur_node);
 
-	/* overwrite delimiter to terminate keyword */
-	retval[0] = '\0';
-	retval++;
+			if (cur_node->next) cur_node = cur_node->next;
+			else return(cur_node);
+		}
+		if (cur_node->next) cur_node = cur_node->next;
+		else return(cur_node);
+	}
 
-	/* cut trailing blanks from key */
-	for (i=strlen(buf)-1; i>0 && isspace((int) buf[i]); buf[i--] = '\0');
-
-	/* strip leading whitespaces from value */
-	while (isspace((int) *retval)) retval++;
-
-	/* cut trailing whitespaces from value */
-	for (i=strlen(retval)-1; i>0 && isspace((int) retval[i]); retval[i--] = '\0');
-
-	return(retval);
+	return(cur_node);
 }
+
+
+enum lcfg_status check_conffile(const char *key, void *data, size_t len, void *tree) {
+	conf_node	*new_node;
+	char		*list_item;
+	
+
+	new_node	= NULL;
+	list_item	= NULL;
+
+	if ((new_node = add_keyword(&config_tree, key, data, len)) == NULL) {
+		fprintf(stderr, "Error - Unable to add configuration option to tree.\n");
+		return(lcfg_status_error);
+	}	
+
+	return(lcfg_status_ok);
+}
+
+
+static const char *config_keywords[] = {
+	"logfile",
+	"pidfile",
+	"response_dir",
+	"plugin_dir",
+	"mirror",
+#ifdef USE_PCAP_MON
+	"promisc",
+#endif
+	"user",
+	"group",
+	"include",
+	"portconf",
+	"portconf.ignore.protocol",
+	"portconf.ignore.port",
+	"portconf.normal.protocol",
+	"portconf.normal.port",
+	"portconf.proxy",
+	"portconf.proxy.map.protocol",
+	"portconf.proxy.map.port",
+	"portconf.proxy.map.target_host",
+	"portconf.proxy.map.target_protocol",
+	"portconf.proxy.map.target_port",
+	"portconf.mirror.protocol",
+	"portconf.mirror.port"
+};
 
 
 int configure(int my_argc, char *my_argv[]) {
 #ifdef USE_PCAP_MON
-	char *bpf_cmd_ext, errbuf[PCAP_ERRBUF_SIZE];
-	struct hostent *ip_cmd_opt;
+	char			*bpf_cmd_ext, errbuf[PCAP_ERRBUF_SIZE];
+	struct hostent		*ip_cmd_opt;
 #endif
-	char option;
-	struct passwd *pwd_entry;
-	struct group *grp_entry;
+	char			option;
+	struct passwd		*pwd_entry;
+	struct group		*grp_entry;
+	int			i;
+
+	config_keywords_tree	= NULL;
+	config_tree		= NULL;
+
+	/* build tree of allowed configuration keywords */
+	for (i=0; i<sizeof(config_keywords)/sizeof(char *); i++) {
+		if (add_keyword(&config_keywords_tree, config_keywords[i], NULL, 0) == NULL) {
+			fprintf(stderr, "  Error - Unable to add configuration keyword to tree.\n");
+			exit(EXIT_FAILURE);
+		}	
+	}
 
 	/* initialilzation of variables */
 	default_response	= NULL;	/* initialize default response list */
-	proxy_dest		= NULL;	/* list with destinations for ports which are handled in proxy mode */
 	pidfile_fd		= 0;
 #ifdef USE_PCAP_MON
 	bpf_cmd_ext		= NULL;	/* bpf string extension ('expression' from command line) */
@@ -93,7 +151,11 @@ int configure(int my_argc, char *my_argv[]) {
 #endif
 
 	/* initialize port flags array with zeros */
-	memset(port_flags, 0, sizeof(port_flags)); 
+	memset(port_flags_tcp, 0, sizeof(portcfg)); 
+	memset(port_flags_tcp, 0, sizeof(portcfg)); 
+
+	/* initialization of plugin hooks */
+	init_plugin_hooks();
 
 
 	/* scan command line options to determine logging level or print version number or usage */
@@ -103,12 +165,12 @@ int configure(int my_argc, char *my_argv[]) {
 				if ((atoi(optarg) < 7) && (atoi(optarg) >= 0)) log_level = atoi(optarg);
 				else {
 					fprintf(stderr, "  Error - Log level must be a value between 0 and 6.\n");
-					exit(1);
+					exit(EXIT_FAILURE);
 				}
 				break;
 			case 'v':
 				fprintf(stdout, "%s\n", PACKAGE_STRING);
-				exit(0);
+				exit(EXIT_SUCCESS);
 			case 'h':
 			case '?':
 				usage(my_argv[0]);
@@ -123,8 +185,8 @@ int configure(int my_argc, char *my_argv[]) {
 	if (first_init) {	
 		DEBUG_FPRINTF(stdout, "  Saving old working directory.\n");
 		if (getcwd(old_cwd, 1024) == NULL) {
-			DEBUG_FPRINTF(stderr, "  Warning - Unable to determine current working directory.\n");
-			exit(1);
+			DEBUG_FPRINTF(stderr, "  Error - Unable to determine current working directory.\n");
+			exit(EXIT_FAILURE);
 		}
 
 		/* scan command line options to get config file name */
@@ -148,9 +210,15 @@ int configure(int my_argc, char *my_argv[]) {
 	}
 		
 	/* process config file */
-	if (parse_config_file(conffile_name) == -1) {
-		fprintf(stderr, "  Error - Unable to parse configuration file %s.\n", conffile_name);
-		exit(1);
+	if ((confkeys_tree = parse_config_file(conffile_name)) == NULL) exit(EXIT_FAILURE);
+	else if (lcfg_accept(confkeys_tree, check_conffile, 0) != lcfg_status_ok) {
+		/* invalid config keyword found, delete config tree */
+		lcfg_delete(confkeys_tree);
+		exit(EXIT_FAILURE);
+	}
+	if (process_conftree(config_tree, config_tree, process_confopt, NULL) == NULL) {
+		fprintf(stderr, "  Error - Unable to process configuration tree.\n");
+		exit(EXIT_FAILURE);
 	}
 
 
@@ -179,8 +247,8 @@ int configure(int my_argc, char *my_argv[]) {
 					break;
 				case 'a':
 					if ((ip_cmd_opt = gethostbyname(optarg)) == NULL) {
-						fprintf(stderr, "  Error - Invalid hostname or ip address.\n");
-						exit(1);
+						perrori("  Error - Invalid hostname or ip address\n");
+						exit(EXIT_FAILURE);
 					}
 					break;
 				case 'p':
@@ -195,7 +263,7 @@ int configure(int my_argc, char *my_argv[]) {
 					if((conn_timeout < 0) || (conn_timeout > 255)) {
 						fprintf(stderr,
 							"  Error - Listen timeout must be a value between 0 and 255.\n");
-						exit(1);
+						exit(EXIT_FAILURE);
 					}
 					break;
 				case 'r':
@@ -203,14 +271,14 @@ int configure(int my_argc, char *my_argv[]) {
 					if((read_timeout < 0) || (read_timeout > 255)) {
 						fprintf(stderr,
 							"  Error - Read timeout must be a value between 0 and 255.\n");
-						exit(1);
+						exit(EXIT_FAILURE);
 					}
 					break;
 				case 'u':
 					if ((pwd_entry = getpwnam(optarg)) == NULL) {
 						if (errno) fprintf(stderr, "  Invalid user: %s\n", strerror(errno));
 						else fprintf(stderr, "  User %s not found.\n", optarg);
-						exit(0);
+						exit(EXIT_FAILURE);
 					} else {
 						u_id = pwd_entry->pw_uid;
 						user = strdup(optarg);
@@ -220,7 +288,7 @@ int configure(int my_argc, char *my_argv[]) {
 					if ((grp_entry = getgrnam(optarg)) == NULL) {
 						if (errno) fprintf(stderr, "  Invalid group: %s\n", strerror(errno));
 						else fprintf(stderr, "  Group %s not found.\n", optarg);
-						exit(0);
+						exit(EXIT_FAILURE);
 					} else {
 						g_id = grp_entry->gr_gid;
 						group = strdup(optarg);
@@ -245,9 +313,8 @@ int configure(int my_argc, char *my_argv[]) {
 		if (dev == NULL) {
 			DEBUG_FPRINTF(stdout, "  No device given, trying to use default device.\n");
 			if ((dev = pcap_lookupdev(errbuf)) == NULL) {
-				fprintf(stderr, "  Error - Unable to determine default network interface.\n");
-				fprintf(stderr, "  Error - No interface given.\n");
-				exit(1);
+				fprintf(stderr, "  Error - Unable to determine default network device: %s.\n", errbuf);
+				exit(EXIT_FAILURE);
 			}
 			fprintf(stdout, "  Default device is %s.\n", dev);
 		}
@@ -256,10 +323,6 @@ int configure(int my_argc, char *my_argv[]) {
 
 	fprintf(stdout, "  Servers will run as user %s (%d).\n", user, u_id);
 	fprintf(stdout, "  Servers will run as group %s (%d).\n", group, g_id);
-
-
-	/* load plugins */
-	load_plugins(plugin_dir);
 
 
 	/* load default responses */
@@ -285,9 +348,8 @@ int configure(int my_argc, char *my_argv[]) {
 			} else {
 				if ((bpf_cmd_ext = (char *) realloc(bpf_cmd_ext,
 					strlen(bpf_cmd_ext)+strlen(my_argv[optind])+2)) == NULL) {
-					fprintf(stderr,
-						"  Error - Unable to allocate memory: %s\n", strerror(errno));
-					exit(1);
+					perror("  Error - Unable to allocate memory");
+					exit(EXIT_FAILURE);
 				}
 				snprintf(bpf_cmd_ext+strlen(bpf_cmd_ext), strlen(my_argv[optind])+2,
 					" %s%c", my_argv[optind], 0);
@@ -315,7 +377,7 @@ int configure(int my_argc, char *my_argv[]) {
 	/* open logfile */
 	if((logfile_fd = open(logfile_name, EXCL_FILE_RW, 0644)) == -1) {
 		fprintf(stderr, "  Error - Unable to open logfile %s: %s.\n", logfile_name, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	fprintf(stdout, "  Logging to %s.\n", logfile_name);
 
@@ -328,250 +390,434 @@ int configure(int my_argc, char *my_argv[]) {
 }
 
 
-int parse_config_file(const char *filename) {
-	char *recvline, *config_opt, *config_val;
-	int config_file_fd, line_number;
-	FILE *config_file;
-
-	line_number		= 0;
-	recvline		= NULL;
-	config_opt		= NULL;
-	config_val		= NULL;
+conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
+	char		*value;
+	struct passwd	*pwd_entry;
+	struct group	*grp_entry;
+	struct lcfg	*confkeys_subtree;
+	conf_node	*confopt;
 
 
-	if((config_file_fd = open(filename, 0, 0640)) == -1) return(-1);
+	pwd_entry		= NULL;
+	grp_entry		= NULL;
+	confopt			= NULL;
+	value			= NULL;
+	confkeys_subtree	= NULL;
 
-	/* lock config file to prevent include loops */
-	if (flock(config_file_fd, LOCK_EX | LOCK_NB) != 0) {
-		fprintf(stderr, "  Error - Unable to lock configuration file: %s\n", strerror(errno));
-		return(-1);
-	}
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(node);
 
-	/* reopen config file as stream to be able to use fgets() */
-	if ((config_file = fdopen(config_file_fd, "r")) == NULL) {
-		fprintf(stderr, "  Error - Unable to open configuration file: %s\n", strerror(errno));
-		return(-1);
-	}
-
-	DEBUG_FPRINTF(stdout, "  Config file parser - File reopened as stream, ready to parse.\n");
-
-	while((recvline = get_next_line(config_file)) > 0) {
-		line_number++;
-		
-		/* ignore comments and blank lines */
-		if ((*recvline == '#') || (*recvline == 0x0a) || (*recvline == 0x00) || (recvline == NULL)) continue;
-
-		/* remove newlines */
-		if ((recvline)[strlen(recvline)-1] == '\n') recvline[strlen(recvline)-1] = 0;
-		DEBUG_FPRINTF(stdout, "  Config file parser - Line %u in %s: %s\n", line_number, filename, recvline);
-
-		config_opt = recvline;
-		if ((config_val = get_value(recvline, '=')) == NULL) {
-			if ((config_opt)[strlen(config_opt)-1] == '\n') config_opt[strlen(config_opt)-1] = 0;
+	do {
+		if (node->val) {
+			if ((value = malloc(node->val->size+1)) == NULL) {
+				perror("  Error - Unable to allocate memory");
+				exit(EXIT_FAILURE);
+			}
+			memset(value, 0, node->val->size+1);
+			memcpy(value, node->val->data, node->val->size);
 		}
-		if (process_config_option(config_opt, config_val, line_number, filename) == -1) {
-			fprintf(stderr, "  Error - Invalid line %u in file %s.\n", line_number, filename); 
-			return(-1);
-		}
-	}
-	DEBUG_FPRINTF(stdout, "  Config file parser - %u lines successfully parsed.\n", line_number); 
 
-	if (flock(config_file_fd, LOCK_UN) != 0) fprintf(stderr, "  Error - Unable to unlock configuration file: %s\n",
-		strerror(errno));
-	if (fclose(config_file) == EOF) fprintf(stderr, "  Error - Unable to close configuration file: %s\n",
-		strerror(errno));
-	
-	return(0);
+		if (OPT_IS("include")) {
+			/* include line found, do recursive processing */
+			DEBUG_FPRINTF(stdout, "  Including configuration from %s.\n", value);
+			if ((confkeys_subtree = parse_config_file(value)) == NULL) exit(EXIT_FAILURE);
+			if (lcfg_accept(confkeys_subtree, check_conffile, 0) != lcfg_status_ok) {
+				/* invalid config keyword found, delete config tree */
+				lcfg_delete(confkeys_subtree);
+				exit(EXIT_FAILURE);
+			}
+		} else if (strstr(node->keyword, "plugin-") == node->keyword) {
+			/* load plugins */
+			value = strchr(node->keyword, '-') + 1;
+			load_plugin(plugin_dir, value);
+			process_conftree(node, node->first_leaf, process_confopt_plugin, NULL);
+			node->first_leaf = NULL;
+			conftree_children_free(node);
+		} else if (OPT_IS("mirror")) {
+			if (strcmp(value, "on") == 0) mirror_mode = 1;
+			else if (strcmp(value, "off") == 0) mirror_mode = 0;
+			else {
+				fprintf(stderr, "  Error - Invalid value '%s' for option '%s'.\n", value, node->keyword);
+				exit(EXIT_FAILURE);
+			}
+			DEBUG_FPRINTF(stdout, "  Activating mirror mode.\n");
+	#ifdef USE_PCAP_MON
+		} else if (OPT_IS("promisc")) {
+			if (strcmp(value, "on") == 0) promisc_mode = 1;
+			else if (strcmp(value, "off") == 0) promisc_mode = 0;
+			else {
+				fprintf(stderr, "  Error - Invalid value '%s' for option '%s'.\n", value, node->keyword);
+				exit(EXIT_FAILURE);
+			}
+			DEBUG_FPRINTF(stdout, "  Activating promiscuous mode.\n");
+	#endif
+		} else if (OPT_IS("read_limit")) {
+			read_limit = atol(value);
+			free(value);
+			DEBUG_FPRINTF(stdout, "  Setting read limit to %d.\n", read_limit);
+		} else if (OPT_IS("pidfile")) OPT_SET("  Pid file is %s.\n", pidfile_name)
+		else if (OPT_IS("logfile")) OPT_SET("  Logfile is %s.\n", logfile_name)
+		else if (OPT_IS("response_dir")) OPT_SET("  Loading default responses from %s.\n", response_dir)
+		else if (OPT_IS("plugin_dir")) OPT_SET("  Loading plugins from %s.\n", plugin_dir)
+		else if (OPT_IS("user")) {
+			if ((pwd_entry = getpwnam(value)) == NULL) {
+				if (errno) fprintf(stderr, "  Invalid user '%s': %s\n", value, strerror(errno));
+				else fprintf(stderr, "  User %s not found.\n", value);
+				exit(EXIT_FAILURE);
+			}
+			u_id = pwd_entry->pw_uid;
+			user = value;
+			DEBUG_FPRINTF(stdout, "  Server processes will run as user %s\n", user);
+		} else if (OPT_IS("group")) {
+			if ((grp_entry = getgrnam(value)) == NULL) {
+				if (errno) fprintf(stderr, "  Invalid group '%s': %s\n", value, strerror(errno));
+				else fprintf(stderr, "  Group %s not found.\n", value);
+				exit(EXIT_FAILURE);
+			}
+			g_id = grp_entry->gr_gid;
+			group = value;
+			DEBUG_FPRINTF(stdout, "  Server processes will run as group %s\n", group);
+		} else if (OPT_IS("portconf")) {
+			if (process_conftree(node, node->first_leaf, process_confopt_portconf, NULL) == NULL) return(NULL);
+			node->first_leaf = NULL;
+			conftree_children_free(node);
+		} else {
+			fprintf(stderr, "  Error - Invalid keyword in configuration file: %s\n", node->keyword);
+			exit(EXIT_FAILURE);
+		}
+		if (node->val) node->val = node->val->next;
+	} while (node->val);
+
+	return(node);
 }
 
-int process_config_option(char *opt, char* val, const int line_number, const char *filename) {
-	char *index, *low_opt, *portnum, *portconf, *proto, *d_addr, *port_str;
-	struct passwd *pwd_entry;
-	struct group *grp_entry;
-	uint16_t d_port;
-	struct s_proxy_dest *pd_tmp, *pd_new;
-	int i;
 
-	portnum		= NULL;
-	portconf	= NULL;
-	proto		= NULL;
-	low_opt		= NULL;
-	d_addr		= NULL;
-	d_port		= 0;
+conf_node *process_confopt_portconf(conf_node *tree, conf_node *node, void *opt_data) {
+	char		*value		= NULL;
+	conf_node	*confopt	= NULL;
+	portcfg		*pconf		= NULL;
+	struct portmap	*portmap	= NULL;
+	struct protomap	*protomap	= NULL;
+	struct pconfmap	*pmap		= NULL,
+			*old_map	= NULL,
+			*cur_map	= NULL;
+	u_char		mode		= 0;
 
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
 
-	/* turn keywords into lowercase */
-	low_opt			= (char *) strdup(opt);
-	index			= low_opt;
-	while(*index != '\0') tolower(*index++);
-
-
-	if (OPT_IS("include")) {
-		/* include line found, do recursive processing */
-		DEBUG_FPRINTF(stdout, "  Including configuration from %s.\n", val);
-		if (parse_config_file(val) == -1) {
-			fprintf(stderr, "  Error - Unable to parse configuration file %s.\n", val);
-			exit(1);
+	/* do instead of while because we can have nodes without values here */
+	do {
+		if (node->val) {
+			if ((value = malloc(node->val->size+1)) == NULL) {
+				perror("  Error - Unable to allocate memory");
+				exit(EXIT_FAILURE);
+			}
+			memset(value, 0, node->val->size+1);
+			memcpy(value, node->val->data, node->val->size);
 		}
-		return(0);
+
+		/* prepare config map */
+		if ((pmap = (struct pconfmap *) malloc(sizeof(struct pconfmap))) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
+		}
+		memset(pmap, 0, sizeof(struct pconfmap));
+
+		if OPT_IS("ignore") {
+			mode = PORTCONF_IGNORE;
+			process_conftree(node, node->first_leaf, process_confopt_portconf_simple, pmap);
+			node->first_leaf = NULL;
+			conftree_children_free(node);
+		} else if OPT_IS("mirror") {
+			mode = PORTCONF_MIRROR;
+			process_conftree(node, node->first_leaf, process_confopt_portconf_simple, pmap);
+			node->first_leaf = NULL;
+			conftree_children_free(node);
+		} else if OPT_IS("normal") {
+			mode = PORTCONF_NORMAL;
+			process_conftree(node, node->first_leaf, process_confopt_portconf_simple, pmap);
+			node->first_leaf = NULL;
+			conftree_children_free(node);
+		} else if OPT_IS("proxy") {
+			mode = PORTCONF_PROXY;
+			process_conftree(node, node->first_leaf, process_confopt_portconf_proxy, pmap);
+			node->first_leaf = NULL;
+			conftree_children_free(node);
+		} else {
+			fprintf(stderr, "  Error - Invalid keyword in configuration file: %s\n", node->keyword);
+			exit(EXIT_FAILURE);
+		}
+		
+		cur_map = pmap;
+		while (cur_map) {
+			protomap = cur_map->protomap;
+			while (protomap) {
+				portmap = cur_map->portmap;
+				while (portmap) {
+					/* prepare port configuration */
+					if ((pconf = (portcfg *) malloc(sizeof(portcfg))) == NULL) {
+						perror("  Error - Unable to allocate memory");
+						exit(EXIT_FAILURE);
+					}
+					memset(pconf, 0, sizeof(portcfg));
+					pconf->mode	= mode;
+					pconf->target	= cur_map->target;
+					pconf->port	= portmap->port;
+					pconf->protocol	= protomap->protocol;
+
+					/* set poiner in port configuration array */
+					if (pconf->protocol == TCP) {
+						if (port_flags_tcp[pconf->port]) {
+							fprintf(stderr, "  Error - Duplicate configuration for port %d/tcp.\n", pconf->port);
+							return(NULL);
+						}
+						port_flags_tcp[pconf->port] = pconf;
+					} else if (pconf->protocol == UDP) {
+						if (port_flags_udp[pconf->port]) {
+							fprintf(stderr, "  Error - Duplicate configuration for port %d/udp.\n", pconf->port);
+							return(NULL);
+						}
+						port_flags_udp[pconf->port] = pconf;
+					} else {
+						fprintf(stderr, "  Error - Invalid protocol type for port %d.\n", pconf->port);
+						return(NULL);
+					}
+					if (mode == PORTCONF_PROXY) {
+						if (pconf->target == NULL) {
+							fprintf(stderr, "  Error - Proxy target for port %d/%s missing.\n",
+								pconf->port, PROTO(pconf->protocol));
+							return(NULL);
+						}
+						printf("  Port %d/%s is configured to be handled in %s mode with target %s:%d/%s.\n",
+							pconf->port, PROTO(pconf->protocol), MODE(pconf->mode),
+							pconf->target->host, pconf->target->port, PROTO(pconf->target->protocol));
+					} else {
+						printf("  Port %d/%s is configured to be handled in %s mode.\n",
+							pconf->port, PROTO(pconf->protocol), MODE(pconf->mode));
+					}
+						
+					portmap = portmap->next;
+				}
+				protomap = protomap->next;
+			}
+			old_map = cur_map;
+			cur_map = cur_map->next;
+			free(old_map);
+		}
+
+		if (node->val) node->val = node->val->next;
+	} while (node->val);
+
+	return(node);
+}
+
+
+conf_node *process_confopt_portconf_proxy(conf_node *tree, conf_node *node, void *pmap) {
+	int		i;
+	conf_node	*map		= NULL;
+	struct pconfmap	*pmap_new	= NULL;
+
+	/* got a proxy map, check map names manually and then parse subtrees */
+	map = node;
+	while (map) {
+		if (((struct pconfmap *)pmap) == NULL) {
+			fprintf(stderr, "  Error - Could not add proxy target configuration: No map given.\n");
+			exit(EXIT_FAILURE);
+		}
+
+		/* only [a-zA-Z-_] map names are allowed */
+		for (i=0; i<strlen(map->keyword); i++) {
+			if (!isalnum(map->keyword[i]) && (map->keyword[i] != '-') && (map->keyword[i] != '_')) {
+				fprintf(stderr, "  Error - Invalid proxy map name (use [a-zA-Z-_]: %s\n", map->keyword);
+				return(NULL);
+			}
+		}
+
+		/* prepare proxy map configuration */
+		if ((((struct pconfmap *)pmap)->target = (proxy_dest *) malloc(sizeof(proxy_dest))) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
+		}
+		memset(((struct pconfmap *)pmap)->target, 0, sizeof(proxy_dest));
+		process_conftree(node, map->first_leaf, process_confopt_portconf_proxy_map, (void *) pmap);
+
+		if ((node = map->next) != NULL) {
+			/* prepare new config map */
+			if ((pmap_new = (struct pconfmap *) malloc(sizeof(struct pconfmap))) == NULL) {
+				perror("  Error - Unable to allocate memory");
+				exit(EXIT_FAILURE);
+			}
+			memset(pmap_new, 0, sizeof(struct pconfmap));
+			((struct pconfmap *)pmap)->next = pmap_new;
+			pmap = ((struct pconfmap *)pmap)->next;
+		}
+		conftree_children_free(map);
+		map = node;
 	}
 
-	if (OPT_IS("mirror")) {
-		mirror_mode = 1;
-		DEBUG_FPRINTF(stdout, "  Activating mirror mode.\n");
-#ifdef USE_PCAP_MON
-	} else if (OPT_IS("promisc")) {
-		promisc_mode = 1;
-		DEBUG_FPRINTF(stdout, "  Activating promiscuous mode.\n");
-#endif
-	} else if (OPT_IS("read_limit")) {
-		read_limit = atol(val);
-		DEBUG_FPRINTF(stdout, "  Setting read limit to %d.\n", read_limit);
-	} else if (OPT_IS("pidfile")) {
-		free(pidfile_name);
-		pidfile_name = strdup(val);
-		DEBUG_FPRINTF(stdout, "  Pid file is %s.\n", val);
-	} else if (OPT_IS("logfile")) {
-		free(logfile_name);
-		logfile_name = strdup(val);
-		DEBUG_FPRINTF(stdout, "  Logfile is %s.\n", val);
-	} else if (OPT_IS("dbfile")) {
-		free(dbfile_name);
-		dbfile_name = strdup(val);
-		DEBUG_FPRINTF(stdout, "  Databse file is %s.\n", val);
-	} else if (OPT_IS("response_dir")) {
-		free(response_dir);
-		response_dir = strdup(val);
-		DEBUG_FPRINTF(stdout, "  Loading default responses from %s.\n", val);
-	} else if (OPT_IS("plugin_dir")) {
-		free(plugin_dir);
-		plugin_dir = strdup(val);
-		DEBUG_FPRINTF(stdout, "  Loading plugins from %s.\n", val);
-	} else if (OPT_IS("attacks_dir")) {
-		free(attacks_dir);
-		attacks_dir = strdup(val);
-		DEBUG_FPRINTF(stdout, "  Storing attack strings in %s.\n", val);
-	} else if (OPT_IS("dlsave_dir")) {
-		free(dlsave_dir);
-		dlsave_dir = strdup(val);
-		DEBUG_FPRINTF(stdout, "  Storing downloaded files in %s.\n", val);
-	} else if (OPT_IS("ftp_host")) {
-		free(ftp_host);
-		ftp_host = strdup(val);
-		DEBUG_FPRINTF(stdout, "  Using '%s' as bind address for FTP data connections (needs a module).\n", val);
-	} else if (OPT_IS("user")) {
-		if ((pwd_entry = getpwnam(val)) == NULL) {
-			if (errno) fprintf(stderr, "  Invalid user (%s line %u): %s\n",
-				filename, line_number, strerror(errno));
-			else fprintf(stderr, "  User %s not found (%s line %u).\n", val, filename, line_number);
-			exit(0);
-		} else {
-			u_id = pwd_entry->pw_uid;
-			user = strdup(val);
+	return(node);
+}
+
+
+conf_node *process_confopt_portconf_simple(conf_node *tree, conf_node *node, void *pmap) {
+	char		*value = NULL;
+	conf_node	*confopt = NULL;
+	struct portmap	*port_new = NULL,
+			*portmap = ((struct pconfmap *)pmap)->portmap;
+	struct protomap	*proto_new = NULL,
+			*protomap = ((struct pconfmap *)pmap)->protomap;
+
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
+
+	while (node->val) {
+		if ((value = malloc(node->val->size+1)) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
 		}
-	} else if (OPT_IS("group")) {
-		if ((grp_entry = getgrnam(val)) == NULL) {
-			if (errno) fprintf(stderr, "  Invalid group (%s line %u): %s\n",
-				filename, line_number, strerror(errno));
-			else fprintf(stderr, "  Group %s not found (%s line %u).\n", val, filename, line_number);
-			exit(0);
-		} else {
-			g_id = grp_entry->gr_gid;
-			group = strdup(val);
+		memset(value, 0, node->val->size+1);
+		memcpy(value, node->val->data, node->val->size);
+
+		if (((struct pconfmap *)pmap) == NULL) {
+			fprintf(stderr, "  Error - Could not add simple port configuration: No map given.\n");
+			exit(EXIT_FAILURE);
 		}
-	} else if (OPT_IS("port")) {
-		for (i=0; i<strlen(val); i++) val[i] = tolower(val[i]);
-		if ((((portconf = get_value(val, ':')) != NULL)) &&
-			((proto = get_value(val, '/')) != NULL)) {
-			if (strcmp(portconf, "normal") == 0) {
-				if (strncmp(proto, "tcp", strlen(proto)) == 0)
-					port_flags[atoi(val)].tcp = PORTCONF_NORMAL;
-				else if (strncmp(proto, "udp", strlen(proto)) == 0)
-					port_flags[atoi(val)].udp = PORTCONF_NORMAL;
-				else {
-					fprintf(stderr, "  Protocol '%s' not supported (%s line %u.\n",
-						proto, filename, line_number);
-					exit(0);
-				}
-				fprintf(stdout, "  Connections to port %u/%s will be handled in normal mode.\n",
-					atoi(val), proto);
-			} else if (strcmp(portconf, "ignore") == 0) {
-				if (strncmp(proto, "tcp", strlen(proto)) == 0) {
-					port_flags[atoi(val)].tcp = PORTCONF_IGNORE;
-					port_flags[atoi(val)].tcp = PORTCONF_IGNORE;
-				} else if (strncmp(proto, "udp", strlen(proto)) == 0) {
-					port_flags[atoi(val)].udp = PORTCONF_IGNORE;
-				} else {
-					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
-						proto, filename, line_number);
-					exit(0);
-				}
-				fprintf(stdout, "  Connections to port %u/%s will be ignored.\n", atoi(val), proto);
-				return(0);
-			} else if (strcmp(portconf, "mirror") == 0) {
-				if (strncmp(proto, "tcp", strlen(proto)) == 0)
-					port_flags[atoi(val)].tcp = PORTCONF_MIRROR;
-				else if (strncmp(proto, "udp", strlen(proto)) == 0)
-					port_flags[atoi(val)].udp = PORTCONF_MIRROR;
-				else {
-					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
-						proto, filename, line_number);
-					exit(0);
-				}
-				fprintf(stdout, "  Connections to port %u/%s will be handled in mirror mode.\n",
-					atoi(val), proto);
-			} else if (strncmp(portconf, "proxy", 5) == 0) {
-				if (strncmp(proto, "tcp", strlen(proto)) == 0)
-					port_flags[atoi(val)].tcp = PORTCONF_PROXY;
-				else if (strncmp(proto, "udp", strlen(proto)) == 0)
-					port_flags[atoi(val)].udp = PORTCONF_PROXY;
-				else {
-					fprintf(stderr, "  Protocol '%s' not supported (%s line %u).\n",
-						proto, filename, line_number);
-					exit(0);
-				}
-				if ((d_addr = get_value(portconf, ',')) != NULL) {
-					if ((port_str = get_value(d_addr, ':')) != NULL)
-						d_port = atoi(port_str);
-					else d_port = atoi(val);
-				} else {
-					fprintf(stderr, "  Invalid port configuration, no proxy destination found (%s line %u).\n", filename, line_number);
-					exit(0);
-				}
 
-				/* create new proxy destination list entry */
-				if ((pd_new = (struct s_proxy_dest*) malloc(sizeof(struct s_proxy_dest))) == 0) {
-					logmsg(LOG_ERR, 1, "    Error - Unable to allocate memory: %s\n", strerror(errno));
-					return(-1);
-				}
-				pd_new->next = NULL;
+		if (OPT_IS("port")) {
+			if ((port_new = (struct portmap *) malloc(sizeof(struct portmap))) == NULL) {
+				perror("  Error - Unable to allocate memory");
+				exit(EXIT_FAILURE);
+			}
+			memset(port_new, 0, sizeof(struct portmap));
+			port_new->port = atoi(value);
+			free(value);
 
-				/* attach new function to list */
-				pd_tmp = proxy_dest;
-				if (pd_tmp) {
-					while(pd_tmp->next) pd_tmp = pd_tmp->next;
-					pd_tmp->next = pd_new;
-				} else proxy_dest = pd_new;
-
-				pd_new->attack_port	= atoi(val);
-				pd_new->d_addr		= strdup(d_addr);
-				pd_new->d_port		= d_port;
-
-				fprintf(stdout, "  Connections to port %u/%s will be handled in 'proxy' mode (to %s:%u/%s).\n", pd_new->attack_port, proto, pd_new->d_addr, pd_new->d_port, proto);
+			/* append new port to list */
+			if ((portmap = ((struct pconfmap *)pmap)->portmap) == NULL) {
+				((struct pconfmap *)pmap)->portmap = port_new;
 			} else {
-				fprintf(stderr, "  Invalid port configuration (%s line %u).\n", filename, line_number);
-				exit(0);
+				while (portmap->next) portmap = portmap->next;
+				portmap->next = port_new;
+			}
+		} else if OPT_IS("protocol") {
+			if ((proto_new = (struct protomap *) malloc(sizeof(struct protomap))) == NULL) {
+				perror("  Error - Unable to allocate memory");
+				exit(EXIT_FAILURE);
+			}
+			memset(proto_new, 0, sizeof(struct protomap));
+			if (strncmp(value, "tcp", 3 < strlen(value) ? 3 : strlen(value)) == 0) proto_new->protocol = TCP;
+			else if (strncmp(value, "udp", 3 < strlen(value) ? 3 : strlen(value)) == 0) proto_new->protocol = UDP;
+			free(value);
+
+			/* append new protocol to list */
+			if ((protomap = ((struct pconfmap *)pmap)->protomap) == NULL) {
+				((struct pconfmap *)pmap)->protomap = proto_new;
+			} else {
+				while (protomap->next) protomap = protomap->next;
+				protomap->next = proto_new;
 			}
 		} else {
-			fprintf(stderr, "  Invalid port configuration, must have format \"port = num/protocol: action\" (%s line %u).\n", filename, line_number);
-			exit(0);
+			fprintf(stderr, "  Error - Invalid keyword in configuration file: %s\n", node->keyword);
+			exit(EXIT_FAILURE);
 		}
-	} else {
-		fprintf(stderr, "  Error - Invalid keyword '%s' (%s line %u).\n", opt, filename, line_number);
-		return(-1);
+
+		node->val = node->val->next;
 	}
+	return(node);
+}
 
-	free(low_opt);
 
-	return(0);
+conf_node *process_confopt_portconf_proxy_map(conf_node *tree, conf_node *node, void *pmap) {
+	char		*value = NULL;
+	conf_node	*confopt = NULL;
+	struct portmap	*port_new = NULL,
+			*portmap = ((struct pconfmap *)pmap)->portmap;
+	struct protomap	*proto_new = NULL,
+			*protomap = ((struct pconfmap *)pmap)->protomap;
+
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
+
+	while (node->val) {
+		if ((value = malloc(node->val->size+1)) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
+		}
+		memset(value, 0, node->val->size+1);
+		memcpy(value, node->val->data, node->val->size);
+
+		if (((struct pconfmap *)pmap) == NULL) {
+			fprintf(stderr, "  Error - Could not add proxy port configuration: No map given.\n");
+			exit(EXIT_FAILURE);
+		}
+
+		if (OPT_IS("port")) {
+			if ((port_new = (struct portmap *) malloc(sizeof(struct portmap))) == NULL) {
+				perror("  Error - Unable to allocate memory");
+				exit(EXIT_FAILURE);
+			}
+			memset(port_new, 0, sizeof(struct portmap));
+			port_new->port = atoi(value);
+			free(value);
+
+			/* append new port to list */
+			if ((portmap = ((struct pconfmap *)pmap)->portmap) == NULL) {
+				((struct pconfmap *)pmap)->portmap = port_new;
+			} else {
+				while (portmap->next) portmap = portmap->next;
+				portmap->next = port_new;
+			}
+		} else if (OPT_IS("protocol")) {
+			if ((proto_new = (struct protomap *) malloc(sizeof(struct protomap))) == NULL) {
+				perror("  Error - Unable to allocate memory");
+				exit(EXIT_FAILURE);
+			}
+			memset(proto_new, 0, sizeof(struct protomap));
+			if (strncmp(value, "tcp", 3 < strlen(value) ? 3 : strlen(value)) == 0) proto_new->protocol = TCP;
+			else if (strncmp(value, "udp", 3 < strlen(value) ? 3 : strlen(value)) == 0) proto_new->protocol = UDP;
+			free(value);
+
+			/* append new protocol to list */
+			if ((protomap = ((struct pconfmap *)pmap)->protomap) == NULL) {
+				((struct pconfmap *)pmap)->protomap = proto_new;
+			} else {
+				while (protomap->next) protomap = protomap->next;
+				protomap->next = proto_new;
+			}
+		} else if (OPT_IS("target_host")) {
+			((struct pconfmap *)pmap)->target->host = value;
+		} else if (OPT_IS("target_port")) {
+			((struct pconfmap *)pmap)->target->port = atoi(value);
+			free(value);
+		} else if (OPT_IS("target_protocol")) {
+			if (strncmp(value, "tcp", 3 < strlen(value) ? 3 : strlen(value)) == 0) ((struct pconfmap *)pmap)->target->protocol = TCP;
+			else if (strncmp(value, "udp", 3 < strlen(value) ? 3 : strlen(value)) == 0) ((struct pconfmap *)pmap)->target->protocol = UDP;
+			free(value);
+		} else {
+			fprintf(stderr, "  Error - Invalid keyword in configuration file: %s\n", node->keyword);
+			exit(EXIT_FAILURE);
+		}
+		node->val = node->val->next;
+	}
+	return(node);
+}
+
+
+conf_node *process_confopt_plugin(conf_node *tree, conf_node *node, void *opt_data) {
+	char		*value = NULL;
+	conf_node	*confopt = NULL;
+
+	/* just check whether all keywords are registered and set values
+	 * evaluation is performed by the plugin itself */
+
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
+
+	while (node->val) {
+		if ((value = malloc(node->val->size+1)) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
+		}
+		memset(value, 0, node->val->size+1);
+		memcpy(value, node->val->data, node->val->size);
+
+		node->val = node->val->next;
+	}
+	return(node);
 }

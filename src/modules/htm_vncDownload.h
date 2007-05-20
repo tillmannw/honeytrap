@@ -17,9 +17,6 @@
 # include <config.h>
 #endif
 
-const char module_name[]="htm_vncDownload";
-const char module_version[]="0.2";
-
 void plugin_init(void);
 void plugin_unload(void);
 void plugin_register_hooks(void);

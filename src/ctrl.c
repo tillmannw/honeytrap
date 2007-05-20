@@ -52,7 +52,7 @@ void usage(char *progname) {
 	fprintf(stdout, "\t-D:\tdon't daemonize\n");
 	fprintf(stdout, "\t-L:\tlogfile\n");
 	fprintf(stdout, "\t-P:\tpid file\n");
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 
@@ -99,7 +99,7 @@ int do_daemonize(void) {
 
 	if (logfile_fd == STDOUT_FILENO) {
 		fprintf(stderr, "  Error - Logging to stdout is not possible while running in daemon mode.\n");
-		clean_exit(0);
+		clean_exit(EXIT_SUCCESS);
 	}
 
 	DEBUG_FPRINTF(stdout, "  Setting up daemon environment.\n");
@@ -108,26 +108,26 @@ int do_daemonize(void) {
 
 	if (getrlimit(RLIMIT_NOFILE, &rl) < 0) {
 		fprintf(stderr, "  Error - Unable to daemonize: %s\n", strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	/* become session leader and loose controlling TTY */
 	if ((pid = fork()) < 0) {
 		fprintf(stderr, "  Error - Unable to daemonize: %s\n", strerror(errno));
-		exit(1);
-	} else if (pid != 0) exit(0);
+		exit(EXIT_FAILURE);
+	} else if (pid != 0) exit(EXIT_SUCCESS);
 		
 	setsid();
 		
 	/* fork again, future opens must not allocate controlling TTYs */
 	if ((pid = fork()) < 0) {
 		fprintf(stderr, "  Error - Unable to daemonize: %s\n", strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	} else if (pid != 0) {
 		DEBUG_FPRINTF(stdout, "  Successfully changed into daemon environment.\n");
 		fprintf(stdout, "\nhoneytrap v%s Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
 		fflush(stdout);
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 
@@ -136,7 +136,7 @@ int do_daemonize(void) {
 	DEBUG_FPRINTF(stdout, "  Changing working directory to /.\n");
 	if (chdir("/") < 0) {
 		fprintf(stderr, "  Error - Cannot change working directory: %s\n", strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 
@@ -160,11 +160,11 @@ int create_pid_file(void) {
 
 	if ((pidfile_fd = open(pidfile_name, O_EXCL | O_CREAT | O_NOCTTY | O_RDWR, 0640)) == -1) {
 		logmsg(LOG_ERR, 1, "Error - Unable to open pid file: %s\n", strerror(errno));
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 	if (lockf(pidfile_fd, F_TLOCK, 0) < 0) {
 		logmsg(LOG_ERR, 1, "Error - Unable to lock pid file: %s\n", strerror(errno));
-		clean_exit(0);
+		clean_exit(EXIT_SUCCESS);
 	}
 
 	parent_pid = getpid();

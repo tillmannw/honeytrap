@@ -25,6 +25,7 @@
 #include <netdb.h>
 #include <string.h>
 
+#include "readconf.h"
 #include "ctrl.h"
 #include "honeytrap.h"
 #include "logging.h"
@@ -64,15 +65,15 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
     int status;
 #endif
     socklen_t client_addr_len;
-    struct sockaddr_in client_addr, server_addr;
-    struct timeval c_timeout;
-    struct s_proxy_dest *proxy_dst;
-    struct hostent *proxy_addr;
-    struct in_addr *p_addr;
-    fd_set rfds;
-    char *ip_l_str, *ip_r_str;
-    Attack *attack;
-    u_int8_t port_mode;
+    struct sockaddr_in	client_addr, server_addr;
+    struct timeval	c_timeout;
+    struct hostent	*proxy_addr;
+    struct in_addr	*p_addr;
+    proxy_dest		*proxy_dst;
+    fd_set		rfds;
+    char		*ip_l_str, *ip_r_str;
+    Attack		*attack;
+    u_int8_t		port_mode;
 
     proxy_addr		= NULL;
     proxy_dst		= NULL;
@@ -92,7 +93,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
     if (!((proto == TCP) || (proto == UDP))) {
 	logmsg(LOG_DEBUG, 1, "Unsupported protocol type.\n");
-	exit(0);
+	return;
     }
 
     logmsg(LOG_DEBUG, 1, "-> %u\t  Connection request from %s, forking server process.\n",
@@ -105,15 +106,15 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
 	if (proto == TCP) {
 		logmsg(LOG_DEBUG, 1, "Requesting tcp socket.\n");
-		if ((listen_fd = tcpsock(&server_addr, port_l)) < 0) exit(1);
-		port_mode = port_flags[htons(port_l)].tcp;
+		if ((listen_fd = tcpsock(&server_addr, port_l)) < 0) exit(EXIT_FAILURE);
+		port_mode = port_flags_tcp[htons(port_l)] ? port_flags_tcp[htons(port_l)]->mode : 0;
 	} else if (proto == UDP) {
 		logmsg(LOG_DEBUG, 1, "Requesting udp socket.\n");
-		if ((listen_fd = udpsock(&server_addr, port_l)) < 0) exit(1);
-		port_mode = port_flags[htons(port_l)].udp;
+		if ((listen_fd = udpsock(&server_addr, port_l)) < 0) exit(EXIT_FAILURE);
+		port_mode = port_flags_udp[htons(port_l)] ? port_flags_udp[htons(port_l)]->mode : 0;
 	} else {
 		logmsg(LOG_DEBUG, 1, "Unsupported protocol type.\n");
-		exit(0);
+		return;
 	}
 
 #ifndef USE_IPQ_MON
@@ -129,7 +130,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	if ((proto == TCP) && ((listen(listen_fd, 10)) < 0)) {
 	    logmsg(LOG_ERR, 1, "Error - Could not listen on socket: %s.\n", strerror(errno));
 	    close(listen_fd);
-	    exit(1);
+	    exit(EXIT_FAILURE);
 	}
 	logmsg(LOG_DEBUG, 1, "Listening on port %u/%s.\n", ntohs(port_l), PROTO(proto));
 
@@ -139,7 +140,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	    logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 	    logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
 	    ipq_destroy_handle(h);
-	    exit(1);
+	    exit(EXIT_FAILURE);
 	}
 
 	/* don't need root privs any more */
@@ -172,12 +173,12 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		if (errno == EINTR) break;
 		logmsg(LOG_ERR, 1, "   %u\t  Error - select() call failed: %s.\n",
 		    (uint16_t) ntohs(port_l), strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	    case  0:
 		/* timeout */
 		logmsg(LOG_NOISY, 1, "-> %u\t  No incoming connection for %u seconds - server terminated.\n",
 		    (uint16_t) ntohs(port_l), conn_timeout);
-		exit(0);
+		return;
 	    default:
 		if (FD_ISSET(listen_fd, &rfds)) {
 		    logmsg(LOG_NOISY, 1, "   %u\t  Connection request from %s.\n",
@@ -187,7 +188,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		    if ((attack = new_attack(ip_l, ip_r, ntohs(port_l), 0, proto)) == NULL) {
 			logmsg(LOG_ERR, 1, "Error - Could not initialize attack record.\n");
 			free(attack);
-			exit(1);
+			exit(EXIT_FAILURE);
 		    }
 		    if (port_mode & PORTCONF_NORMAL) {
 		    	/* handle connection in normal mode if this port configured to be handled 'normal' */
@@ -197,37 +198,37 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		    } else if (port_mode & PORTCONF_PROXY) {
 			/* get proxy server address for port */
 			logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection in proxy mode.\n", (uint16_t) ntohs(port_l));
-			proxy_dst = proxy_dest;
-			while (proxy_dst) {
-			    if (proxy_dst->attack_port == ntohs(port_l)) break;
-			    proxy_dst = proxy_dst->next;
+
+			if (proto == TCP) {
+				if (port_flags_tcp[htons(port_l)]) proxy_dst = port_flags_tcp[htons(port_l)]->target;
+			} else if (proto == UDP) {
+				if (port_flags_udp[htons(port_l)]) proxy_dst = port_flags_udp[htons(port_l)]->target;
 			}
-			if (proxy_dst->attack_port == ntohs(port_l)) {
-				/* try to establish proxy connection to server */
-                            if ((proxy_addr = gethostbyname(proxy_dst->d_addr)) == NULL) {
-                                logmsg(LOG_ERR, 1, "   %u\t  Error - Unable to resolve proxy host %s.\n",
-				    (uint16_t) ntohs(port_l), proxy_dst->d_addr);
-				free(attack);
-                                exit(0);
-                            }
-                            logmsg(LOG_DEBUG, 1, "== %u\t  Proxy hostname %s resolved to %s.\n",
-                                (uint16_t) ntohs(port_l), proxy_dst->d_addr,
-                                inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]));
+
+			/* try to establish proxy connection to server */
+                       if ((proxy_addr = gethostbyname(proxy_dst->host)) == NULL) {
+                            logmsg(LOG_ERR, 1, "   %u\t  Error - Unable to resolve proxy host %s.\n",
+				(uint16_t) ntohs(port_l), proxy_dst->host);
+			    free(attack);
+                            exit(EXIT_FAILURE);
+                        }
+                        logmsg(LOG_DEBUG, 1, "== %u\t  Proxy hostname %s resolved to %s.\n",
+                            (uint16_t) ntohs(port_l), proxy_dst->host,
+                            inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]));
 
 
-			    logmsg(LOG_DEBUG, 1, "== %u\t  Requesting proxy connection to %s:%u.\n",
-				(uint16_t) ntohs(port_l),
-				inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]), proxy_dst->d_port);
+			logmsg(LOG_DEBUG, 1, "== %u\t  Requesting proxy connection to %s:%u.\n",
+			    (uint16_t) ntohs(port_l),
+			    inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]), proxy_dst->port);
 			    p_addr = (struct in_addr *) proxy_addr->h_addr_list[0];
-			    if ((proxy_sock_fd = proxy_connect(PORTCONF_PROXY, *p_addr,
-				ntohs(port_l), proxy_dst->d_port, proto, attack)) == -1) {
-				logmsg(LOG_INFO, 1, "== %u\t  Proxy connection rejected, falling back to normal mode.\n",
-				    (uint16_t) ntohs(port_l));
-				proxy_this = 0;
-			    } else logmsg(LOG_NOTICE, 1, "== %u\t  Proxy connection to %s:%u established.\n",
-				(uint16_t) ntohs(port_l),
-				inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]), proxy_dst->d_port);
-			}
+			if ((proxy_sock_fd = proxy_connect(PORTCONF_PROXY, *p_addr,
+			    ntohs(port_l), proxy_dst->port, proto, attack)) == -1) {
+			    logmsg(LOG_INFO, 1, "== %u\t  Proxy connection rejected, falling back to normal mode.\n",
+				(uint16_t) ntohs(port_l));
+			    proxy_this = 0;
+			} else logmsg(LOG_NOTICE, 1, "== %u\t  Proxy connection to %s:%u established.\n",
+			    (uint16_t) ntohs(port_l),
+			    inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]), proxy_dst->port);
 		    } else if ((mirror_this) || (port_mode & PORTCONF_MIRROR)) {
 			/* try to establish mirror connection back to the client */
 			logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection in mirror mode.\n", (uint16_t) ntohs(port_l));
@@ -260,7 +261,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					(uint16_t) ntohs(port_l), strerror(errno));
 				    close(mirror_sock_fd);
 				    free(attack);
-				    exit(1);
+				    exit(EXIT_FAILURE);
 				}
 			    }
 			    established = 1;
@@ -279,7 +280,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					(uint16_t) ntohs(port_l), strerror(errno));
 				    close(mirror_sock_fd);
 				    free(attack);
-				    exit(1);
+				    exit(EXIT_FAILURE);
 				}
 			    }
 
@@ -291,7 +292,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					(uint16_t) ntohs(port_l), strerror(errno));
 				    close(mirror_sock_fd);
 				    free(attack);
-				    exit(1);
+				    exit(EXIT_FAILURE);
 				}
 			    }
 			    established = 1;
@@ -321,8 +322,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 				handle_connection_proxied(connection_fd, PORTCONF_PROXY, proxy_sock_fd,
 				    (uint16_t) ntohs(port_l), client_addr.sin_port,
 				    client_addr.sin_addr, proto, m_read_timeout, read_timeout, attack);
-				free(attack);
-				exit(0);
 			    } else if ((mirror_this) || (port_mode & PORTCONF_MIRROR)) {
 				logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection from %s:%u in mirror mode.\n",
 				    (uint16_t) ntohs(port_l), inet_ntoa(client_addr.sin_addr),
@@ -330,17 +329,15 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 				handle_connection_proxied(connection_fd, PORTCONF_MIRROR, mirror_sock_fd,
 				    (uint16_t) ntohs(port_l), client_addr.sin_port,
 				    client_addr.sin_addr, proto, m_read_timeout, read_timeout, attack);
-				free(attack);
-				exit(0);
 			    } else {
 				logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection from %s:%u in normal mode.\n",
 				    (uint16_t) ntohs(port_l), inet_ntoa(client_addr.sin_addr),
 				    ntohs(client_addr.sin_port));
 				handle_connection_normal(connection_fd, (uint16_t) ntohs(port_l),
 				    proto, read_timeout, attack);
-				free(attack);
-				exit(0);
 			    }
+			    free(attack);
+			    return;
 
 			} else if (pid == -1) logmsg(LOG_ERR, 1, "Error - forking connection handler failed.\n");
 			close(mirror_sock_fd);

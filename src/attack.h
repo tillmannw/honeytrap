@@ -49,7 +49,6 @@ typedef struct s_attack {
 	struct s_conn		p_conn;		/* proxy/mirror connection */
 	u_char			op_mode;	/* mode of operation (none, ignore, normal, proxy, mirror) */
 	uint16_t		dl_count;	/* number of downloads */
-//	struct s_download	download[];	/* array of download structs */
 	struct s_download	*download;	/* array of download structs */
 } Attack;
 

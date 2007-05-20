@@ -1,4 +1,4 @@
-/* htm_aSaveFile.c
+/* htm_SaveFile.c
  * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
@@ -26,17 +26,36 @@
 #include <unistd.h>
 #include <stdio.h>
 
-#include <ip.h>
 #include <logging.h>
 #include <honeytrap.h>
+#include <readconf.h>
+#include <conftree.h>
 #include <md5.h>
 #include <attack.h>
 #include <plughook.h>
+#include <ip.h>
 
-#include "htm_aSaveFile.h"
+#include "htm_SaveFile.h"
+
+const char module_name[]="SaveFile";
+const char module_version[]="0.2.0";
+
+static const char *config_keywords[] = {
+	"attacks_dir",
+	"downloads_dir"
+};
+
+const char *attacks_dir;
+const char *downloads_dir;
+
 
 void plugin_init(void) {
 	plugin_register_hooks();
+	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
+	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
+		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
+		exit(EXIT_FAILURE);
+	}
 	return;
 }
 
@@ -50,6 +69,34 @@ void plugin_register_hooks(void) {
 	add_attack_func_to_list(PPRIO_SAVEDATA, module_name, "save_to_file", (void *) save_to_file);
 
 	return;
+}
+
+conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_data) {
+	char		*value = NULL;
+	conf_node	*confopt = NULL;
+
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
+
+	while (node->val) {
+		if ((value = malloc(node->val->size+1)) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
+		}
+		memset(value, 0, node->val->size+1);
+		memcpy(value, node->val->data, node->val->size);
+
+		node->val = node->val->next;
+
+		if OPT_IS("attacks_dir") {
+			attacks_dir = value;
+		} else if OPT_IS("downloads_dir") {
+			downloads_dir = value;
+		} else {
+			fprintf(stderr, "  Error - Invalid configuration option for plugin %s: %s\n", module_name, node->keyword);
+			exit(EXIT_FAILURE);
+		}
+	}
+	return(node);
 }
 
 int save_to_file(Attack *attack) {
@@ -116,9 +163,9 @@ int save_to_file(Attack *attack) {
 	for (i=0; i<attack->dl_count; i++) {
 		/* save file */
 		/* we need the length of directory + "/" + filename plus md5 checksum */
-		mwfilename = (char *) malloc(strlen(dlsave_dir)+strlen(attack->download[i].filename)+35);
-		snprintf(mwfilename, strlen(dlsave_dir)+strlen(attack->download[i].filename)+35, "%s/%s-%s",
-			dlsave_dir,
+		mwfilename = (char *) malloc(strlen(downloads_dir)+strlen(attack->download[i].filename)+35);
+		snprintf(mwfilename, strlen(downloads_dir)+strlen(attack->download[i].filename)+35, "%s/%s-%s",
+			downloads_dir,
 			mem_md5sum(attack->download[i].dl_payload.data, attack->download[i].dl_payload.size),
 			attack->download[i].filename);
 		logmsg(LOG_DEBUG, 1, "Malware sample dump - File name is %s\n", mwfilename);

@@ -61,7 +61,7 @@ int udpsock(struct sockaddr_in *server_addr, uint16_t port) {
 		logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 		logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
 		ipq_destroy_handle(h);
-		exit(1);
+		exit(EXIT_FAILURE);
 	    }
 	    return(-1);
 #else

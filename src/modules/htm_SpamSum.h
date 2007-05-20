@@ -17,12 +17,11 @@
 # include <config.h>
 #endif
 
-const char module_name[]="htm_SpamSum";
-const char module_version[]="0.3.0";
-
 void plugin_init(void);
 void plugin_unload(void);
 void plugin_register_hooks(void);
+void plugin_register_confopts(void);
+conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_data);
 int calc_spamsum(Attack *attack);
 char *spamsum(const u_char *in, size_t length, u_int32_t bsize);
 static inline u_int32_t roll_hash(u_char c);

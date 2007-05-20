@@ -1,5 +1,5 @@
 /* signals.c
- * Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -14,13 +14,13 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "logging.h"
 #include "honeytrap.h"
 #include "ctrl.h"
 #include "readconf.h"
 #include "plugin.h"
-//#include "sniffer.h"
 #include "signals.h"
 
 #define MASTER_PROCESS (pid = getpid()) == parent_pid
@@ -46,7 +46,7 @@ void handle_signal(int sig) {
 			break;
 		case SIGSEGV:
 			logmsg(LOG_ERR, 1, "Error - Segmentation fault (SIGSEGV received).\n");
-			_exit(0);
+			_exit(EXIT_FAILURE);
 		case SIGINT:
 			logmsg(LOG_DEBUG, 1, "SIGINT received.\n");
 			if (MASTER_PROCESS) {
@@ -54,17 +54,23 @@ void handle_signal(int sig) {
 					logmsg(LOG_DEBUG, 1, "SIGINT was successfully sent to process group.\n");
 					/* wait for children */
 					while ((pid = wait(0)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
-				} else logmsg(LOG_ERR, 1, "Error sending SIGINT to process group.\n");
-				clean_exit(0);
-			} else _exit(0);
+				} else {
+					logmsg(LOG_ERR, 1, "Error sending SIGINT to process group.\n");
+					clean_exit(EXIT_FAILURE);
+				}
+				clean_exit(EXIT_SUCCESS);
+			} else _exit(EXIT_SUCCESS);
 		case SIGQUIT:
 			logmsg(LOG_DEBUG, 1, "SIGQUIT received.\n");
 			if (MASTER_PROCESS) {
 				if (kill(0-getpgrp(), SIGQUIT) == 0)
 					logmsg(LOG_DEBUG, 1, "SIGQUIT was successfully sent to process group.\n");
-				else logmsg(LOG_ERR, 1, "Error sending SIGQUIT to process group.\n");
-				clean_exit(0);
-			} else _exit(0);
+				else {
+					logmsg(LOG_ERR, 1, "Error sending SIGQUIT to process group.\n");
+					clean_exit(EXIT_FAILURE);
+				}
+				clean_exit(EXIT_SUCCESS);
+			} else _exit(EXIT_SUCCESS);
 		case SIGTERM:
 			logmsg(LOG_DEBUG, 1, "SIGTERM received.\n");
 			if (MASTER_PROCESS) {
@@ -72,17 +78,15 @@ void handle_signal(int sig) {
 					logmsg(LOG_DEBUG, 1, "SIGTERM was successfully sent to process group.\n");
 					/* wait for children */
 					while ((pid = wait(0)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
-				} else logmsg(LOG_ERR, 1, "Error sending SIGTERM to process group.\n");
-				clean_exit(0);
-			} else _exit(0);
+				} else {
+					logmsg(LOG_ERR, 1, "Error sending SIGTERM to process group.\n");
+					clean_exit(EXIT_FAILURE);
+				}
+				clean_exit(EXIT_SUCCESS);
+			} else _exit(EXIT_SUCCESS);
 		case SIGCHLD:
 			logmsg(LOG_DEBUG, 1, "SIGCHILD received.\n");
-//			while ((pid = wait(0)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
-			while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
-//			while ((pid = wait(0)) > 0) {
-				logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
-//				sleep(1);
-			}
+			while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
 			break;
 		default:
 			break;

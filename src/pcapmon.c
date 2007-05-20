@@ -141,7 +141,7 @@ int start_pcap_mon(void) {
 		logmsg(LOG_WARN, 1, "Warning - No device given, trying to use default device.\n");
 		if ((dev = pcap_lookupdev(errbuf)) == NULL) {
 			logmsg(LOG_ERR, 1, "Error - Could not find default device: %s\n", errbuf);
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -213,7 +213,7 @@ int start_pcap_mon(void) {
 #endif
 			default:
 				logmsg(LOG_ERR, 1, "Error - Link type of %s is currently not supported.\n", dev);
-				exit(1);
+				clean_exit(EXIT_FAILURE);
 				break;
 		}
 		logmsg(LOG_DEBUG, 1, "Using a %d bytes offset for %s.\n",
@@ -222,11 +222,11 @@ int start_pcap_mon(void) {
 		/* compile bpf for tcp RST fragments */
 		if (pcap_compile(packet_sniffer, &filter, bpf_filter_string, 1, net) == -1) {
                 	logmsg(LOG_ERR, 1, "Pcap error - Invalid BPF string: %s.\n", errbuf);
-                	clean_exit(0);
+                	clean_exit(EXIT_FAILURE);
         	}
 		if (pcap_setfilter(packet_sniffer, &filter) == -1) {
 			logmsg(LOG_ERR, 1, "Pcap error - Unable to start tcp sniffer: %s\n", errbuf);
-			clean_exit(0);
+			clean_exit(EXIT_FAILURE);
 		}
 		pcap_freecode(&filter);
 
@@ -238,7 +238,7 @@ int start_pcap_mon(void) {
 	} else {
 		logmsg(LOG_ERR, 1, "Error - Could not open %s for sniffing: %s.\n", dev, errbuf);
 		logmsg(LOG_ERR, 1, "Do you have root privileges?\n");
-		clean_exit(0);
+		clean_exit(EXIT_FAILURE);
 	}
 	return(1);
 }
@@ -256,7 +256,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 
 	if (pcap_findalldevs(&alldevsp, errbuf) == -1) {
 		logmsg(LOG_ERR, 1, "Error - Unable to find network devices for pcap: %s\n",errbuf);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	/* determine ip address of device */
@@ -314,7 +314,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 	pcap_freealldevs(alldevsp);
 	if ((strcmp(dev, "any") != 0) && (!dev_found)) {
 		fprintf(stderr, "  Error - No such interface: %s.\n", dev);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	
 	if (ip_cmd_opt) {
@@ -335,7 +335,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 		if (!(bpf_filter_string = (char *)realloc(bpf_filter_string,
 			strlen(bpf_filter_string)+strlen(bpf_cmd_ext)+8))) {
 			fprintf(stderr, "  Error - Unable to allocate memory: %s\n", strerror(errno));
-			exit(1);
+			exit(EXIT_FAILURE);
 		}	
 		snprintf(bpf_filter_string+strlen(bpf_filter_string), strlen(bpf_cmd_ext)+8,
 			" and (%s)%c", bpf_cmd_ext, 0);

@@ -24,10 +24,24 @@
 
 #include <honeytrap.h>
 #include <logging.h>
+#include <readconf.h>
+#include <conftree.h>
 #include <util.h>
 #include <plughook.h>
 
 #include "htm_SpamSum.h"
+
+const char module_name[]="SpamSum";
+const char module_version[]="0.4.0";
+
+static const char *config_keywords[] = {
+	"md5sum_sigfile",
+	"spamsum_sigfile"
+};
+
+const char *md5sum_filename;
+const char *spamsum_filename;
+
 
 #define SPAMSUM_LENGTH 64	/* the output is a string of length 64 in base64 */
 #define MIN_BLOCKSIZE 3
@@ -54,6 +68,11 @@ static struct {
 
 void plugin_init(void) {
 	plugin_register_hooks();
+	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
+	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
+		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
+		exit(EXIT_FAILURE);
+	}
 	return;
 }
 
@@ -67,6 +86,34 @@ void plugin_register_hooks(void) {
 	add_attack_func_to_list(PPRIO_POSTPROC, module_name, "calc_spamsum", (void *) calc_spamsum);
 
 	return;
+}
+
+conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_data) {
+	char		*value = NULL;
+	conf_node	*confopt = NULL;
+
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
+
+	while (node->val) {
+		if ((value = malloc(node->val->size+1)) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
+		}
+		memset(value, 0, node->val->size+1);
+		memcpy(value, node->val->data, node->val->size);
+
+		node->val = node->val->next;
+
+		if OPT_IS("spamsum_sigfile") {
+			spamsum_filename = value;
+		} else if OPT_IS("md5sum_sigfile") {
+			md5sum_filename = value;
+		} else {
+			fprintf(stderr, "  Error - Invalid configuration option for plugin %s: %s\n", module_name, node->keyword);
+			exit(EXIT_FAILURE);
+		}
+	}
+	return(node);
 }
 
 int calc_spamsum(Attack *attack) {
@@ -91,8 +138,8 @@ int calc_spamsum(Attack *attack) {
 
 	/* check for MD5 hash match before calculating spamsum */
 	logmsg(LOG_DEBUG, 1, "Searching MD5 hash file for exact match.\n");
-	if ((hashfile = fopen("/tmp/md5sum.sigs", "r")) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Could not open MD5 hash file: %s.\n", strerror(errno));
+	if ((hashfile = fopen(md5sum_filename, "r")) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Could not open MD5 hash file %s: %s.\n", md5sum_filename, strerror(errno));
 		return(0);
 	}
 	logmsg(LOG_DEBUG, 1, "MD5 hash file successfully opened.\n");
@@ -116,8 +163,8 @@ int calc_spamsum(Attack *attack) {
 
 	/* hash is not in signature file, append it */
 	if (sig_match == 0) {
-		if ((hashfile = fopen("/tmp/md5sum.sigs", "a")) == NULL) {
-			logmsg(LOG_ERR, 1, "Error - Could not open MD5 hash signature file: %s.\n", strerror(errno));
+		if ((hashfile = fopen(md5sum_filename, "a")) == NULL) {
+			logmsg(LOG_ERR, 1, "Error - Could not open MD5 hash file %s: %s.\n", md5sum_filename, strerror(errno));
 			return(0);
 		}
 		if (fprintf(hashfile, "%s\n", attack->a_conn.payload.md5sum) != 33) {
@@ -139,8 +186,8 @@ int calc_spamsum(Attack *attack) {
 	logmsg(LOG_DEBUG, 1, "Spamsum is %s.\n", sum);
 
 	logmsg(LOG_DEBUG, 1, "Searching signature file for exact match.\n");
-	if ((sigfile = fopen("/tmp/spamsum.sigs", "r")) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Could not open spamsum signature file: %s.\n", strerror(errno));
+	if ((sigfile = fopen(spamsum_filename, "r")) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Could not open SpamSum hash file %s: %s.\n", spamsum_filename, strerror(errno));
 		return(0);
 	}
 	logmsg(LOG_DEBUG, 1, "Signature file successfully opened.\n");
@@ -163,11 +210,11 @@ int calc_spamsum(Attack *attack) {
 	
 	/* sum is not in signature file, append it */
 	if (sig_match == 0) {
-		score = spamsum_match_db("/tmp/spamsum.sigs", sum, threshold);
+		score = spamsum_match_db(spamsum_filename, sum, threshold);
 		logmsg(LOG_INFO, 1, "Spamsum match score is %u.\n", score);
 
-		if ((sigfile = fopen("/tmp/spamsum.sigs", "a")) == NULL) {
-			logmsg(LOG_ERR, 1, "Error - Could not open spamsum signature file: %s.\n", strerror(errno));
+		if ((sigfile = fopen(spamsum_filename, "a")) == NULL) {
+			logmsg(LOG_ERR, 1, "Error - Could not open SpamSum hash file %s: %s.\n", spamsum_filename, strerror(errno));
 			return(0);
 		}
 		strncat(sum, "\n", 1);

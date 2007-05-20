@@ -35,7 +35,7 @@
 static void die(struct ipq_handle *h) {
 	logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
 	ipq_destroy_handle(h);
-	clean_exit(0);
+	clean_exit(EXIT_SUCCESS);
 }
 
 int start_ipq_mon(void) {
@@ -78,7 +78,7 @@ int start_ipq_mon(void) {
 			case NLMSG_ERROR:
 				logmsg(LOG_ERR, 1, "IPQ Error: %s\n", strerror(ipq_get_msgerr(buf)));
 				ipq_destroy_handle(h);
-				clean_exit(0);
+				clean_exit(EXIT_SUCCESS);
 			case IPQM_PACKET:
 				packet	= ipq_get_packet(buf);
 				ip	= (struct ip_header*) packet->payload;

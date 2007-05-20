@@ -1,5 +1,5 @@
 /* nfqmon.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -24,10 +24,10 @@
 #include "nfqmon.h"
 
 /* Set BUFSIZE to 1500 (ethernet frame size) to prevent
- * errors with ipq_read due to truncated messages.
- * This is only necessary for UDP. A buffer size of
- * 256 seems to be enough to hanlde TCP when there is
- * no data on the SYNs */
+ * errors within ipq_read due to truncated messages.
+ * This is only necessary for UDP.
+ * A buffer size of 256 seems to be enough to hanlde TCP
+ * (provided there's no data on the SYNs) */
 #define BUFSIZE 1500
 
 
@@ -77,7 +77,10 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		break;
 	case PORTCONF_IGNORE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n", dport, PROTO(ip->ip_p));
-		nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) != 0) {
+			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+			exit(EXIT_FAILURE);
+		}
 		return(0);
 	case PORTCONF_NORMAL:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in normal mode.\n", dport, PROTO(ip->ip_p));
@@ -90,16 +93,16 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		break;
 	default:
 		logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n", dport, PROTO(ip->ip_p));
-		nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) != 0) {
+			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+			exit(EXIT_FAILURE);
+		}
 		return(0);
 	}
 
 	logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
 	start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 	
-	/* nfq_set_verdict()'s return value is really confusing and documented nowhere */
-//	nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
-
 	return(1);
 }
 
@@ -120,27 +123,27 @@ int start_nfq_mon(void) {
 	logmsg(LOG_DEBUG, 1, "Creating NFQ connection monitor.\n");
 	if ((h = nfq_open()) < 0) {
 		logmsg(LOG_ERR, 1, "Error - Could not create NFQ handle: %s\n", strerror(errno));
-		clean_exit(0);
+		clean_exit(EXIT_FAILURE);
 	}
 
 	if (nfq_unbind_pf(h, AF_INET) < 0) {
 		logmsg(LOG_ERR, 1, "Error - Could not unbind existing NFQ handle: %s\n", strerror(errno));
-		clean_exit(0);
+		clean_exit(EXIT_FAILURE);
 	}
 
 	if (nfq_bind_pf(h, AF_INET) < 0) {
 		logmsg(LOG_ERR, 1, "Error - Could not unbind existing NFQ handle: %s\n", strerror(errno));
-		clean_exit(0);
+		clean_exit(EXIT_FAILURE);
 	}
 
 	if ((qh = nfq_create_queue(h,  0, &server_wrapper, NULL)) == NULL) {
 		logmsg(LOG_ERR, 1, "Error - Could not create NFQ queue handle: %s\n", strerror(errno));
-		clean_exit(0);
+		clean_exit(EXIT_FAILURE);
 	}
 
 	if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
 		logmsg(LOG_ERR, 1, "Error - Could not set NFQ mode.\n");
-		clean_exit(0);
+		clean_exit(EXIT_FAILURE);
 	}
 
 	/* to what is publicly documented checking retvals is unnecessary here

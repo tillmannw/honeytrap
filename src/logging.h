@@ -18,13 +18,13 @@
 #include <sys/types.h>
 
 typedef enum {
-	OFF	= 0,
-	ERR	= 1,
-	WARN	= 2,
-	NOTICE	= 3,
-	INFO	= 4,
-	NOISY	= 5,
-	DEBUG	= 6,
+	LL_OFF		= 0,
+	LL_ERR		= 1,
+	LL_WARN		= 2,
+	LL_NOTICE	= 3,
+	LL_INFO		= 4,
+	LL_NOISY	= 5,
+	LL_DEBUG	= 6,
 } s_log_level;
 
 s_log_level log_level;
@@ -43,7 +43,7 @@ u_char log_level;
 
 #define LOGLINE_SIZE	256	/* truncates longer lines */
 
-#define DEBUG_FPRINTF	if (log_level == DEBUG) fprintf
+#define DEBUG_FPRINTF	if (log_level == LOG_DEBUG) fprintf
 
 int logfile_fd;
 

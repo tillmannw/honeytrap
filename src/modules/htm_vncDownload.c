@@ -27,6 +27,10 @@
 
 #include "htm_vncDownload.h"
 
+const char module_name[]="htm_vncDownload";
+const char module_version[]="0.3";
+
+
 void plugin_init(void) {
 	plugin_register_hooks();
 	return;

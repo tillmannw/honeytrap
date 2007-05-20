@@ -1,4 +1,4 @@
-/* htm_aSavePostgres.c
+/* htm_SavePostgres.c
  * Copyright (C) 2007 Tillmann Werner <tillmann.werner@gmx.de>,
  *                    Christoph Fuchs <christoph.fuchs@gmx.de>
  *
@@ -16,8 +16,6 @@
  *   
  */
 
-#ifdef USE_POSTGRES
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,16 +30,46 @@
 #include <logging.h>
 #include <honeytrap.h>
 #include <attack.h>
-#include <ip.h>
 #include <plughook.h>
+#include <readconf.h>
+#include <conftree.h>
 #include <md5.h>
 #include <sha512.h>
+#include <ip.h>
 
-#include "htm_aSavePostgres.h"
+#include "htm_SavePostgres.h"
+
+const char	module_name[]		= "SavePostgres";
+const char	module_version[]	= "0.4.0";
+
+static const char *config_keywords[] = {
+	"db_host",
+	"db_port",
+	"db_name",
+	"db_user",
+	"db_pass"
+};
+
+struct pg_conn	*db_connection;
+char		*db_host = NULL,
+		*db_port = NULL,
+		*db_name = NULL,
+		*db_user = NULL,
+		*db_pass = NULL,
+		*db_info = NULL;
+
+#define MAX_SQL_BUFFER	10485760		// 10 MB
+#define MAX_URI_SIZE	2048
+
 
 void plugin_init(void) {
 	/* TODO: register sensor in db, if not existent */
 	plugin_register_hooks();
+	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
+	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
+		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
+		exit(EXIT_FAILURE);
+	}
 	return;
 }
 
@@ -60,7 +88,80 @@ void plugin_register_hooks(void) {
 }
 
 
+conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_data) {
+	char		*value = NULL;
+	conf_node	*confopt = NULL;
+
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
+
+	while (node->val) {
+		if ((value = malloc(node->val->size+1)) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
+		}
+		memset(value, 0, node->val->size+1);
+		memcpy(value, node->val->data, node->val->size);
+
+		node->val = node->val->next;
+
+		if OPT_IS("db_host") {
+			db_host = value;
+		} else if OPT_IS("db_port") {
+			db_port = value;
+		} else if OPT_IS("db_name") {
+			db_name = value;
+		} else if OPT_IS("db_user") {
+			db_user = value;
+		} else if OPT_IS("db_pass") {
+			db_pass = value;
+		} else {
+			fprintf(stderr, "  Error - Invalid configuration option for plugin %s: %s\n", module_name, node->keyword);
+			exit(EXIT_FAILURE);
+		}
+	}
+	return(node);
+}
+
+
 int db_connect(void) {
+	int dbstr_len = 0;
+
+	if (db_port == NULL) {
+		/* use default PostgeSQL port */
+		if ((db_port = strdup("5432")) == NULL) {
+			logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+	if (db_host == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Database connection info is incomplete: Host missing.\n");
+		return(-1);
+	}
+	if (db_name == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Database connection info is incomplete: Database name missing.\n");
+		return(-1);
+	}
+	if (db_user == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Database connection info is incomplete: User missing.\n");
+		return(-1);
+	}
+	if (db_pass == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Database connection info is incomplete: Password missing.\n");
+		return(-1);
+	}
+
+	/* set db info */
+	dbstr_len = strlen(db_host)+strlen(db_port)+strlen(db_name)+strlen(db_user)+strlen(db_pass)+36;
+	if ((db_info = malloc(dbstr_len)) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s\n", strerror(errno));
+		return(-1);
+	}
+	memset(db_info, 0, dbstr_len);
+	if (snprintf(db_info, dbstr_len, "port=%s host=%s user=%s password=%s dbname=%s", db_port, db_host, db_user, db_pass, db_name) >= dbstr_len) {
+		logmsg(LOG_ERR, 1, "Error - Database connect string truncated: %s.\n", strerror(errno));
+		return(-1);
+	}
+
 	/* connect to database */
 	if (PQstatus(db_connection = PQconnectdb(db_info)) != CONNECTION_OK) {
 		logmsg(LOG_ERR, 1, "Postgres client error - Could not connect to database: %s.\n", PQerrorMessage(db_connection));
@@ -140,6 +241,7 @@ int db_submit(Attack *attack) {
 
 	logmsg(LOG_DEBUG, 1, "Postgres client - Connecting to database.\n");
 	if (db_connect() != 0) return(-1);
+
 
 	/* Start a transaction block */
 	if (PQresultStatus(res = PQexec(db_connection, "BEGIN")) != PGRES_COMMAND_OK) {
@@ -344,5 +446,3 @@ logmsg(LOG_DEBUG, 1, "Postgres client - Query is: %s.\n", query);
 	db_disconnect();
 	return(0);
 }
-
-#endif

@@ -1,5 +1,5 @@
 /* honeytrap.h
- * Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -31,6 +31,7 @@
 #define PORTCONF_IGNORE	2
 #define PORTCONF_MIRROR	4
 #define PORTCONF_PROXY	8
+#define MODE(m)		(m == PORTCONF_NONE ? "none" : (m == PORTCONF_NORMAL ? "normal" : (m == PORTCONF_IGNORE ? "ignore" : (m == PORTCONF_MIRROR ? "mirror" : (m == PORTCONF_PROXY ? "proxy" : "unknown")))))
 
 char *conffile_name, **arg_v;
 int arg_c;
@@ -39,13 +40,9 @@ int arg_c;
 
 char *pidfile_name;
 char *logfile_name;
-char *dbfile_name;
 char *dev;
 char *response_dir;
 char *plugin_dir;
-char *attacks_dir;
-char *dlsave_dir;
-char *ftp_host;
 int daemonize;
 int mirror_mode;
 int promisc_mode;
@@ -57,14 +54,6 @@ uint32_t m_read_timeout;
 uint32_t read_limit;
 
 
-/* struct for destinationa if connection is handled in proxy mode */
-struct s_proxy_dest {
-	uint16_t		attack_port;
-	char			*d_addr;
-	uint16_t		d_port;
-	struct s_proxy_dest	*next;
-};
-
 /* explicit port configurations */
 typedef struct sport_flag {
 	u_int8_t tcp;
@@ -72,7 +61,6 @@ typedef struct sport_flag {
 } port_flag;
 
 port_flag port_flags[0x10000];
-struct s_proxy_dest *proxy_dest;
 
 // end of global config variables
 

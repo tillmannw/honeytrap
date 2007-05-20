@@ -1,25 +1,43 @@
-# honeytrap configuration file
-# Explicit configuration for some tcp ports
-#
-# the syntax is 'port = portnum/protocol: mode[,host,port]'
-# e.g. 'port = 80/tcp: mirror'
-#
-# protocol must either be tcp or udp
-#
-# possible values for mode are:
-# ignore:	ignore connection requests on this port
-# normal:	always handle connections on this port in normal mode
-# mirror:	always handle connections on this port in mirror mode
-# proxy:	always handle connections on this port in proxy mod
-#
-# 'proxy' takes the arguments 'host,port' where port is optional
-# e.g. 'port = 80/tcp: proxy,example.com:8000
-# if no port argument is given, the attacked port is used.
-# the proxy destination port does not support protocol changes
-#
+/* 
+ * honeytrap 1.0 port configuration file template
+ * should be included in main configuration file
+ * (c) Tillmann Werner <tillmann.werner@gmx.de>
+*/
 
-#port = 21/tcp: normal
-#port = 22/tcp: ignore
-#port = 25/tcp: mirror
-#port = 53/udp: ignore
-#port = 80/tcp: proxy,example.com:8000
+portconf = {
+	/* ignore these ports */
+	ignore = {
+		protocol	= "tcp"
+		port		= ["25", "1433"]
+	}
+	/* process ports in normal mode */
+	normal = {
+		protocol	= ["tcp", "udp"]
+		port		= ["53"]
+	}
+	/* mirror ports back to the initiator */
+	mirror = {
+		protocol	= ["tcp"]
+		port		= ["23"]
+	}
+	/* proxy ports to a target */
+	proxy = {
+		/* names for proxy maps can be chosen from [a-zA-Z0-9-_] */
+		proxy-http = {
+			protocol	= ["tcp"]
+			port		= ["80", "8080"]
+
+			target_host	= "127.0.0.1"
+			target_protocol	= "tcp"
+			target_port	= "8080"
+		}
+		proxy-tftp = {
+			protocol	= ["udp"]
+			port		= ["69"]
+
+			target_host	= "tftp.localhost"
+			target_protocol	= "udp"
+			target_port	= "69"
+		}
+	}
+}
