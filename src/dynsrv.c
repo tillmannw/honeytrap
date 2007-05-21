@@ -176,6 +176,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		exit(EXIT_FAILURE);
 	    case  0:
 		/* timeout */
+		close(listen_fd);
 		logmsg(LOG_NOISY, 1, "-> %u\t  No incoming connection for %u seconds - server terminated.\n",
 		    (uint16_t) ntohs(port_l), conn_timeout);
 		return;

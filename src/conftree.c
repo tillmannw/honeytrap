@@ -197,7 +197,6 @@ conf_node *add_keyword(conf_node **tree, const char *keyword, const void *data, 
 			if (isdigit(subkey[0])) {
 				if ((cur_node = check_keyword(*tree, key)) == NULL)
 					if ((cur_node = add_keyword(tree, key, NULL, 0)) == NULL) return(NULL);
-//printf(" -- got a list entry: %s:%s = %s\n", key, subkey, (char *) data);
 				if (add_list_item(cur_node, data, size) == NULL) {
 					fprintf(stderr, "  Error - Unable to add list item for %s.\n", key);
 					return(NULL);
@@ -224,7 +223,6 @@ conf_node *add_keyword(conf_node **tree, const char *keyword, const void *data, 
 	free(key);
 
 	if (size) {
-//printf(" -- got single list entry: %s = %s\n", keyword, (char *) data);
 		if (add_list_item(new_node, data, size) == NULL) {
 			fprintf(stderr, "  Error - Unable to add list item for %s.\n", keyword);
 			return(NULL);

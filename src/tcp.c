@@ -56,7 +56,8 @@ int tcpsock(struct sockaddr_in *server_addr, uint16_t port) {
 	server_addr->sin_addr.s_addr	= htonl(INADDR_ANY);
 	server_addr->sin_port		= port;
 	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) < 0) {
-	/* we already got one server process */
+	    /* we already got one server process */
+	    logmsg(LOG_DEBUG, 1, "Warning - Unable to bind port %d/tcp: %s.\n", ntohs(port), strerror(errno));
 #ifdef USE_IPQ_MON
 	    /* hand packet processing back to the kernel */
 	    if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
@@ -65,11 +66,17 @@ int tcpsock(struct sockaddr_in *server_addr, uint16_t port) {
 		ipq_destroy_handle(h);
 		exit(EXIT_FAILURE);
 	    }
+	    logmsg(LOG_DEBUG, 1, "IPQ - Successfully set verdict on packet.\n");
 	    return(-1);
 #else
 #ifdef USE_NFQ_MON
 	    /* hand packet processing back to the kernel */
-	    nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
+	    if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) != 0) {
+		logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+		nfq_destroy_queue(qh);
+		exit(EXIT_FAILURE);
+	    }
+	    logmsg(LOG_DEBUG, 1, "IPQ - Successfully set verdict on packet.\n");
 	    return(-1);
 #else
 	    if (errno != 98)
