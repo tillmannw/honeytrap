@@ -77,12 +77,15 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		break;
 	case PORTCONF_IGNORE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n", dport, PROTO(ip->ip_p));
-		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) != 0) {
+		/* nfq_set_verdict()'s return value is undocumented,
+		 * but digging the source of libnetfilter_queue and libnfnetlink reveals
+		 * that itis just the passed-through value of a sendmsg() */
+		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
 			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 			nfq_destroy_queue(qh);
 			exit(EXIT_FAILURE);
 		}
-		logmsg(LOG_DEBUG, 1, "IPQ - Successfully set verdict on packet.\n");
+		logmsg(LOG_DEBUG, 1, "NFQ - Successfully set verdict on packet.\n");
 		return(0);
 	case PORTCONF_NORMAL:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in normal mode.\n", dport, PROTO(ip->ip_p));
@@ -95,12 +98,15 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		break;
 	default:
 		logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n", dport, PROTO(ip->ip_p));
-		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) != 0) {
+		/* nfq_set_verdict()'s return value is undocumented,
+		 * but digging the source of libnetfilter_queue and libnfnetlink reveals
+		 * that itis just the passed-through value of a sendmsg() */
+		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
 			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 			nfq_destroy_queue(qh);
 			exit(EXIT_FAILURE);
 		}
-		logmsg(LOG_DEBUG, 1, "IPQ - Successfully set verdict on packet.\n");
+		logmsg(LOG_DEBUG, 1, "NFQ - Successfully set verdict on packet.\n");
 		return(0);
 	}
 

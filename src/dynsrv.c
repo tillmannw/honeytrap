@@ -142,18 +142,23 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	    ipq_destroy_handle(h);
 	    exit(EXIT_FAILURE);
 	}
+	logmsg(LOG_DEBUG, 1, "IPQ - Successfully set verdict on packet.\n");
 
 	/* don't need root privs any more */
 	drop_privileges(); 
 	logmsg(LOG_DEBUG, 1, "Server is now running with user id %d and group id %d.\n", getuid(), getgid());
 #endif
 #ifdef USE_NFQ_MON
-	/* hand packet processing back to the kernel
-	 *
-	 * cannot set verdict here - it won't work for unknown reasons
-	 * Just do it in the stream monitor
-	 */
-	nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
+	/* hand packet processing back to the kernel */
+	/* nfq_set_verdict()'s return value is undocumented,
+	 * but digging the source of libnetfilter_queue and libnfnetlink reveals
+	 * that itis just the passed-through value of a sendmsg() */
+	if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
+	    logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", strerror(errno));
+	    nfq_destroy_queue(qh);
+	    exit(EXIT_FAILURE);
+	}
+	logmsg(LOG_DEBUG, 1, "NFQ - Successfully set verdict on packet.\n");
 
 	/* don't need root privs any more */
 	drop_privileges(); 

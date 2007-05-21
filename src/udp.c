@@ -63,11 +63,20 @@ int udpsock(struct sockaddr_in *server_addr, uint16_t port) {
 		ipq_destroy_handle(h);
 		exit(EXIT_FAILURE);
 	    }
+	    logmsg(LOG_DEBUG, 1, "IPQ - Successfully set verdict on packet.\n");
 	    return(-1);
 #else
 #ifdef USE_NFQ_MON
 	    /* hand packet processing back to the kernel */
-	    nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL); 
+	    /* nfq_set_verdict()'s return value is undocumented,
+	     * but digging the source of libnetfilter_queue and libnfnetlink reveals
+	     * that itis just the passed-through value of a sendmsg() */
+	    if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
+		logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+		nfq_destroy_queue(qh);
+		exit(EXIT_FAILURE);
+	    }
+	    logmsg(LOG_DEBUG, 1, "NFQ - Successfully set verdict on packet.\n");
 	    return(-1);
 #else
 	    if (errno != 98)
