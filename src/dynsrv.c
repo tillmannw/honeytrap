@@ -89,7 +89,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
     proxy_this		= 0;
     mirror_this		= mirror_mode;
     established		= 0;
-    port_mode		= PORTCONF_IGNORE;
+    port_mode		= PORTCONF_NONE;
 
     if (!((proto == TCP) || (proto == UDP))) {
 	logmsg(LOG_DEBUG, 1, "Unsupported protocol type.\n");
@@ -101,21 +101,20 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
     /* fork server process */
     if ((pid = fork()) == 0) {
-	    ip_l_str = strdup(inet_ntoa(ip_l));
-	    ip_r_str = strdup(inet_ntoa(ip_r));
 
 	if (proto == TCP) {
-		logmsg(LOG_DEBUG, 1, "Requesting tcp socket.\n");
-		if ((listen_fd = tcpsock(&server_addr, port_l)) < 0) exit(EXIT_FAILURE);
-		port_mode = port_flags_tcp[htons(port_l)] ? port_flags_tcp[htons(port_l)]->mode : 0;
+	    logmsg(LOG_DEBUG, 1, "Requesting tcp socket.\n");
+	    if ((listen_fd = tcpsock(&server_addr, port_l)) < 0) exit(EXIT_FAILURE);
 	} else if (proto == UDP) {
-		logmsg(LOG_DEBUG, 1, "Requesting udp socket.\n");
-		if ((listen_fd = udpsock(&server_addr, port_l)) < 0) exit(EXIT_FAILURE);
-		port_mode = port_flags_udp[htons(port_l)] ? port_flags_udp[htons(port_l)]->mode : 0;
+	    logmsg(LOG_DEBUG, 1, "Requesting udp socket.\n");
+	    if ((listen_fd = udpsock(&server_addr, port_l)) < 0) exit(EXIT_FAILURE);
 	} else {
-		logmsg(LOG_DEBUG, 1, "Unsupported protocol type.\n");
-		return;
+	    logmsg(LOG_DEBUG, 1, "Unsupported protocol type.\n");
+	    return;
 	}
+
+	ip_l_str = strdup(inet_ntoa(ip_l));
+	ip_r_str = strdup(inet_ntoa(ip_r));
 
 #ifndef USE_IPQ_MON
 #ifndef USE_NFQ_MON
@@ -152,7 +151,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	/* hand packet processing back to the kernel */
 	/* nfq_set_verdict()'s return value is undocumented,
 	 * but digging the source of libnetfilter_queue and libnfnetlink reveals
-	 * that itis just the passed-through value of a sendmsg() */
+	 * that it's just the passed-through value of a sendmsg() */
 	if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
 	    logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", strerror(errno));
 	    nfq_destroy_queue(qh);

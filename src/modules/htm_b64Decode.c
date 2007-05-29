@@ -109,10 +109,13 @@ int b64_decode(Attack *attack) {
 	struct dec *decoded;
 	Attack dec_attack;
 
-	logmsg(LOG_DEBUG, 1, "Base64 decoder - Searching for base64 encoded attack string.\n");
+	/* no data - nothing todo */
+	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
+		logmsg(LOG_DEBUG, 1, "Base64 decoder - No data received, nothing to decode.\n");
+		return(0);
+	}
 
-	/* no data, nothing to do */
-	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) return(1);
+	logmsg(LOG_DEBUG, 1, "Base64 decoder - Searching for base64 encoded attack string.\n");
 
 	/* zero-terminate attack string */
 	if ((astr = (char *) malloc(attack->a_conn.payload.size+1)) == NULL) {

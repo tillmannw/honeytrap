@@ -86,12 +86,12 @@ int start_ipq_mon(void) {
 					tcp		= (struct tcp_header*) (packet->payload + (4 * ip->ip_hlen));
 					sport		= ntohs(tcp->th_sport);
 					dport		= ntohs(tcp->th_dport);
-					port_mode	= port_flags[dport].tcp;
+					port_mode	= port_flags_tcp[dport] ? port_flags_tcp[dport]->mode : 0;
 				} else if (ip->ip_p == UDP) {
 					udp		= (struct udp_header*) (packet->payload + (4 * ip->ip_hlen));
 					sport		= ntohs(udp->uh_sport);
 					dport		= ntohs(udp->uh_dport);
-					port_mode	= port_flags[dport].udp;
+					port_mode	= port_flags_udp[dport] ? port_flags_udp[dport]->mode : 0;
 				} else {
 					logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip->ip_p);
 					break;
@@ -137,7 +137,7 @@ int start_ipq_mon(void) {
 				
 				if (process == 0) break;
 
-				logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
+				logmsg(LOG_NOISY, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
 				start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 				break;
 			default:

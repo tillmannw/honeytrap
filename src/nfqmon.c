@@ -21,6 +21,7 @@
 #include "logging.h"
 #include "dynsrv.h"
 #include "ctrl.h"
+#include "readconf.h"
 #include "nfqmon.h"
 
 /* Set BUFSIZE to 1500 (ethernet frame size) to prevent
@@ -56,15 +57,15 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 	if ((ret = nfq_get_payload(nfa, &payload)) >= 0) {
 		ip = (struct ip_header*) payload;
 		if (ip->ip_p == TCP) {
-			tcp	= (struct tcp_header*) (payload + (4 * ip->ip_hlen));
-			sport	= ntohs(tcp->th_sport);
-			dport	= ntohs(tcp->th_dport);
-			port_mode = port_flags[dport].tcp;
+			tcp		= (struct tcp_header*) (payload + (4 * ip->ip_hlen));
+			sport		= ntohs(tcp->th_sport);
+			dport		= ntohs(tcp->th_dport);
+			port_mode	= port_flags_tcp[dport] ? port_flags_tcp[dport]->mode : 0;
 		} else if (ip->ip_p == UDP) {
-			udp	= (struct udp_header*) (payload + (4 * ip->ip_hlen));
-			sport	= ntohs(udp->uh_sport);
-			dport	= ntohs(udp->uh_dport);
-			port_mode = port_flags[dport].udp;
+			udp		= (struct udp_header*) (payload + (4 * ip->ip_hlen));
+			sport		= ntohs(udp->uh_sport);
+			dport		= ntohs(udp->uh_dport);
+			port_mode	= port_flags_udp[dport] ? port_flags_udp[dport]->mode : 0;
 		} else {
 			logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip->ip_p);
 			return(-1);
@@ -79,7 +80,7 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n", dport, PROTO(ip->ip_p));
 		/* nfq_set_verdict()'s return value is undocumented,
 		 * but digging the source of libnetfilter_queue and libnfnetlink reveals
-		 * that itis just the passed-through value of a sendmsg() */
+		 * that it's just the passed-through value of a sendmsg() */
 		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
 			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 			nfq_destroy_queue(qh);
@@ -100,7 +101,7 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n", dport, PROTO(ip->ip_p));
 		/* nfq_set_verdict()'s return value is undocumented,
 		 * but digging the source of libnetfilter_queue and libnfnetlink reveals
-		 * that itis just the passed-through value of a sendmsg() */
+		 * that it's just the passed-through value of a sendmsg() */
 		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
 			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 			nfq_destroy_queue(qh);
@@ -110,7 +111,7 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		return(0);
 	}
 
-	logmsg(LOG_INFO, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
+	logmsg(LOG_NOISY, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
 	start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 	
 	return(1);

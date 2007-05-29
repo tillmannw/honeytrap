@@ -79,17 +79,17 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 	ip = (u_char *)(packet + pcap_offset);
 	ip_hdr = (struct ip_header *)ip;
 	if (ip_hdr->ip_p == TCP) {
-		tcp	= (struct tcp_header*) (ip + (4 * ip_hdr->ip_hlen));
-		sport	= ntohs(tcp->th_sport);
-		dport	= ntohs(tcp->th_dport);
-		port_mode = port_flags[sport].tcp;
+		tcp		= (struct tcp_header*) (ip + (4 * ip_hdr->ip_hlen));
+		sport		= ntohs(tcp->th_sport);
+		dport		= ntohs(tcp->th_dport);
+		port_mode	= port_flags_tcp[dport] ? port_flags_tcp[dport]->mode : 0;
 	} else if (ip_hdr->ip_p == ICMP) {
 		if ((ip = icmp_dissect(ip)) == NULL) return;
-		ip_hdr	= (struct ip_header *) ip;
-		udp	= (struct udp_header *) (ip + (4 * ip_hdr->ip_hlen));
-		sport	= ntohs(udp->uh_sport);
-		dport	= ntohs(udp->uh_dport);
-		port_mode = port_flags[dport].udp;
+		ip_hdr		= (struct ip_header *) ip;
+		udp		= (struct udp_header *) (ip + (4 * ip_hdr->ip_hlen));
+		sport		= ntohs(udp->uh_sport);
+		dport		= ntohs(udp->uh_dport);
+		port_mode	= port_flags_udp[dport] ? port_flags_udp[dport]->mode : 0;
 	} else {
 		logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip_hdr->ip_p);
 		return;
@@ -119,10 +119,10 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 	}
 
 	if (ip_hdr->ip_p == UDP) {
-		logmsg(LOG_INFO, 1, "Connection request on port %d/udp.\n", dport);
+		logmsg(LOG_NOISY, 1, "Connection request on port %d/udp.\n", dport);
 		start_dynamic_server(ip_hdr->ip_src, htons(sport), ip_hdr->ip_dst, htons(dport), ip_hdr->ip_p);
 	} else if (ip_hdr->ip_p == TCP) {
-		logmsg(LOG_INFO, 1, "Connection request on port %d/tcp.\n", sport);
+		logmsg(LOG_NOISY, 1, "Connection request on port %d/tcp.\n", sport);
 		start_dynamic_server(ip_hdr->ip_dst, htons(dport), ip_hdr->ip_src, htons(sport), ip_hdr->ip_p);
 	}
 	return;

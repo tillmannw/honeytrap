@@ -131,99 +131,101 @@ int calc_spamsum(Attack *attack) {
 	hashfile	= NULL;
 
 	/* no data - nothing todo */
-	if (!attack->a_conn.payload.size) {
-		logmsg(LOG_DEBUG, 1, "No data received, won't calculate spamsum.\n");
+	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
+		logmsg(LOG_DEBUG, 1, "SpamSum - No data received, won't calculate spamsum.\n");
 		return(0);
 	}
 
+	logmsg(LOG_DEBUG, 1, "SpamSum - Calculating hashes.\n");
+
 	/* check for MD5 hash match before calculating spamsum */
-	logmsg(LOG_DEBUG, 1, "Searching MD5 hash file for exact match.\n");
+	logmsg(LOG_DEBUG, 1, "SpamSum - Searching MD5 hash file for exact match.\n");
 	if ((hashfile = fopen(md5sum_filename, "r")) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Could not open MD5 hash file %s: %s.\n", md5sum_filename, strerror(errno));
+		logmsg(LOG_ERR, 1, "SpamSum error - Could not open MD5 hash file %s: %s.\n", md5sum_filename, strerror(errno));
 		return(0);
 	}
-	logmsg(LOG_DEBUG, 1, "MD5 hash file successfully opened.\n");
+	logmsg(LOG_DEBUG, 1, "SpamSum - MD5 hash file successfully opened.\n");
 
 	/* search MD5 hash file for calculated sum */
 	while((sig_match == 0) && (!feof(hashfile))) {
 		bzero(sig, BUFSIZ);
 		if ((fgets(sig, BUFSIZ-1, hashfile) == NULL) && (!feof(hashfile))) {
-			logmsg(LOG_ERR, 1, "Error - Could not read MD5 hash from signature file: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "SpamSum error - Could not read MD5 hash from signature file: %s.\n", strerror(errno));
 			fclose(hashfile);
 			return(0);
 		}
 		if ((sig) && (!feof(hashfile))) {
 			if (sig[32] == '\n') sig[32] = 0;
-			logmsg(LOG_DEBUG, 1, "Comparing with %s.\n", sig);
+			logmsg(LOG_DEBUG, 1, "SpamSum - Comparing with %s.\n", sig);
 			if (strcmp(attack->a_conn.payload.md5sum, sig) == 0) sig_match = 1;
 		}
 	}
 	fclose(hashfile);
-	logmsg(LOG_DEBUG, 1, "MD5 hash file processed.\n");
+	logmsg(LOG_DEBUG, 1, "SpamSum - MD5 hash file processed.\n");
 
 	/* hash is not in signature file, append it */
 	if (sig_match == 0) {
 		if ((hashfile = fopen(md5sum_filename, "a")) == NULL) {
-			logmsg(LOG_ERR, 1, "Error - Could not open MD5 hash file %s: %s.\n", md5sum_filename, strerror(errno));
+			logmsg(LOG_ERR, 1, "SpamSum error - Could not open MD5 hash file %s: %s.\n", md5sum_filename, strerror(errno));
 			return(0);
 		}
 		if (fprintf(hashfile, "%s\n", attack->a_conn.payload.md5sum) != 33) {
-			logmsg(LOG_ERR, 1, "Error - Could not append MD5 hash to signature file: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "SpamSum error - Could not append MD5 hash to signature file: %s.\n", strerror(errno));
 			fclose(hashfile);
 			return(0);
 		}
-		logmsg(LOG_INFO, 1, "MD5 hash appended to signature file.\n");
+		logmsg(LOG_INFO, 1, "SpamSum - MD5 hash appended to signature file.\n");
 		fclose(hashfile);
 	} else {
-		logmsg(LOG_INFO, 1, "Found an exact MD5 hash match.\n");
+		logmsg(LOG_INFO, 1, "SpamSum - Found an exact MD5 hash match.\n");
 		return(1);
 	}
 
 
 	/* calculate spamsum */
-	logmsg(LOG_NOISY, 1, "Calculating spamsum.\n");
+	logmsg(LOG_NOISY, 1, "SpamSum - Calculating spamsum.\n");
 	sum = spamsum(attack->a_conn.payload.data, attack->a_conn.payload.size, block_size);
-	logmsg(LOG_DEBUG, 1, "Spamsum is %s.\n", sum);
+	logmsg(LOG_DEBUG, 1, "SpamSum - Spamsum is %s.\n", sum);
 
-	logmsg(LOG_DEBUG, 1, "Searching signature file for exact match.\n");
+	logmsg(LOG_DEBUG, 1, "SpamSum - Searching signature file for exact match.\n");
 	if ((sigfile = fopen(spamsum_filename, "r")) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Could not open SpamSum hash file %s: %s.\n", spamsum_filename, strerror(errno));
+		logmsg(LOG_ERR, 1, "SpamSum error - Could not open SpamSum hash file %s: %s.\n", spamsum_filename, strerror(errno));
 		return(0);
 	}
-	logmsg(LOG_DEBUG, 1, "Signature file successfully opened.\n");
+	logmsg(LOG_DEBUG, 1, "SpamSum - Signature file successfully opened.\n");
 
 	/* search signature file for calculated sum */
 	while((sig_match == 0) && (!feof(sigfile))) {
 		bzero(sig, BUFSIZ);
 		if ((fgets(sig, BUFSIZ-1, sigfile) == NULL) && (!feof(sigfile))) {
-			logmsg(LOG_ERR, 1, "Error - Could not read spamsum from signature file: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "SpamSum error - Could not read spamsum from signature file: %s.\n", strerror(errno));
 			fclose(sigfile);
 			return(0);
 		}
 		if ((sig) && (!feof(sigfile))) {
-			logmsg(LOG_DEBUG, 1, "Comparing with %s", sig);
+			logmsg(LOG_DEBUG, 1, "SpamSum - Comparing with %s", sig);
 			if (strcmp(sum, sig) == 0) sig_match = 1;
 		}
 	}
 	fclose(sigfile);
-	logmsg(LOG_DEBUG, 1, "Signature file processed.\n");
+	logmsg(LOG_DEBUG, 1, "SpamSum - Signature file processed.\n");
 	
 	/* sum is not in signature file, append it */
 	if (sig_match == 0) {
 		score = spamsum_match_db(spamsum_filename, sum, threshold);
-		logmsg(LOG_INFO, 1, "Spamsum match score is %u.\n", score);
+		logmsg(LOG_INFO, 1, "SpamSum - Spamsum match score is %u.\n", score);
 
 		if ((sigfile = fopen(spamsum_filename, "a")) == NULL) {
-			logmsg(LOG_ERR, 1, "Error - Could not open SpamSum hash file %s: %s.\n", spamsum_filename, strerror(errno));
+			logmsg(LOG_ERR, 1, "SpamSum error - Could not open SpamSum hash file %s: %s.\n", spamsum_filename, strerror(errno));
 			return(0);
 		}
 		strncat(sum, "\n", 1);
 		if (fprintf(sigfile, "%s", sum) != strlen(sum)) {
-			logmsg(LOG_ERR, 1, "Error - Could not append spamsum to signature file: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "SpamSum error - Could not append spamsum to signature file: %s.\n", strerror(errno));
 			fclose(sigfile);
 			return(0);
 		}
-		logmsg(LOG_NOISY, 1, "Spamsum appended to signature file.\n");
+		logmsg(LOG_NOISY, 1, "SpamSum - Locality sensitive hash value appended to signature file.\n");
 		fclose(sigfile);
 	}
 	

@@ -1,5 +1,5 @@
 /* hex2bin.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -12,7 +12,7 @@
  *
  * This file is part of the honeytrap tools collection.
  * 
- * hex2bin converts reads hexadecimal input from a file, converts it into
+ * hex2bin reads input in hexadecimal notion from a file, converts it into
  * binary data and writes it to stdout. This is useful for converting
  * exploit code or malware binaries that are submitted in hex.
  */
@@ -40,7 +40,8 @@ int main(int argc, char *argv[]) {
 
 	errno = 0;
 	while((retval = fscanf(file, "%2x", &chr)) > 0) fprintf(stdout, "%c", chr);
-	if (retval = EOF && errno) fprintf(stderr, "Error - Unable to read from file: %s.\n", strerror(errno));
+	if ((retval = EOF) && errno) fprintf(stderr, "Error - Unable to read from file: %s.\n", strerror(errno));
 
 	fclose(file);
+	return(0);
 }

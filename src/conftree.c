@@ -86,12 +86,9 @@ void print_conftree(conf_node *tree, int depth) {
 
 
 list_entry *add_list_item(conf_node *node, const void *data, ssize_t size) {
-	list_entry	*new_entry;
+	list_entry	*new_entry, *cur_entry;
 
 	if (!node) return(NULL);
-
-	/* find last list element */
-	if (node->val) while (node->val->next) node->val = node->val->next;
 
 	/* create new element */
 	if ((new_entry = malloc(sizeof(list_entry))) == NULL) {
@@ -109,9 +106,11 @@ list_entry *add_list_item(conf_node *node, const void *data, ssize_t size) {
 	new_entry->size = size;
 	memcpy(new_entry->data, data, size);
 
-	/* attach new element to the list and return */
-	if (node->val) node->val->next = new_entry;
-	 else node->val = new_entry;
+	/* attach new element to list tail and return */
+	if ((cur_entry = node->val) != NULL) {
+		while (cur_entry->next) cur_entry = cur_entry->next;
+		cur_entry->next = new_entry;
+	} else node->val = new_entry;
 
 	return(new_entry);
 }

@@ -24,6 +24,7 @@ const char module_version[]="0.1";
 #define CODE_OFFSET 0x417001
 
 
+/*
 static struct run_time_options {
 	int		verbose;
 	int		nasm_force;
@@ -49,6 +50,7 @@ struct instr_test {
 		uint32_t	eip;
 	} out_state;
 };
+*/
 
 void plugin_init(void);
 void plugin_unload(void);

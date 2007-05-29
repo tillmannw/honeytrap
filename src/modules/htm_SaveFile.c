@@ -109,24 +109,24 @@ int save_to_file(Attack *attack) {
 	mwfilename	= NULL;
 	proto_str	= NULL;
 
-	logmsg(LOG_DEBUG, 1, "Dumping attack string into file.\n");
-
-	/* do not create file if no data was received */
-	if (!attack->a_conn.payload.size) {
-		logmsg(LOG_DEBUG, 1, "No data received, no need for dumpfile creation.\n");
+	/* no data - nothing todo */
+	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
+		logmsg(LOG_DEBUG, 1, "SaveFile - No data received, no need for dumpfile creation.\n");
 		return(0);
 	}
+
+	logmsg(LOG_DEBUG, 1, "SaveFile - Dumping attack string into file.\n");
 
 	/* create filename */
 	if (attack->a_conn.protocol == TCP) proto_str = strdup("tcp");
 	else if (attack->a_conn.protocol == UDP) proto_str = strdup("udp");
 	else {
-		logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", attack->a_conn.protocol);
+		logmsg(LOG_ERR, 1, "SaveFile error - Protocol %u is not supported.\n", attack->a_conn.protocol);
 		return(-1);
 	}
 
 	if ((filename = (char *) malloc(strlen(attacks_dir) + strlen(proto_str) + 34)) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "SaveFile error - Unable to allocate memory: %s\n", strerror(errno));
 		return(-1);
 	}
 	bzero(filename, strlen(attacks_dir)+34);
@@ -134,7 +134,7 @@ int save_to_file(Attack *attack) {
 	/* assemble filename */
 	loc_time = time(NULL);
 	if((file_time = localtime(&loc_time)) == NULL) {
-		logmsg(LOG_WARN, 1, "Warning - Unable to get local time for filename.\n");
+		logmsg(LOG_WARN, 1, "SaveFile warning - Unable to get local time for filename.\n");
 		sprintf(filename, "%s/from_port_%u-%s_%u", attacks_dir, attack->a_conn.l_port, proto_str, getpid());
 	} else {
 		sprintf(filename, "%s/from_port_%u-%s_%u_%04d-%02d-%02d", attacks_dir, attack->a_conn.l_port, proto_str,
@@ -143,21 +143,21 @@ int save_to_file(Attack *attack) {
 
 	/* open file and set access rights */
 	if ((dumpfile_fd = open(filename, O_WRONLY | O_CREAT | O_EXCL)) < 0) {
-		logmsg(LOG_ERR, 1, "Error - Unable to save attack string in attacks directory: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "SaveFile error - Unable to save attack string in attacks directory: %s\n", strerror(errno));
 		return(-1);
 	}
 	if (chmod(filename, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)
-		logmsg(LOG_WARN, 1, "Warning - Unable to set proper acces rights\n");
+		logmsg(LOG_WARN, 1, "SaveFile warning - Unable to set proper acces rights\n");
 
 
 	/* write data to file */
 	if (write(dumpfile_fd, attack->a_conn.payload.data, attack->a_conn.payload.size) != attack->a_conn.payload.size) {
-		logmsg(LOG_ERR, 1, "Error - Unable to write attack string into file: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "SaveFile error - Unable to write attack string into file: %s\n", strerror(errno));
 		close(dumpfile_fd);
 		return(-1);
 	}
 	close(dumpfile_fd);
-	logmsg(LOG_DEBUG, 1, "Plugin aSaveFile: Attack string saved as %s.\n", filename);
+	logmsg(LOG_DEBUG, 1, "SaveFile - Attack string saved as %s.\n", filename);
 
 	/* save malware */
 	for (i=0; i<attack->dl_count; i++) {
@@ -168,10 +168,10 @@ int save_to_file(Attack *attack) {
 			downloads_dir,
 			mem_md5sum(attack->download[i].dl_payload.data, attack->download[i].dl_payload.size),
 			attack->download[i].filename);
-		logmsg(LOG_DEBUG, 1, "Malware sample dump - File name is %s\n", mwfilename);
+		logmsg(LOG_DEBUG, 1, "SaveFile - Malware sample dumpfile name is %s\n", mwfilename);
 		if (((dumpfile_fd = open(mwfilename, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
 		    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {
-			logmsg(LOG_WARN, 1, "Malware sample dump - Unable to save %s: %s.\n", mwfilename,
+			logmsg(LOG_WARN, 1, "SaveFile error - Unable to save malware sample dumpfile %s: %s.\n", mwfilename,
 				strerror(errno));
 			close(dumpfile_fd);
 			return(-1);
@@ -179,13 +179,13 @@ int save_to_file(Attack *attack) {
 		if (write(dumpfile_fd,
 			attack->download[i].dl_payload.data,
 			attack->download[i].dl_payload.size) != attack->download[i].dl_payload.size) { 
-			logmsg(LOG_ERR, 1, "Malware sample dump error - Unable to write data to file: %s\n",
+			logmsg(LOG_ERR, 1, "SaveFile error - Unable to save malware sample dumpfile: %s\n",
 				strerror(errno));
 			close(dumpfile_fd);
 			return(-1);
 		}
 		close(dumpfile_fd);
-		logmsg(LOG_NOTICE, 1, "Malware sample dump - %s saved.\n", attack->download[i].filename);
+		logmsg(LOG_NOTICE, 1, "SaveFile - Malware sample dumpfile %s saved.\n", attack->download[i].filename);
 	}
 
 	return(0);

@@ -73,7 +73,7 @@ int tcpsock(struct sockaddr_in *server_addr, uint16_t port) {
 	    /* hand packet processing back to the kernel */
 	    /* nfq_set_verdict()'s return value is undocumented,
 	     * but digging the source of libnetfilter_queue and libnfnetlink reveals
-	     * that itis just the passed-through value of a sendmsg() */
+	     * that it's just the passed-through value of a sendmsg() */
 	    if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
 		logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
 		nfq_destroy_queue(qh);

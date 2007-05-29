@@ -44,6 +44,8 @@
 //#include <emu/environment/win32/emu_env_w32_dll_export.h>
 #include <emu/emu_getpc.h>
 
+#include "emu/emu_shellcode.h"
+
 
 void plugin_init(void) {
 	plugin_register_hooks();
@@ -63,80 +65,30 @@ void plugin_register_hooks(void) {
 }
 
 int find_shellcode(Attack *attack) {
-	logmsg(LOG_DEBUG, 1, "Parsing attack string (%d bytes) for shellcode.\n", attack->a_conn.payload.size);
+	struct emu *e = NULL;
+	int32_t offset;
 
-	struct emu *e = emu_new();
-	struct emu_cpu *cpu = emu_cpu_get(e);
-	struct emu_memory *mem = emu_memory_get(e);
-	struct emu_env_w32 *env = emu_env_w32_new(e);
-	struct emu_track_and_source *et = emu_track_and_source_new();
+	/* no data - nothing todo */
+	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
+		logmsg(LOG_DEBUG, 1, "CPU emulation - No data received, won't start emulation.\n");
+		return(0);
+	}
 
-	struct instr_test i_test;
-	memset(&i_test, 0, sizeof(struct instr_test));
+	logmsg(LOG_DEBUG, 1, "CPU emulation - Parsing attack string (%d bytes) for shellcode.\n", attack->a_conn.payload.size);
 
-	if (env == 0) {
-		logmsg(LOG_ERR, 1, "CPU emulation error - Unable to create win32 environment: %s.\n", emu_strerror(e));
-		logmsg(LOG_ERR, 1, "CPU emulation error - strerror(emu_errno(e)): %s.\n", strerror(emu_errno(e)));
+	if ((e = emu_new()) == NULL) {
+		logmsg(LOG_ERR, 1, "cpuEmu Error - Unable to initialize virtual CPU.\n");
 		return(-1);
 	}
 
-	bool found_good_candidate_after_getpc = false;
-
 	logmsg(LOG_NOISY, 1, "CPU emulation - Analyzing %d bytes.\n", attack->a_conn.payload.size);
 
-	uint32_t offset;
-	for (offset=0; offset<attack->a_conn.payload.size && found_good_candidate_after_getpc == false; offset++) {
-		if (emu_getpc_check(e, (uint8_t *)attack->a_conn.payload.data, attack->a_conn.payload.size, offset) == 1) {
-			int j = 0;
-
-			/* set registers to initial values */
-			for (j = 0; j < 8; j++) emu_cpu_reg32_set(cpu,j ,i_test.in_state.reg[j]);
-
-			/* set flags */
-			emu_cpu_eflags_set(cpu, i_test.in_state.eflags);
-
-			/* write code to offset */
-			int static_offset = CODE_OFFSET;
-			for (j = 0; j < attack->a_conn.payload.size; j++)
-				emu_memory_write_byte(mem, static_offset+j, attack->a_conn.payload.data[j]);
-
-			/* set eip to getpc code */
-			emu_cpu_eip_set(emu_cpu_get(e), static_offset+offset);
-
-			int ret = -1;
-			int track = 0;
-
-			/* run the code */
-			for (j = 0; j < opts.steps; j++) {
-				uint32_t eipsave			= emu_cpu_eip_get(emu_cpu_get(e));
-				struct emu_env_w32_dll_export *dllhook	= NULL;
-				ret					= 0;
-				eipsave					= emu_cpu_eip_get(emu_cpu_get(e));
-				dllhook					= emu_env_w32_eip_check(env);
-
-				if (dllhook == NULL) {
-					ret = emu_cpu_parse(emu_cpu_get(e));
-
-					if (ret != -1) {
-						track = emu_track_instruction_check(e, et);
-						if (track == -1) {
-							logmsg(LOG_WARN, 1, "CPU emulation warning - Uninitialized variable during instruction tracking.\n");
-							break;
-						}
-					}
-
-					if (ret != -1) ret = emu_cpu_step(emu_cpu_get(e));
-
-					if (ret == -1) {
-						logmsg(LOG_ERR, 1, "CPU emulation error - %s\n", emu_strerror(e));
-						break;
-					}
-				}
-			}
-			logmsg(LOG_DEBUG, 1, "CPU emulation - Stepcount is %i.\n",j);
-		}
+	if ((offset = emu_shellcode_test(e, (u_char *) attack->a_conn.payload.data, attack->a_conn.payload.size)) >= 0) {
+		logmsg(LOG_NOISY, 1, "CPU emulation - Possible start of shellcode detected at offset %u.\n", offset);
+		emu_free(e);
+		return(1);
 	}
-	if (found_good_candidate_after_getpc == true) logmsg(LOG_INFO, 1, "CPU emulation - Shellcode start position found.\n");
+
 	emu_free(e);
 	return(0);
 }

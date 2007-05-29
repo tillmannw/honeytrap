@@ -54,19 +54,25 @@ int cmd_parse_for_vnc(Attack *attack) {
 	char *readable_chars = NULL, *clean_str = NULL, *curchar = NULL, *cmd = NULL;
 	FILE *f;
 
-	logmsg(LOG_DEBUG, 1, "Checking for VNC session string in attack string.\n");
+	/* no data - nothing todo */
+	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
+		logmsg(LOG_DEBUG, 1, "VNC download - No data received, nothing to analyze.\n");
+		return(0);
+	}
+
+	logmsg(LOG_DEBUG, 1, "VNC download - Checking for VNC session string in attack string.\n");
 
 	/* no data, nothing to do */
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) return(1);
 
 	/* parse for VNC session indicator - if found, search for url */
 	if (memcmp(attack->a_conn.payload.data, vnc_str, strlen(vnc_str)) == 0) {
-		logmsg(LOG_DEBUG, 1, "Found VNC session string, parsing attack string for HTTP URL.\n");
+		logmsg(LOG_DEBUG, 1, "VNC download - Found VNC session string, parsing attack string for HTTP URL.\n");
 		for (i=strlen(vnc_str); i<attack->a_conn.payload.size; i++) {
 			if (isprint(attack->a_conn.payload.data[i])) {
 			       	if (isspace(attack->a_conn.payload.data[i])) break;
 				if ((readable_chars = realloc(readable_chars, len+2)) == NULL) {
-					logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+					logmsg(LOG_ERR, 1, "VNC download error - Unable to allocate memory: %s.\n", strerror(errno));
 					return(0);
 				}
 				readable_chars[len] = attack->a_conn.payload.data[i];
@@ -95,13 +101,13 @@ int cmd_parse_for_vnc(Attack *attack) {
 			/* assemble wget download command and execute it */
 			if (strstr(clean_str, "http://") == clean_str) {
 				if ((cmd = malloc(strlen(clean_str)+19)) == NULL) {
-					logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+					logmsg(LOG_ERR, 1, "VNC download error - Unable to allocate memory: %s.\n", strerror(errno));
 					return(0);
 				}
 				sprintf(cmd, "%s %s", "/usr/bin/wget -nv", clean_str);
-				logmsg(LOG_DEBUG, 1, "Calling '%s'.\n", cmd);
+				logmsg(LOG_DEBUG, 1, "VNC download - Calling '%s'.\n", cmd);
 				if ((f = popen(cmd, "r")) == NULL) {
-					logmsg(LOG_ERR, 1, "Error - Cannot call download command: %s.\n", strerror(errno));
+					logmsg(LOG_ERR, 1, "VNC download error - Cannot call download command: %s.\n", strerror(errno));
 					return(0);
 				}
 				pclose(f);
@@ -109,6 +115,6 @@ int cmd_parse_for_vnc(Attack *attack) {
 			}
 		}
 		free(readable_chars);
-	} else logmsg(LOG_DEBUG, 1, "No VNC session string found.\n");
+	} else logmsg(LOG_DEBUG, 1, "VNC download - No VNC session string found.\n");
 	return(1);
 }

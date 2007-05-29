@@ -151,8 +151,8 @@ int configure(int my_argc, char *my_argv[]) {
 #endif
 
 	/* initialize port flags array with zeros */
-	memset(port_flags_tcp, 0, sizeof(portcfg)); 
-	memset(port_flags_tcp, 0, sizeof(portcfg)); 
+	memset(port_flags_tcp, 0, 0xffff * sizeof(portcfg *)); 
+	memset(port_flags_udp, 0, 0xffff * sizeof(portcfg *)); 
 
 	/* initialization of plugin hooks */
 	init_plugin_hooks();

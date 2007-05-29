@@ -63,7 +63,13 @@ int cmd_parse_for_tftp(Attack *attack) {
 	char tftp_str[] = "tftp";
 	char *string_for_processing;
 
-	logmsg(LOG_DEBUG, 1, "Parsing attack string (%d bytes) for tftp commands.\n", attack->a_conn.payload.size);
+	/* no data - nothing todo */
+	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
+		logmsg(LOG_DEBUG, 1, "TFTP download - No data received, nothing to download.\n");
+		return(0);
+	}
+
+	logmsg(LOG_DEBUG, 1, "TFTP download - Parsing attack string (%d bytes) for tftp commands.\n", attack->a_conn.payload.size);
 
 	string_for_processing = (char *) malloc(attack->a_conn.payload.size + 1);
 	memcpy(string_for_processing, attack->a_conn.payload.data, attack->a_conn.payload.size);
@@ -72,13 +78,13 @@ int cmd_parse_for_tftp(Attack *attack) {
 	for (i=0; i<attack->a_conn.payload.size; i++) {
 		if ((attack->a_conn.payload.size-i >= strlen(tftp_str))
 			&& (memcmp(string_for_processing+i, tftp_str, strlen(tftp_str)) == 0)) {
-			logmsg(LOG_DEBUG, 1, "Found TFTP command in attack string.\n");
+			logmsg(LOG_DEBUG, 1, "TFTP download - Found TFTP command in attack string.\n");
 
 			/* do tftp download */
 			return(get_tftpcmd(string_for_processing, attack->a_conn.payload.size, attack));
 		}
 	}
-	logmsg(LOG_DEBUG, 1, "No tftp command found.\n");
+	logmsg(LOG_DEBUG, 1, "TFTP download - No tftp command found.\n");
 	return(0);
 }
 

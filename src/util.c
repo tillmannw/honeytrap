@@ -27,7 +27,7 @@ int valid_ipaddr(uint32_t address) {
 	return(address > 0 ? 1 : 0);
 }
 
-int read_line(int socket, char *line, int timeout) {
+int read_line(int socket, char *line, ssize_t len, int timeout) {
 	/* reads a line from 'socket' into buffer 'line' */
 	/* 'timeout' is optional, 0 means read without timeout */
 
@@ -37,7 +37,7 @@ int read_line(int socket, char *line, int timeout) {
 	struct timeval r_timeout;
 	fd_set rfds;
 
-	bzero(line, MAX_LINE+1);
+	memset(line, 0, len);
 
 	/* read line with timeout */
 	if (timeout) {
@@ -53,7 +53,7 @@ int read_line(int socket, char *line, int timeout) {
 		select_return = select(socket + 1, &rfds, NULL, NULL, &r_timeout);
 		while ((select_return > 0) || (errno == EINTR)) {
 			if (FD_ISSET(socket, &rfds)) {
-				if (read_chars >= MAX_LINE-1) {
+				if (read_chars >= len-1) {
 					logmsg(LOG_DEBUG, 1, "Error while reading from socket - Line exceeds buffer.\n");
 					return(-2);
 				}
@@ -85,7 +85,7 @@ int read_line(int socket, char *line, int timeout) {
 
 	/* read line without timeout */
 	while (1){
-		if (read_chars >= MAX_LINE-1) {
+		if (read_chars >= len-1) {
 			logmsg(LOG_DEBUG, 1, "Error while reading from socket - Line exceeds buffer.\n");
 			return(-2);
 		}
