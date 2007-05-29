@@ -23,6 +23,7 @@
 #include "logging.h"
 #include "dynsrv.h"
 #include "ctrl.h"
+#include "readconf.h"
 #include "ipqmon.h"
 
 /* Set BUFSIZE to 1500 (ethernet frame size) to prevent
