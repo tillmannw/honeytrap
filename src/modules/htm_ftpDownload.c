@@ -32,7 +32,7 @@
 #include <plughook.h>
 #include <util.h>
 #include <md5.h>
-#include <ip.h>
+#include <tcpip.h>
 
 #include "htm_ftpDownload.h"
 

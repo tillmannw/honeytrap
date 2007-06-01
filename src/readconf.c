@@ -36,7 +36,7 @@
 #include "signals.h"
 #include "plugin.h"
 #include "plughook.h"
-#include "ip.h"
+#include "tcpip.h"
 #include "pcapmon.h"
 #include "ipqmon.h"
 
@@ -247,7 +247,7 @@ int configure(int my_argc, char *my_argv[]) {
 					break;
 				case 'a':
 					if ((ip_cmd_opt = gethostbyname(optarg)) == NULL) {
-						perrori("  Error - Invalid hostname or ip address\n");
+						perror("  Error - Invalid hostname or ip address\n");
 						exit(EXIT_FAILURE);
 					}
 					break;

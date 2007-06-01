@@ -14,17 +14,25 @@ honeytrap_SOURCES = 	honeytrap.c honeytrap.h \
 			plughook.c plughook.h \
 			util.c util.h \
 			connectmon.c connectmon.h \
- 			pcapmon.c pcapmon.h \
-			ipqmon.c ipqmon.h \
-			nfqmon.c nfqmon.h \
 			response.c response.h \
 			dynsrv.c dynsrv.h \
 			attack.c attack.h \
-			ip.h \
-			tcp.c tcp.h \
-			udp.c udp.h \
+			tcpip.h \
+			sock.c sock.h \
 			proxy.c proxy.h \
 			sha512.c sha512.h \
 			md5.c md5.h
+
+if PCAP_MON
+honeytrap_SOURCES +=	pcapmon.c pcapmon.h
+endif
+
+if IPQ_MON
+honeytrap_SOURCES += 	ipqmon.c ipqmon.h
+endif
+
+if NFQ_MON
+honeytrap_SOURCES += 	nfqmon.c nfqmon.h
+endif
 
 SUBDIRS = modules

@@ -18,5 +18,6 @@
 #include "attack.h"
 
 int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port, uint16_t proto, Attack *attack);
+int copy_data(int to_fd, int from_fd, u_char **save_string, uint32_t offset, int *bytes_read, int *bytes_sent);
 
 #endif

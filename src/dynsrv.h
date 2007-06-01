@@ -18,9 +18,7 @@
 #  include <pcap.h>
 #endif
 
-#include "ip.h"
-#include "tcp.h"
-#include "udp.h"
+#include "tcpip.h"
 #include "attack.h"
 
 int drop_privileges(void);

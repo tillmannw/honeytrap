@@ -4,9 +4,6 @@ o  Review automake installation process
 -- Small Changes ------------------------------------------------------
 o  Do fallback to default interface already in ip guessing phase
 o  Check for EINVAL when select()ing in plugins
-o  Dump attack payload and responses in tcpdump format for future
-   deep packet analysis
 
 -- Future plans -------------------------------------------------------
-o  dump attack data into MySQL and Postgres databases
 o  add ipfw connection monitors

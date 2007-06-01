@@ -10,35 +10,34 @@
  * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-#include <sys/stat.h>
+#include <errno.h>
 #include <fcntl.h>
-#include <time.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
-#include "readconf.h"
+#include "attack.h"
 #include "ctrl.h"
 #include "honeytrap.h"
+#include "readconf.h"
 #include "logging.h"
-#include "dynsrv.h"
 #include "response.h"
 #include "md5.h"
 #include "proxy.h"
 #include "plughook.h"
 #include "ipqmon.h"
 #include "nfqmon.h"
-#include "tcp.h"
-#include "udp.h"
-#include "attack.h"
+#include "tcpip.h"
+#include "sock.h"
+#include "dynsrv.h"
 
 
 u_char buffer[BUFSIZ], *attack_string;
@@ -73,7 +72,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
     fd_set		rfds;
     char		*ip_l_str, *ip_r_str;
     Attack		*attack;
-    u_int8_t		port_mode;
+    u_char		port_mode;
 
     proxy_addr		= NULL;
     proxy_dst		= NULL;
@@ -96,21 +95,25 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	return;
     }
 
-    logmsg(LOG_DEBUG, 1, "-> %u\t  Connection request from %s, forking server process.\n",
-	    (uint16_t) ntohs(port_l), inet_ntoa(ip_r));
-
     /* fork server process */
     if ((pid = fork()) == 0) {
 
+	/* use this port string as log prefix */
+	memset(portstr, 0, 16);
+	if (snprintf(portstr, 16, "%u/%s\t", ntohs(port_l), PROTO(proto)) > 15) {
+	    logmsg(LOG_ERR, 1, "Error - Port string is too long.\n");
+	    return;
+	}
+	
+
 	if (proto == TCP) {
 	    logmsg(LOG_DEBUG, 1, "Requesting tcp socket.\n");
-	    if ((listen_fd = tcpsock(&server_addr, port_l)) < 0) exit(EXIT_FAILURE);
+	    if ((listen_fd = get_boundsock(&server_addr, port_l, SOCK_STREAM)) < 0) return;
+	    if (port_flags_tcp[htons(port_l)]) port_mode = port_flags_tcp[htons(port_l)]->mode;
 	} else if (proto == UDP) {
 	    logmsg(LOG_DEBUG, 1, "Requesting udp socket.\n");
-	    if ((listen_fd = udpsock(&server_addr, port_l)) < 0) exit(EXIT_FAILURE);
-	} else {
-	    logmsg(LOG_DEBUG, 1, "Unsupported protocol type.\n");
-	    return;
+	    if ((listen_fd = get_boundsock(&server_addr, port_l, SOCK_DGRAM)) < 0) return;
+	    if (port_flags_udp[htons(port_l)]) port_mode = port_flags_udp[htons(port_l)]->mode;
 	}
 
 	ip_l_str = strdup(inet_ntoa(ip_l));
@@ -161,7 +164,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
 	/* don't need root privs any more */
 	drop_privileges(); 
-	logmsg(LOG_DEBUG, 1, "Server is now running with user id %d and group id %d.\n", getuid(), getgid());
+	logmsg(LOG_DEBUG, 1, "Server is now running with user id %d and group id %d.\n", geteuid(), getegid());
 #endif
 		  
 	/* wait for incoming connections */
@@ -175,19 +178,19 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	    switch (select_return = select(listen_fd + 1, &rfds, NULL, NULL, &c_timeout)) {
 	    case -1:
 		if (errno == EINTR) break;
-		logmsg(LOG_ERR, 1, "   %u\t  Error - select() call failed: %s.\n",
-		    (uint16_t) ntohs(port_l), strerror(errno));
+		logmsg(LOG_ERR, 1, "   %s  Error - select() call failed: %s.\n",
+		    portstr, strerror(errno));
 		exit(EXIT_FAILURE);
 	    case  0:
 		/* timeout */
 		close(listen_fd);
-		logmsg(LOG_NOISY, 1, "-> %u\t  No incoming connection for %u seconds - server terminated.\n",
-		    (uint16_t) ntohs(port_l), conn_timeout);
+		logmsg(LOG_NOISY, 1, "-> %s  No incoming connection for %u seconds - server terminated.\n",
+		    portstr, conn_timeout);
 		return;
 	    default:
 		if (FD_ISSET(listen_fd, &rfds)) {
-		    logmsg(LOG_NOISY, 1, "   %u\t  Connection request from %s.\n",
-			(uint16_t) ntohs(port_l), inet_ntoa(ip_r));
+		    logmsg(LOG_NOISY, 1, "   %s  Connection request from %s.\n",
+			portstr, inet_ntoa(ip_r));
 
 		    /* initialize attack record */
 		    if ((attack = new_attack(ip_l, ip_r, ntohs(port_l), 0, proto)) == NULL) {
@@ -197,12 +200,12 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		    }
 		    if (port_mode & PORTCONF_NORMAL) {
 		    	/* handle connection in normal mode if this port configured to be handled 'normal' */
-			logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection in normal mode.\n", (uint16_t) ntohs(port_l));
+			logmsg(LOG_DEBUG, 1, "   %s  Handling connection in normal mode.\n", portstr);
 			mirror_this = 0;
 			proxy_this = 0;
 		    } else if (port_mode & PORTCONF_PROXY) {
 			/* get proxy server address for port */
-			logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection in proxy mode.\n", (uint16_t) ntohs(port_l));
+			logmsg(LOG_DEBUG, 1, "   %s  Handling connection in proxy mode.\n", portstr);
 
 			if (proto == TCP) {
 				if (port_flags_tcp[htons(port_l)]) proxy_dst = port_flags_tcp[htons(port_l)]->target;
@@ -212,41 +215,41 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
 			/* try to establish proxy connection to server */
                        if ((proxy_addr = gethostbyname(proxy_dst->host)) == NULL) {
-                            logmsg(LOG_ERR, 1, "   %u\t  Error - Unable to resolve proxy host %s.\n",
-				(uint16_t) ntohs(port_l), proxy_dst->host);
+                            logmsg(LOG_ERR, 1, "   %s  Error - Unable to resolve proxy host %s.\n",
+				portstr, proxy_dst->host);
 			    free(attack);
                             exit(EXIT_FAILURE);
                         }
-                        logmsg(LOG_DEBUG, 1, "== %u\t  Proxy hostname %s resolved to %s.\n",
-                            (uint16_t) ntohs(port_l), proxy_dst->host,
+                        logmsg(LOG_DEBUG, 1, "== %s  Proxy hostname %s resolved to %s.\n",
+                            portstr, proxy_dst->host,
                             inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]));
 
 
-			logmsg(LOG_DEBUG, 1, "== %u\t  Requesting proxy connection to %s:%u.\n",
-			    (uint16_t) ntohs(port_l),
+			logmsg(LOG_DEBUG, 1, "== %s  Requesting proxy connection to %s:%u.\n",
+			    portstr,
 			    inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]), proxy_dst->port);
 			    p_addr = (struct in_addr *) proxy_addr->h_addr_list[0];
 			if ((proxy_sock_fd = proxy_connect(PORTCONF_PROXY, *p_addr,
 			    ntohs(port_l), proxy_dst->port, proto, attack)) == -1) {
-			    logmsg(LOG_INFO, 1, "== %u\t  Proxy connection rejected, falling back to normal mode.\n",
-				(uint16_t) ntohs(port_l));
+			    logmsg(LOG_INFO, 1, "== %s  Proxy connection rejected, falling back to normal mode.\n",
+				portstr);
 			    proxy_this = 0;
-			} else logmsg(LOG_NOTICE, 1, "== %u\t  Proxy connection to %s:%u established.\n",
-			    (uint16_t) ntohs(port_l),
+			} else logmsg(LOG_NOTICE, 1, "== %s  Proxy connection to %s:%u established.\n",
+			    portstr,
 			    inet_ntoa(*(struct in_addr*)proxy_addr->h_addr_list[0]), proxy_dst->port);
 		    } else if ((mirror_this) || (port_mode & PORTCONF_MIRROR)) {
 			/* try to establish mirror connection back to the client */
-			logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection in mirror mode.\n", (uint16_t) ntohs(port_l));
+			logmsg(LOG_DEBUG, 1, "   %s  Handling connection in mirror mode.\n", portstr);
 
-			logmsg(LOG_DEBUG, 1, "<> %u\t  Requesting mirror connection to %s:%u.\n",
-			    (uint16_t) ntohs(port_l), inet_ntoa(ip_r), ntohs(port_l));
+			logmsg(LOG_DEBUG, 1, "<> %s  Requesting mirror connection to %s:%u.\n",
+			    portstr, inet_ntoa(ip_r), ntohs(port_l));
 			if ((mirror_sock_fd = proxy_connect(PORTCONF_MIRROR,
 			    (struct in_addr) ip_r, ntohs(port_l), ntohs(port_l), proto, attack)) == -1) {
-			    logmsg(LOG_INFO, 1, "<> %u\t  Mirror connection rejected, falling back to normal mode.\n",
-				(uint16_t) ntohs(port_l));
+			    logmsg(LOG_INFO, 1, "<> %s  Mirror connection rejected, falling back to normal mode.\n",
+				portstr);
 			    mirror_this = 0;
-			} else logmsg(LOG_NOTICE, 1, "<> %u\t  Mirror connection to %s:%u established.\n",
-			    (uint16_t) ntohs(port_l), inet_ntoa(ip_r), (uint16_t) ntohs(port_l));
+			} else logmsg(LOG_NOTICE, 1, "<> %s  Mirror connection to %s:%u established.\n",
+			    portstr, inet_ntoa(ip_r), (uint16_t) ntohs(port_l));
 		    }
 
 		    bzero(&client_addr, sizeof(client_addr));
@@ -262,8 +265,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 				(struct sockaddr *) &client_addr, &client_addr_len)) < 0) {
 				if (errno == EINTR) break;
 				else {
-				    logmsg(LOG_ERR, 1, "   %u\t  Error - Could not accept tcp connection: %s\n",
-					(uint16_t) ntohs(port_l), strerror(errno));
+				    logmsg(LOG_ERR, 1, "   %s  Error - Could not accept tcp connection: %s\n",
+					portstr, strerror(errno));
 				    close(mirror_sock_fd);
 				    free(attack);
 				    exit(EXIT_FAILURE);
@@ -281,8 +284,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			    if (connect(connection_fd, (struct sockaddr *) &client_addr, client_addr_len) < 0) {
 				if (errno == EINTR) break;
 				else {
-				    logmsg(LOG_ERR, 1, "   %u\t  Error - Could not connect udp socket: %s\n",
-					(uint16_t) ntohs(port_l), strerror(errno));
+				    logmsg(LOG_ERR, 1, "   %s  Error - Could not connect udp socket: %s\n",
+					portstr, strerror(errno));
 				    close(mirror_sock_fd);
 				    free(attack);
 				    exit(EXIT_FAILURE);
@@ -293,8 +296,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			    if (getpeername(connection_fd, (struct sockaddr *) &client_addr, &client_addr_len) < 0) {
 				if (errno == EINTR) break;
 				else {
-				    logmsg(LOG_ERR, 1, "   %u\t  Error - Could not get remote host information: %s\n",
-					(uint16_t) ntohs(port_l), strerror(errno));
+				    logmsg(LOG_ERR, 1, "   %s  Error - Could not get remote host information: %s\n",
+					portstr, strerror(errno));
 				    close(mirror_sock_fd);
 				    free(attack);
 				    exit(EXIT_FAILURE);
@@ -310,8 +313,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		    if (established) {
 			/* connection successful established, fork handler process */
 					
-			logmsg(LOG_NOTICE, 1, "   %u\t  Connection from %s:%u accepted.\n",
-				(uint16_t) ntohs(port_l), inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+			logmsg(LOG_NOTICE, 1, "   %s  Connection from %s:%u accepted.\n",
+				portstr, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 			attack->a_conn.r_port	= ntohs(client_addr.sin_port);
 			
 			if ((pid = fork()) == 0) {
@@ -321,22 +324,22 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			    total_bytes		= 0;
 
 			    if ((proxy_this) || (port_mode & PORTCONF_PROXY)) {
-				logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection from %s:%u in proxy mode.\n",
-				    (uint16_t) ntohs(port_l), inet_ntoa(client_addr.sin_addr),
+				logmsg(LOG_DEBUG, 1, "   %s  Handling connection from %s:%u in proxy mode.\n",
+				    portstr, inet_ntoa(client_addr.sin_addr),
 				    ntohs(client_addr.sin_port));
 				handle_connection_proxied(connection_fd, PORTCONF_PROXY, proxy_sock_fd,
 				    (uint16_t) ntohs(port_l), client_addr.sin_port,
 				    client_addr.sin_addr, proto, m_read_timeout, read_timeout, attack);
 			    } else if ((mirror_this) || (port_mode & PORTCONF_MIRROR)) {
-				logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection from %s:%u in mirror mode.\n",
-				    (uint16_t) ntohs(port_l), inet_ntoa(client_addr.sin_addr),
+				logmsg(LOG_DEBUG, 1, "   %s  Handling connection from %s:%u in mirror mode.\n",
+				    portstr, inet_ntoa(client_addr.sin_addr),
 				    ntohs(client_addr.sin_port));
 				handle_connection_proxied(connection_fd, PORTCONF_MIRROR, mirror_sock_fd,
 				    (uint16_t) ntohs(port_l), client_addr.sin_port,
 				    client_addr.sin_addr, proto, m_read_timeout, read_timeout, attack);
 			    } else {
-				logmsg(LOG_DEBUG, 1, "   %u\t  Handling connection from %s:%u in normal mode.\n",
-				    (uint16_t) ntohs(port_l), inet_ntoa(client_addr.sin_addr),
+				logmsg(LOG_DEBUG, 1, "   %s  Handling connection from %s:%u in normal mode.\n",
+				    portstr, inet_ntoa(client_addr.sin_addr),
 				    ntohs(client_addr.sin_port));
 				handle_connection_normal(connection_fd, (uint16_t) ntohs(port_l),
 				    proto, read_timeout, attack);
@@ -376,7 +379,7 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 	r_timeout.tv_usec = 0;
 
 	if (((retval = select(connection_fd + 1, &rfds, NULL, NULL, &r_timeout)) < 0) && (errno != EINTR)) {
-	    logmsg(LOG_ERR, 1, "   %u\t  Error - select() failed: %s.\n", port, strerror(errno));
+	    logmsg(LOG_ERR, 1, "   %s  Error - select() failed: %s.\n", portstr, strerror(errno));
 	    close(connection_fd);
 	    return(process_data(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 	} else if (retval == 0) {
@@ -384,12 +387,12 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 	    disconnect++;
 	    if (disconnect > 10) {
 		/* close timeout'd connection and process attack string */
-		logmsg(LOG_INFO, 1, "   %u\t  Timeout expired, closing connection.\n", port);
+		logmsg(LOG_INFO, 1, "   %s  Timeout expired, closing connection.\n", portstr);
 		close(connection_fd);
 		return(process_data(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 	    } else {
 		if ((!send_default_response(connection_fd, port, proto, read_timeout)) == -1) {
-		    logmsg(LOG_ERR, 1, "   %u\t  Error - Sending response failed: %s.\n", port, strerror(errno));
+		    logmsg(LOG_ERR, 1, "   %s  Error - Sending response failed: %s.\n", portstr, strerror(errno));
 		    close(connection_fd);
 		    return(process_data(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 		}
@@ -399,10 +402,10 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 	/* handle data on server connection */
 	if (FD_ISSET(connection_fd, &rfds)) {
 	    if ((bytes_read = read(connection_fd, buffer, sizeof(buffer))) > 0) {
-		logmsg(LOG_INFO, 1, "   %u\t* %d bytes read.\n", port, bytes_read);
+		logmsg(LOG_INFO, 1, "   %s* %d bytes read.\n", portstr, bytes_read);
 		total_bytes += bytes_read;
 		if (!(attack_string = (u_char *) realloc(attack_string, total_bytes))) {
-		    logmsg(LOG_ERR, 1, "   %u\t  Error - Reallocating buffer size failed: %s.\n", port, strerror(errno));
+		    logmsg(LOG_ERR, 1, "   %s  Error - Reallocating buffer size failed: %s.\n", portstr, strerror(errno));
 		    free(attack_string);
 		    return(-1);
 		}
@@ -411,19 +414,19 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 		/* check if read limit was hit */
 		if (bytes_read >= read_limit) {
 			/* read limit hit, process attack string */
-			logmsg(LOG_WARN, 1, "   %u\t  Warning - Byte limit (%d) hit. Closing connection.\n",
-				port, read_limit);
+			logmsg(LOG_WARN, 1, "   %s  Warning - Byte limit (%d) hit. Closing connection.\n",
+				portstr, read_limit);
 			close(connection_fd);
 			return(process_data(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 		}
 	    } else if (bytes_read == 0) {
-		logmsg(LOG_INFO, 1, "   %u\t  Connection closed by foreign host.\n", port);
+		logmsg(LOG_INFO, 1, "   %s  Connection closed by foreign host.\n", portstr);
 
 		/* process attack string */
 		close(connection_fd);
 		return(process_data(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 	    } else {
-		logmsg(LOG_NOISY, 1, "   %u\t  Could not read data: %s.\n", port, strerror(errno));
+		logmsg(LOG_NOISY, 1, "   %s  Could not read data: %s.\n", portstr, strerror(errno));
 		close(connection_fd);
 		return(process_data(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 	    }
@@ -475,7 +478,7 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 	r_timeout.tv_sec = (u_char) timeout;
 	r_timeout.tv_usec = 0;
 	if ((select(max_read_fd + 1, &rfds, NULL, NULL, &r_timeout) < 0) && (errno != EINTR)) {
-	    logmsg(LOG_INFO, 1, "%s %u\t  Error - Select failed: %s.\n", logpre, dport, strerror(errno));
+	    logmsg(LOG_INFO, 1, "%s %s  Error - Select failed: %s.\n", logpre, portstr, strerror(errno));
 	    shutdown(server_sock_fd, SHUT_RDWR);
 	    shutdown(connection_fd, SHUT_RDWR);
 	    return(process_data(attack_string, total_bytes, server_string, total_from_server, dport, attack));
@@ -485,14 +488,14 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 	/* read data and proxy it to client connection */
 	    bytes_read = 0;
 	    if ((retval =
-		tcpcopy(connection_fd, server_sock_fd, &server_string, total_from_server, &bytes_read, &bytes_sent)) > 0) {
-		logmsg(LOG_INFO, 1, "%s %u\t* %u (of %u) bytes copied from %s connection to %s:%u.\n",
-			logpre, dport, bytes_sent, bytes_read, logact, inet_ntoa(ipaddr), sport);
+		copy_data(connection_fd, server_sock_fd, &server_string, total_from_server, &bytes_read, &bytes_sent)) > 0) {
+		logmsg(LOG_INFO, 1, "%s %s* %u (of %u) bytes copied from %s connection to %s:%u.\n",
+			logpre, portstr, bytes_sent, bytes_read, logact, inet_ntoa(ipaddr), sport);
 		total_from_server += bytes_read;
 		if (total_from_server >= read_limit) {
 			/* read limit hit, process attack string */
-			logmsg(LOG_WARN, 1, "%s %u\t  Warning - Byte limit (%d) hit. Closing %s connections.\n",
-				logpre, dport, read_limit, logact);
+			logmsg(LOG_WARN, 1, "%s %s  Warning - Byte limit (%d) hit. Closing %s connections.\n",
+				logpre, portstr, read_limit, logact);
 			shutdown(server_sock_fd, SHUT_RDWR);
 			shutdown(connection_fd, SHUT_RDWR);
 	    		return(process_data(attack_string, total_bytes, server_string, total_from_server, dport, attack));
@@ -503,30 +506,30 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 			return(handle_connection_normal(connection_fd, dport, proto, read_timeout, attack));
 	    		    
 		/* remote host closed server connection */
-		logmsg(LOG_INFO, 1, "%s %u\t  %s connection closed by foreign host.\n", logpre, dport, Logstr);
+		logmsg(LOG_INFO, 1, "%s %s  %s connection closed by foreign host.\n", logpre, portstr, Logstr);
 		shutdown(server_sock_fd, SHUT_RDWR);
 		shutdown(connection_fd, SHUT_RDWR);
 	    	return(process_data(attack_string, total_bytes, server_string, total_from_server, dport, attack));
 	    } else {
-		/* tcpcopy error */
-		logmsg(LOG_INFO, 1, "%s %u\t  Error - Unable to %s data to client connection.\n", logpre, dport, logact);
+		/* copy_data error */
+		logmsg(LOG_INFO, 1, "%s %s  Error - Unable to %s data to client connection.\n", logpre, portstr, logact);
 		if (close(server_sock_fd) == -1)
-		    logmsg(LOG_ERR, 1, "%s %u\t  Error - Unable to close %s sockt.\n", logpre, dport, logstr);
-		else logmsg(LOG_NOISY, 1, "%s %u\t  %s connection closed.\n", logpre, dport, Logstr);
+		    logmsg(LOG_ERR, 1, "%s %s  Error - Unable to close %s sockt.\n", logpre, portstr, logstr);
+		else logmsg(LOG_NOISY, 1, "%s %s  %s connection closed.\n", logpre, portstr, Logstr);
 		shutdown(connection_fd, SHUT_RDWR);
 	    	return(process_data(attack_string, total_bytes, server_string, total_from_server, dport, attack));
 	    }
 	} else if (FD_ISSET(connection_fd, &rfds)) {
 	/* read data and proxy it to server connection */
 	    bytes_read = 0;
-	    if ((retval= tcpcopy(server_sock_fd, connection_fd, &attack_string, total_bytes, &bytes_read, &bytes_sent))>0) {
-		logmsg(LOG_INFO, 1, "%s %u\t* %u (of %u) bytes copied from client connection to %s:%u.\n",
-			logpre, dport, bytes_sent, bytes_read, inet_ntoa(ipaddr), dport);
+	    if ((retval = copy_data(server_sock_fd, connection_fd, &attack_string, total_bytes, &bytes_read, &bytes_sent))>0) {
+		logmsg(LOG_INFO, 1, "%s %s* %u (of %u) bytes copied from client connection to %s:%u.\n",
+			logpre, portstr, bytes_sent, bytes_read, inet_ntoa(ipaddr), dport);
 		total_bytes += bytes_read;
 		if (total_from_server >= read_limit) {
 			/* read limit hit, process attack string */
-			logmsg(LOG_WARN, 1, "%s %u\tWarning - Byte limit (%d) hit. Closing %s connections.\n",
-				logpre, dport, read_limit, logact);
+			logmsg(LOG_WARN, 1, "%s %s  Warning - Byte limit (%d) hit. Closing %s connections.\n",
+				logpre, portstr, read_limit, logact);
 			shutdown(server_sock_fd, SHUT_RDWR);
 			shutdown(connection_fd, SHUT_RDWR);
 	    		return(process_data(attack_string, total_bytes, server_string, total_from_server, dport, attack));
@@ -534,20 +537,20 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 	    } else if (retval == 0) {
 		/* remote host closed client connection */
 		shutdown(server_sock_fd, SHUT_RDWR);
-		logmsg(LOG_INFO, 1, "%s %u\t  Connection closed by foreign host.\n", logpre, dport);
+		logmsg(LOG_INFO, 1, "%s %s  Connection closed by foreign host.\n", logpre, portstr);
 		shutdown(server_sock_fd, SHUT_RDWR);
-		logmsg(LOG_NOISY, 1, "%s %u\t  %s connection closed.\n", logpre, dport, Logstr);
+		logmsg(LOG_NOISY, 1, "%s %s  %s connection closed.\n", logpre, portstr, Logstr);
 	    	return(process_data(attack_string, total_bytes, server_string, total_from_server, dport, attack));
 	    } else {
-		/* tcpcopy error */
-		logmsg(LOG_INFO, 1, "%s %u\t  Error - Unable to %s data to %s connection.\n", logpre, dport, logact,logstr);
+		/* copy_data error */
+		logmsg(LOG_INFO, 1, "%s %s  Error - Unable to %s data to %s connection.\n", logpre, portstr, logact,logstr);
 		shutdown(server_sock_fd, SHUT_RDWR);
 		shutdown(connection_fd, SHUT_RDWR);
 	    	return(process_data(attack_string, total_bytes, server_string, total_from_server, dport, attack));
 	    }
 	} else {
 		/* select() timed out, close connections */
-		logmsg(LOG_INFO, 1, "%s %u\t  %s connection timed out, closing connections.\n", logpre, dport, Logstr);
+		logmsg(LOG_INFO, 1, "%s %s  %s connection timed out, closing connections.\n", logpre, portstr, Logstr);
 		shutdown(server_sock_fd, SHUT_RDWR);
 		shutdown(connection_fd, SHUT_RDWR);
 	    	return(process_data(attack_string, total_bytes, server_string, total_from_server, dport, attack));

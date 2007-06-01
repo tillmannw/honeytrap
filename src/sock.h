@@ -1,5 +1,5 @@
-/* udp.h
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+/* sock.h
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -10,20 +10,10 @@
  * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef __HONEYTRAP_UDP_H
-#define __HONEYTRAP_UDP_H 1
+#ifndef __HONEYTRAP_SOCK_H
+#define __HONEYTRAP_SOCK_H 1
 
 
-/* udp header */
-struct udp_header{
-	uint16_t	uh_sport;	/* udp source port */
-	uint16_t	uh_dport;	/* udp dest port */
-	uint16_t	uh_len;		/* datagram length */
-	uint16_t	uh_sum;		/* udp checksum */
-};
-
-const struct udp_header *udp;
-
-int udpsock(struct sockaddr_in *server_addr, uint16_t port);
+int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type);
 
 #endif

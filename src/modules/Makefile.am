@@ -27,6 +27,10 @@ if BUILD_CPUEMU_PLUGIN
 lib_LTLIBRARIES += htm_cpuEmu.la
 endif
 
+if BUILD_CLAMAV_PLUGIN
+lib_LTLIBRARIES += htm_ClamAV.la
+endif
+
 htm_SaveFile_la_SOURCES = htm_SaveFile.c htm_SaveFile.h
 htm_SaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
 
@@ -55,6 +59,11 @@ endif
 if BUILD_CPUEMU_PLUGIN
 htm_cpuEmu_la_SOURCES = htm_cpuEmu.c htm_cpuEmu.h
 htm_cpuEmu_la_LDFLAGS = -module -no-undefined -avoid-version -lemu
+endif
+
+if BUILD_CLAMAV_PLUGIN
+htm_ClamAV_la = htm_ClamAV.c htm_ClamAV.h
+htm_ClamAV_la_LDFLAGS = -module -no-undefined -avoid-version
 endif
 
 install-exec-am:

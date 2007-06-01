@@ -13,12 +13,12 @@
 #include "honeytrap.h"
 #ifdef USE_IPQ_MON
 
+#include <arpa/inet.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <linux/netfilter.h>
 #include <libipq.h>
-#include <errno.h>
+#include <linux/netfilter.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "logging.h"
 #include "dynsrv.h"
@@ -58,8 +58,8 @@ int start_ipq_mon(void) {
 
 	logmsg(LOG_DEBUG, 1, "Creating ipq connection monitor.\n");
 	if ((h = ipq_create_handle(0, PF_INET)) == NULL) {
-		die(h);
 		logmsg(LOG_ERR, 1, "Error - Could not create IPQ handle.\n");
+		die(h);
 	}
 
 	if ((status = ipq_set_mode(h, IPQ_COPY_PACKET, BUFSIZE)) < 0) {
@@ -70,16 +70,17 @@ int start_ipq_mon(void) {
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via IPQ. ----\n");
 
 	for (;;) {
+logmsg(LOG_INFO, 1, "---> being in loop\n");
 		process	= 1;
 		if ((status = ipq_read(h, buf, BUFSIZE, 0)) < 0) {
 			logmsg(LOG_ERR, 1, "Error - Could not read queued packet.\n");
 			die(h);
 		}
+logmsg(LOG_INFO, 1, "---> got a packet.\n");
 		switch (ipq_message_type(buf)) {
 			case NLMSG_ERROR:
-				logmsg(LOG_ERR, 1, "IPQ Error: %s\n", strerror(ipq_get_msgerr(buf)));
-				ipq_destroy_handle(h);
-				clean_exit(EXIT_SUCCESS);
+				logmsg(LOG_WARN, 1, "IPQ Warning - ipq_read() returned status NLMSG_ERROR: %s\n", strerror(ipq_get_msgerr(buf)));
+				break;
 			case IPQM_PACKET:
 				packet	= ipq_get_packet(buf);
 				ip	= (struct ip_header*) packet->payload;
@@ -98,7 +99,7 @@ int start_ipq_mon(void) {
 					break;
 				}
 
-				/* Got a connection request, fork handler and pass it back to the kernel */
+				/* Got a connection request, start dynamic server and pass packet processing back to the kernel */
 				switch (port_mode) {
 				case PORTCONF_NONE:
 					logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n",
@@ -138,7 +139,8 @@ int start_ipq_mon(void) {
 				
 				if (process == 0) break;
 
-				logmsg(LOG_NOISY, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
+				logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
+					inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), dport, PROTO(ip->ip_p));
 				start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 				break;
 			default:

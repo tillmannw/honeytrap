@@ -136,7 +136,7 @@ int init_plugin(char *plugin_name) {
 		unload_at_err(new_plugin);
 		return(-1);
 	}
-	fprintf(stdout, "  Loading plugin %s v%s.\n", new_plugin->name, new_plugin->version);
+	fprintf(stdout, "  Loading plugin %s v%s\n", new_plugin->name, new_plugin->version);
 
 	DEBUG_FPRINTF(stdout, "  Initializing plugin %s.\n", new_plugin->name);
 	/* resolve module's unload function and add it to unload hook */
@@ -159,12 +159,11 @@ int init_plugin(char *plugin_name) {
 	if (((init_plugin = dlsym(new_plugin->handle, "plugin_init")) == NULL) && 
 	    ((plugin_error_str = (char *) dlerror()) != NULL)) {
 		/* handle error, the symbol wasn't found */
-		fprintf(stderr, "    Unable to resolve symbol 'plugin_init': %s\n", plugin_error_str);
+		fprintf(stderr, "\n    Unable to resolve symbol 'plugin_init': %s\n", plugin_error_str);
 		return(-1);
 	}
 	retval = -1;
 	init_plugin();
-	DEBUG_FPRINTF(stdout, "  Plugin %s successfully initialized.\n", new_plugin->name);
 
 	/* attach plugin to plugin_list */
 	if (!plugin_list) plugin_list = new_plugin;

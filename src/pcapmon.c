@@ -1,5 +1,5 @@
 /* pcapmon.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -13,13 +13,13 @@
 #include "honeytrap.h"
 #ifdef USE_PCAP_MON
 
+#include <arpa/inet.h>
 #include <errno.h>
-#include <stdlib.h>
+#include <netinet/in.h>
 #include <pcap.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include "pcapmon.h"
 
@@ -33,13 +33,15 @@
  #define ETHER_HDRLEN 14
 #endif
 
-#include "pcapmon.h"
-#include "logging.h"
-#include "dynsrv.h"
 #include "ctrl.h"
+#include "dynsrv.h"
+#include "logging.h"
+#include "readconf.h"
+#include "tcpip.h"
+#include "pcapmon.h"
 
 
-u_char *icmp_dissect(const u_char *packet) {
+u_char *icmp_dissect(const struct ip_header *packet) {
 	struct ip_header *ip, *icmp_data;
 	u_char *icmp;
 	u_int32_t len;
@@ -48,7 +50,7 @@ u_char *icmp_dissect(const u_char *packet) {
 	if (ip->ip_p != ICMP) return(NULL);
 
 	/* It's an ICMP message */
-	icmp = (u_char *) (packet + 4*ip->ip_hl);
+	icmp = (u_char *) packet + 4*ip->ip_hl;
 	if ((icmp[0] != 3) || (icmp[1] != 3)) return(NULL);
 
 	/* It's 'port unreachable', locate encapsulated IP packet */
@@ -56,7 +58,7 @@ u_char *icmp_dissect(const u_char *packet) {
 		logmsg(LOG_ERR, 1, "Error - ICMP message truncated.\n");
 		return(NULL);
 	}
-	icmp_data = (struct ip_header *) (packet + 4*ip->ip_hl + 8);
+	icmp_data = (struct ip_header *) ((u_char *) packet + 4*ip->ip_hl + 8);
 	if (icmp_data->ip_p != 17) return(NULL);
 	
 	/* It's a UDP port unreachable response */
@@ -65,65 +67,61 @@ u_char *icmp_dissect(const u_char *packet) {
 
 
 void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_char * packet) {
-	struct ip_header *ip_hdr;
-	struct udp_header *udp;
-	struct tcp_header *tcp;
-	u_char *ip;
-	uint16_t sport, dport;
-	u_int8_t port_mode;
+	uint16_t	sport, dport;
+	u_int8_t	port_mode;
 
 	sport		= 0;
 	dport		= 0;
 	port_mode	= PORTCONF_IGNORE;
 
-	ip = (u_char *)(packet + pcap_offset);
-	ip_hdr = (struct ip_header *)ip;
-	if (ip_hdr->ip_p == TCP) {
-		tcp		= (struct tcp_header*) (ip + (4 * ip_hdr->ip_hlen));
+	ip = (struct ip_header *) (packet + pcap_offset);
+	if (ip->ip_p == TCP) {
+		tcp		= (struct tcp_header *) ((u_char *) ip + (4 * ip->ip_hlen));
 		sport		= ntohs(tcp->th_sport);
 		dport		= ntohs(tcp->th_dport);
 		port_mode	= port_flags_tcp[dport] ? port_flags_tcp[dport]->mode : 0;
-	} else if (ip_hdr->ip_p == ICMP) {
-		if ((ip = icmp_dissect(ip)) == NULL) return;
-		ip_hdr		= (struct ip_header *) ip;
-		udp		= (struct udp_header *) (ip + (4 * ip_hdr->ip_hlen));
+	} else if (ip->ip_p == ICMP) {
+		if ((ip = (struct ip_header *) icmp_dissect(ip)) == NULL) return;
+		udp		= (struct udp_header *) ((u_char *) ip + (4 * ip->ip_hlen));
 		sport		= ntohs(udp->uh_sport);
 		dport		= ntohs(udp->uh_dport);
 		port_mode	= port_flags_udp[dport] ? port_flags_udp[dport]->mode : 0;
 	} else {
-		logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip_hdr->ip_p);
+		logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip->ip_p);
 		return;
 	}
 
 	switch (port_mode) {
 	case PORTCONF_NONE:
-		logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n", sport, PROTO(ip_hdr->ip_p));
+		logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n", sport, PROTO(ip->ip_p));
 		break;
 	case PORTCONF_IGNORE:
-		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n", sport, PROTO(ip_hdr->ip_p));
+		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n", sport, PROTO(ip->ip_p));
 		return;
 	case PORTCONF_NORMAL:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in normal mode.\n",
-			sport, PROTO(ip_hdr->ip_p));
+			sport, PROTO(ip->ip_p));
 		break;
 	case PORTCONF_MIRROR:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in mirror mode.\n",
-			sport, PROTO(ip_hdr->ip_p));
+			sport, PROTO(ip->ip_p));
 		break;
 	case PORTCONF_PROXY:
-		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in proxy mode\n", sport, PROTO(ip_hdr->ip_p));
+		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in proxy mode\n", sport, PROTO(ip->ip_p));
 		break;
 	default:
-		logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n", sport, PROTO(ip_hdr->ip_p));
+		logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n", sport, PROTO(ip->ip_p));
 		return;
 	}
 
-	if (ip_hdr->ip_p == UDP) {
-		logmsg(LOG_NOISY, 1, "Connection request on port %d/udp.\n", dport);
-		start_dynamic_server(ip_hdr->ip_src, htons(sport), ip_hdr->ip_dst, htons(dport), ip_hdr->ip_p);
-	} else if (ip_hdr->ip_p == TCP) {
-		logmsg(LOG_NOISY, 1, "Connection request on port %d/tcp.\n", sport);
-		start_dynamic_server(ip_hdr->ip_dst, htons(dport), ip_hdr->ip_src, htons(sport), ip_hdr->ip_p);
+	if (ip->ip_p == UDP) {
+		logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
+			inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), dport, PROTO(ip->ip_p));
+		start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
+	} else if (ip->ip_p == TCP) {
+		logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
+			inet_ntoa(ip->ip_dst), dport, PROTO(ip->ip_p), sport, PROTO(ip->ip_p));
+		start_dynamic_server(ip->ip_dst, htons(dport), ip->ip_src, htons(sport), ip->ip_p);
 	}
 	return;
 }

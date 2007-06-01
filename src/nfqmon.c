@@ -13,9 +13,9 @@
 #include "honeytrap.h"
 #ifdef USE_NFQ_MON
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
 
 #include "logging.h"
@@ -43,16 +43,21 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 	struct nfqnl_msg_packet_hdr *ph;
 
 	ret		= -1;
-	id		= 0;
 	sport		= 0;
 	dport		= 0;
+	id		= 0;
 	port_mode	= PORTCONF_IGNORE;
 	ip		= NULL;
 	udp		= NULL;
 	tcp		= NULL;
 
 
-	if ((ph = nfq_get_msg_packet_hdr(nfa)) > 0) id = ntohl(ph->packet_id);
+	if ((ph = nfq_get_msg_packet_hdr(nfa)) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to get packet header from queued packet.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	id = ntohl(ph->packet_id);
 
 	if ((ret = nfq_get_payload(nfa, &payload)) >= 0) {
 		ip = (struct ip_header*) payload;
@@ -111,7 +116,8 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		return(0);
 	}
 
-	logmsg(LOG_NOISY, 1, "Connection request on port %d/%s.\n", dport, PROTO(ip->ip_p));
+	logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
+		inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), dport, PROTO(ip->ip_p));
 	start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 	
 	return(1);
@@ -143,7 +149,7 @@ int start_nfq_mon(void) {
 	}
 
 	if (nfq_bind_pf(h, AF_INET) < 0) {
-		logmsg(LOG_ERR, 1, "Error - Could not unbind existing NFQ handle: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Could not bind existing NFQ handle: %s\n", strerror(errno));
 		clean_exit(EXIT_FAILURE);
 	}
 

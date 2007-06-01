@@ -45,7 +45,8 @@ u_char log_level;
 
 #define DEBUG_FPRINTF	if (log_level == LOG_DEBUG) fprintf
 
-int logfile_fd;
+int	logfile_fd;
+char	portstr[16];
 
 void logmsg(int level, int add_time, const char * format, ...) __attribute__ ((format (printf, 3, 4)));
 

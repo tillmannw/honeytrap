@@ -1,5 +1,6 @@
 Version 1.0.0
 - New configuration concept with hierarchically organized file format
+- New plugin: libclamav-based virus scanner module
 - New plugin: PostgreSQL module for commits into mwcollect database
 - New plugin: Saving attack data in files is performed by a module now
 - New plugin: x86 CPU emulation module for generic shellcode analysis

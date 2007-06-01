@@ -204,6 +204,7 @@ fi
 
 AC_ARG_WITH(pcap-mon,
 	[  --with-pcap-mon          Use libpcap to catch connection requests])
+AM_CONDITIONAL(PCAP_MON, test x$with_pcap_mon = xyes)
 if test "$with_pcap_mon" = "yes"; then
   AC_ARG_WITH(libpcap_includes,
     [  --with-libpcap-includes=DIR  libpcap include directory],
@@ -238,6 +239,7 @@ fi
 
 AC_ARG_WITH(ipq-mon,
 	[  --with-ipq-mon          Use libipq to catch connection requests])
+AM_CONDITIONAL(IPQ_MON, test x$with_ipq_mon = xyes)
 if test "$with_ipq_mon" = "yes"; then
   AC_ARG_WITH(libipq_includes,
     [  --with-libipq-includes=DIR  libipq include directory],
@@ -272,6 +274,7 @@ fi
 
 AC_ARG_WITH(nfq-mon,
 	[  --with-nfq-mon           Use nfqueue to catch connection requests])
+AM_CONDITIONAL(NFQ_MON, test x$with_nfq_mon = xyes)
 if test "$with_nfq_mon" = "yes"; then
   AC_ARG_WITH(libnetfilter_queue_includes,
     [  --with-libnetfilter_queue-includes=DIR  libnetfilter_queue include directory],
@@ -305,6 +308,7 @@ fi
 
 AC_ARG_WITH(ipfw-mon,
 	[  --with-ipfw-mon          Use ipfw to catch connection requests])
+AM_CONDITIONAL(IPFW_MON, test x$with_ipfw_mon = xyes)
 if test "$with_ipfw_mon" = "yes"; then
   echo "ipfw connection monitor is currently not supported."
   exit 1
@@ -314,6 +318,41 @@ fi
 
 
 #----------------------- optional plugins ---------------------------
+
+AC_ARG_WITH(clamav,
+	[  --with-clamav            Scan downloaded samples with ClamAV antivirus engine])
+AM_CONDITIONAL(BUILD_CLAMAV_PLUGIN, test x$with_clamav = xyes)
+if test "$with_clamav" = "yes"; then
+  AC_ARG_WITH(libclamav_includes,
+    [  --with-libclamav-includes=DIR  libclamav include directory],
+    [with_libclamav_includes="$withval"],[with_libclamav_includes=no])
+
+  AC_ARG_WITH(libclamav_libraries,
+    [  --with-libclamav-libraries=DIR  libclamav library directory],
+    [with_libclamav_libraries="$withval"],[with_libclamav_libraries=no])
+
+  if test "$with_libclamav_includes" != "no"; then
+    CPPFLAGS="${CPPFLAGS} -I${with_libclamav_includes}"
+  fi
+  AC_CHECK_HEADER(clamav.h,,[AC_ERROR(clamav.h not found.)])
+
+  if test "$with_libemu_libraries" != "no"; then
+    LDFLAGS="${LDFLAGS}  -L${with_libclamav_libraries}"
+  fi
+  LCLAMAV="yes"
+  AC_CHECK_LIB(clamav, cl_load,, LCLAMAV="no")
+
+  if test "$LCLAMAV" = "no"; then
+    echo
+    echo "   ERROR!  Libclamav library/headers not found. Install it or use the"
+    echo "   --with-libclamav-* options, if you have it installed in unusual place."
+    echo
+    exit
+  fi
+else
+  with_clamav="no"
+fi
+
 
 AC_ARG_WITH(cpuemu,
 	[  --with-cpuemu            Perform shellcode analysis in x86 CPU emulation])
@@ -485,3 +524,4 @@ echo "Optional plugins"
 echo "  PostgeSQL:                        $with_postgres"
 echo "  SpamSum:                          $with_spamsum"
 echo "  cpuEmu:                           $with_cpuemu"
+echo "  ClamAV:                           $with_clamav"

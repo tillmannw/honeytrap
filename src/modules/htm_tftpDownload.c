@@ -1,5 +1,5 @@
 /* htm_tftpDownload.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -31,7 +31,7 @@
 #include <plughook.h>
 #include <util.h>
 #include <md5.h>
-#include <ip.h>
+#include <tcpip.h>
 
 #include "htm_tftpDownload.h"
 

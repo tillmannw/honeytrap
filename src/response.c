@@ -19,19 +19,19 @@
  * and avoid compile-time configuration.
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <sys/stat.h>
 #include <dirent.h>
+#include <errno.h>
 #include <fnmatch.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
-#include "response.h"
 #include "honeytrap.h"
-#include "ip.h"
+#include "tcpip.h"
 #include "logging.h"
+#include "response.h"
 
 
 void unload_default_responses(void) {
@@ -153,7 +153,7 @@ int send_default_response(int connection_fd, uint16_t port, uint16_t proto, u_ch
 		return(-1);
 	}
 
-	logmsg(LOG_DEBUG, 1, "Searching for default response for port %u/%s.\n", port, PROTO(proto));
+	logmsg(LOG_DEBUG, 1, "Searching for default response for port %s.\n", portstr);
 	
 	/* advance through list to find response for port */
 	cur_response = default_response;
@@ -162,12 +162,12 @@ int send_default_response(int connection_fd, uint16_t port, uint16_t proto, u_ch
 	
 	if (cur_response && (cur_response->port == port) && (cur_response->proto == proto)) {
 		/* default response for port found */
-		logmsg(LOG_NOISY, 1, "   %u\t  No data for %u second(s), sending default response.\n",
-			port, (u_char) timeout);
+		logmsg(LOG_NOISY, 1, "   %s  No data for %u second(s), sending default response.\n",
+			portstr, (u_char) timeout);
 
 		if (!(write(connection_fd, cur_response->response, cur_response->size))) return(-1);
 	} else {
-		logmsg(LOG_NOISY, 1, "   %u\t  No data for %d second(s), sending '\\n'.\n", port, timeout);
+		logmsg(LOG_NOISY, 1, "   %s  No data for %d second(s), sending '\\n'.\n", portstr, timeout);
 		if (!(write(connection_fd, "\n", 1))) return(-1);
 	}
 	return(0);
