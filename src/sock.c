@@ -32,7 +32,8 @@
 
 
 /* returns a bound socket matching a connection request *
- * sets verdict on request packet if ipq or nfq was used */
+ * sets verdict on request packet if ipq or nfq was used and the port is already bound *
+ * in the latter case, -1 is returned */
 int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 	int fd, sockopt;
 #ifdef USE_IPQ_MON
@@ -41,12 +42,12 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 
 	if ((type != SOCK_DGRAM) && (type != SOCK_STREAM)) {
 	    logmsg(LOG_ERR, 1, "Error - Socket type %d not supported.\n", type);
-	    return(-1);
+	    exit(EXIT_FAILURE);
 	}
 
 	if (!(fd = socket(AF_INET, type, 0))) {
 	    logmsg(LOG_ERR, 1, "Error - Could not create socket: %s\n", strerror(errno));
-	    return(-1);
+	    exit(EXIT_FAILURE);
 	}
 
 	sockopt = 1;
@@ -59,7 +60,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 	server_addr->sin_port		= port;
 	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) < 0) {
 	    /* we already got one server process */
-	    logmsg(LOG_DEBUG, 1, "Unable to bind port %s: %s.\n", portstr, strerror(errno));
+	    logmsg(LOG_DEBUG, 1, "Unable to bind to port %s: %s.\n", portstr, strerror(errno));
 #ifdef USE_IPQ_MON
 	    /* hand packet processing back to the kernel */
 	    if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
@@ -81,14 +82,15 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 		exit(EXIT_FAILURE);
 	    }
 	    logmsg(LOG_DEBUG, 1, "NFQ - Successfully set verdict on packet.\n");
+
+	    /* a dynamic server is already present */
+	    close(fd);
 	    return(-1);
 #else
 	    /* if bind() did not fail for 'port already in use' but for some other reason,
-	       we're in troubles and want a verbose error message */
+	     *  we're in troubles and want a verbose error message */
 	    if (errno != 98) logmsg(LOG_NOISY, 1, "Warning - Could not bind to port %s: %s.\n", portstr, strerror(errno));
-
-	    close(fd);
-	    return(-1);
+	    exit(EXIT_FAILURE);
 #endif
 #endif
 	}

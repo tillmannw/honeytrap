@@ -181,6 +181,7 @@ void unload_plugins(void) {
 	Plugin *cur_plugin;
 	
 	/* call unload functions from plugins */
+	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'unload_plugins'.\n");
 	plughook_unload_plugins();
 	
 	/* unload plugin and free mem for filename and plugin 

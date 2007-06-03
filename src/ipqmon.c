@@ -70,13 +70,11 @@ int start_ipq_mon(void) {
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via IPQ. ----\n");
 
 	for (;;) {
-logmsg(LOG_INFO, 1, "---> being in loop\n");
 		process	= 1;
 		if ((status = ipq_read(h, buf, BUFSIZE, 0)) < 0) {
 			logmsg(LOG_ERR, 1, "Error - Could not read queued packet.\n");
 			die(h);
 		}
-logmsg(LOG_INFO, 1, "---> got a packet.\n");
 		switch (ipq_message_type(buf)) {
 			case NLMSG_ERROR:
 				logmsg(LOG_WARN, 1, "IPQ Warning - ipq_read() returned status NLMSG_ERROR: %s\n", strerror(ipq_get_msgerr(buf)));

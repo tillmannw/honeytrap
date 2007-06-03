@@ -79,7 +79,7 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 		tcp		= (struct tcp_header *) ((u_char *) ip + (4 * ip->ip_hlen));
 		sport		= ntohs(tcp->th_sport);
 		dport		= ntohs(tcp->th_dport);
-		port_mode	= port_flags_tcp[dport] ? port_flags_tcp[dport]->mode : 0;
+		port_mode	= port_flags_tcp[sport] ? port_flags_tcp[sport]->mode : 0;
 	} else if (ip->ip_p == ICMP) {
 		if ((ip = (struct ip_header *) icmp_dissect(ip)) == NULL) return;
 		udp		= (struct udp_header *) ((u_char *) ip + (4 * ip->ip_hlen));
@@ -228,7 +228,7 @@ int start_pcap_mon(void) {
 		}
 		pcap_freecode(&filter);
 
-		logmsg(LOG_NOTICE, 1, "---- Trapping attacks on %s. ----\n", dev);
+		logmsg(LOG_NOTICE, 1, "---- Trapping attacks on %s via PCAP. ----\n", dev);
 
 		pcap_loop(packet_sniffer, -1, (void *) server_wrapper, NULL);
 

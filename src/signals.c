@@ -53,7 +53,7 @@ void handle_signal(int sig) {
 				if (kill(0-getpgrp(), SIGINT) == 0) {
 					logmsg(LOG_DEBUG, 1, "SIGINT was successfully sent to process group.\n");
 					/* wait for children */
-					while ((pid = wait(0)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
+					while ((pid = waitpid(-1, 0, WNOHANG)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
 				} else {
 					logmsg(LOG_ERR, 1, "Error sending SIGINT to process group.\n");
 					clean_exit(EXIT_FAILURE);
@@ -77,7 +77,7 @@ void handle_signal(int sig) {
 				if (kill(0-getpgrp(), SIGTERM) == 0) {
 					logmsg(LOG_DEBUG, 1, "SIGTERM was successfully sent to process group.\n");
 					/* wait for children */
-					while ((pid = wait(0)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
+					while ((pid = waitpid(-1, 0, WNOHANG)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
 				} else {
 					logmsg(LOG_ERR, 1, "Error sending SIGTERM to process group.\n");
 					clean_exit(EXIT_FAILURE);

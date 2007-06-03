@@ -26,7 +26,8 @@ AC_ARG_ENABLE(debug,
                   else
                     CFLAGS="$CFLAGS -DDEBUG"
                   fi      
-                ], enable_debug="no")
+		  enable_debug="X"
+                ], enable_debug=" ")
 
 AC_ARG_ENABLE(profile,
 [  --enable-profile        enable profiling options (developers only)],
@@ -35,7 +36,8 @@ AC_ARG_ENABLE(profile,
           else
             CFLAGS="$CFLAGS -DPROFILE"
           fi
-        ], enable_profile="no")
+	  enable_profile="X"
+        ], enable_profile=" ")
 
 #AC_CANONICAL_HOST
 linux=no
@@ -206,6 +208,7 @@ AC_ARG_WITH(pcap-mon,
 	[  --with-pcap-mon          Use libpcap to catch connection requests])
 AM_CONDITIONAL(PCAP_MON, test x$with_pcap_mon = xyes)
 if test "$with_pcap_mon" = "yes"; then
+  with_pcap_mon="X"
   AC_ARG_WITH(libpcap_includes,
     [  --with-libpcap-includes=DIR  libpcap include directory],
     [with_libpcap_includes="$withval"],[with_libpcap_includes=no])
@@ -234,13 +237,14 @@ if test "$with_pcap_mon" = "yes"; then
   fi
 
   AC_DEFINE([USE_PCAP_MON], [], [Define if pcap connection monitor is used])
-else with_pcap_mon="no"
+else with_pcap_mon=" "
 fi
 
 AC_ARG_WITH(ipq-mon,
 	[  --with-ipq-mon          Use libipq to catch connection requests])
 AM_CONDITIONAL(IPQ_MON, test x$with_ipq_mon = xyes)
 if test "$with_ipq_mon" = "yes"; then
+  with_ipq_mon="X"
   AC_ARG_WITH(libipq_includes,
     [  --with-libipq-includes=DIR  libipq include directory],
     [with_libipq_includes="$withval"],[with_libipq_includes=no])
@@ -269,13 +273,14 @@ if test "$with_ipq_mon" = "yes"; then
   fi
 
   AC_DEFINE([USE_IPQ_MON], [], [Define if ip_queue connection monitor is used])
-else with_ipq_mon="no"
+else with_ipq_mon=" "
 fi
 
 AC_ARG_WITH(nfq-mon,
 	[  --with-nfq-mon           Use nfqueue to catch connection requests])
 AM_CONDITIONAL(NFQ_MON, test x$with_nfq_mon = xyes)
 if test "$with_nfq_mon" = "yes"; then
+  with_nfq_mon="X"
   AC_ARG_WITH(libnetfilter_queue_includes,
     [  --with-libnetfilter_queue-includes=DIR  libnetfilter_queue include directory],
     [with_libnetfilter_queue_includes="$withval"],[with_libnetfilter_queue_includes=no])
@@ -303,17 +308,18 @@ if test "$with_nfq_mon" = "yes"; then
     exit
   fi
   AC_DEFINE([USE_NFQ_MON], [], [Define if netfilter_queue connection monitor is used])
-else with_nfq_mon="no"
+else with_nfq_mon=" "
 fi
 
 AC_ARG_WITH(ipfw-mon,
 	[  --with-ipfw-mon          Use ipfw to catch connection requests])
 AM_CONDITIONAL(IPFW_MON, test x$with_ipfw_mon = xyes)
 if test "$with_ipfw_mon" = "yes"; then
+  with_ipfw_mon="X"
   echo "ipfw connection monitor is currently not supported."
   exit 1
   AC_DEFINE([USE_IPFW_MON], [], [Define if ipfw connection monitor is used])
-else with_ipfw_mon="no"
+else with_ipfw_mon=" "
 fi
 
 
@@ -323,6 +329,7 @@ AC_ARG_WITH(clamav,
 	[  --with-clamav            Scan downloaded samples with ClamAV antivirus engine])
 AM_CONDITIONAL(BUILD_CLAMAV_PLUGIN, test x$with_clamav = xyes)
 if test "$with_clamav" = "yes"; then
+  with_clamav="X"
   AC_ARG_WITH(libclamav_includes,
     [  --with-libclamav-includes=DIR  libclamav include directory],
     [with_libclamav_includes="$withval"],[with_libclamav_includes=no])
@@ -336,7 +343,7 @@ if test "$with_clamav" = "yes"; then
   fi
   AC_CHECK_HEADER(clamav.h,,[AC_ERROR(clamav.h not found.)])
 
-  if test "$with_libemu_libraries" != "no"; then
+  if test "$with_libclamav_libraries" != "no"; then
     LDFLAGS="${LDFLAGS}  -L${with_libclamav_libraries}"
   fi
   LCLAMAV="yes"
@@ -350,7 +357,7 @@ if test "$with_clamav" = "yes"; then
     exit
   fi
 else
-  with_clamav="no"
+  with_clamav=" "
 fi
 
 
@@ -358,6 +365,7 @@ AC_ARG_WITH(cpuemu,
 	[  --with-cpuemu            Perform shellcode analysis in x86 CPU emulation])
 AM_CONDITIONAL(BUILD_CPUEMU_PLUGIN, test x$with_cpuemu = xyes)
 if test "$with_cpuemu" = "yes"; then
+  with_cpuemu="X"
   AC_ARG_WITH(libemu_includes,
     [  --with-libemu-includes=DIR  libemu include directory],
     [with_libemu_includes="$withval"],[with_libemu_includes=no])
@@ -386,7 +394,7 @@ if test "$with_cpuemu" = "yes"; then
   fi
 
 else
-  with_cpuemu="no"
+  with_cpuemu=" "
 fi
 
 
@@ -394,8 +402,10 @@ fi
 AC_ARG_WITH(spamsum,
 	[  --with-spamsum           Perform SpamSum similarity analysis for recorded attacks])
 AM_CONDITIONAL(BUILD_SPAMSUM_PLUGIN, test x$with_spamsum = xyes)
-if test "$with_spamsum" != "yes"; then
-	with_spamsum="no"
+if test "$with_spamsum" = "yes"; then
+	with_spamsum="X"
+else
+	with_spamsum=" "
 fi
 
 
@@ -404,6 +414,7 @@ AC_ARG_WITH(postgres,
 	[  --with-postgres          Store attack data in PostgreSQL database])
 AM_CONDITIONAL(BUILD_POSTGRES_PLUGIN, test x$with_postgres = xyes)
 if test "$with_postgres" = "yes"; then
+  with_postgres="X"
   AC_ARG_WITH(libpq_includes,
     [  --with-libpq-includes=DIR  libpq include directory],
     [with_libpq_includes="$withval"],[with_libpq_includes=no])
@@ -432,7 +443,7 @@ if test "$with_postgres" = "yes"; then
   fi
 
   AC_DEFINE([USE_POSTGRES_DB], [], [Define to store attacks in PostgreSQL database])
-else with_postgres="no"
+else with_postgres=" "
 fi
 
 #-------------------------------------------------------------
@@ -478,8 +489,9 @@ AC_ARG_WITH(efence,
 	[  --with-efence           link with electric fence ])
 	if test "$with_efence" = "yes"
 	then
+		with_efence="X"
 		AC_CHECK_LIB(efence, EF_ALIGNMENT, LIBS="${LIBS} -lefence", AC_MSG_ERROR(libefence not found))
-	else with_efence="no"
+	else with_efence=" "
 	fi
 
 
@@ -510,18 +522,19 @@ AC_OUTPUT
 
 echo
 echo "--- honeytrap configuration ---"
-echo "Debugging options:                  $enable_debug"
-echo "Profiling options:                  $enable_profile"
-echo "Electric Fence:                     $with_efence"
+echo "General options"
+echo -e "  \x5b$enable_debug]  Debugging"
+echo -e "  \x5b$enable_profiling]  Profiling"
+echo -e "  \x5b$with_efence]  Electric Fence"
 echo
 echo "Connection monitor"
-echo "  Linux ip_queue (ipq):             $with_ipq_mon"
-echo "  Linux libnetfilter_queue (nfq):   $with_nfq_mon"
-echo "  FreeBSD ipfw (ipfw):              $with_ipfw_mon"
-echo "  Libpcap (pcap):                   $with_pcap_mon"
+echo -e "  \x5b$with_ipq_mon]  Linux ip_queue (ipq)"
+echo -e "  \x5b$with_ipfw_mon]  FreeBSD ipfw (ipfw)"
+echo -e "  \x5b$with_nfq_mon]  Linux libnetfilter_queue (nfq)"
+echo -e "  \x5b$with_pcap_mon]  Libpcap (pcap)"
 echo
 echo "Optional plugins"
-echo "  PostgeSQL:                        $with_postgres"
-echo "  SpamSum:                          $with_spamsum"
-echo "  cpuEmu:                           $with_cpuemu"
-echo "  ClamAV:                           $with_clamav"
+echo -e "  \x5b$with_clamav]  ClamAV"
+echo -e "  \x5b$with_cpuemu]  cpuEmu"
+echo -e "  \x5b$with_postgres]  PostgeSQL"
+echo -e "  \x5b$with_spamsum]  SpamSum"

@@ -135,13 +135,6 @@ PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plug
 void plughook_process_attack(PlugFuncList *func_list, Attack *attack) {
 	PlugFuncList *func_tmp = NULL;
 
-	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'process_attack'.\n");
-
-	if (func_list == NULL) {
-		logmsg(LOG_DEBUG, 1, "No plugins registered for hook 'process_attack'.\n");
-		return;
-	}
-
 	func_tmp = func_list;
 	while(func_tmp) {
 		if (func_tmp->func) {
@@ -183,8 +176,6 @@ PlugFuncList *add_unload_func_to_list(const char *plugname, const char *funcname
 
 void plughook_unload_plugins(void) {
 	PlugFuncList *func_del, *func_tmp = NULL;
-
-	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'unload_plugins'.\n");
 
 	func_tmp = funclist_unload_plugins;
 	while(func_tmp) {
