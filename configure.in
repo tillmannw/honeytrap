@@ -410,6 +410,54 @@ fi
 
 
 
+AC_ARG_WITH(submit-mwserv,
+	[  --with-submit-mwserv     Submit malware samples to a central server])
+AM_CONDITIONAL(BUILD_SUBMIT_MWSERV_PLUGIN, test x$with_submit_mwserv = xyes)
+if test "$with_submit_mwserv" = "yes"; then
+	with_submit_mwserv="X"
+
+	AC_CHECK_FUNC(gethostbyname, , AC_CHECK_LIB(nsl, gethostbyname))
+	AC_CHECK_FUNC(connect, , AC_CHECK_LIB(socket, connect))
+
+	AC_ARG_WITH(libcurl_includes,
+	[  --with-libcurl-includes=DIR  libcurl include directory],
+	[with_libcurl_includes="$withval"],[with_libcurl_includes=no])
+
+	AC_ARG_WITH(libcurl_libraries,
+	[  --with-libcurl-libraries=DIR  libcurl library directory],
+	[with_libcurl_libraries="$withval"],[with_libcurl_libraries=no])
+
+	if test "$with_libcurl_includes" != "no"; then
+		CPPFLAGS="${CPPFLAGS} -I${with_libcurl_includes}"
+	fi
+	AC_CHECK_HEADER(curl.h,,[AC_ERROR(curl.h not found.)])
+
+	AC_CHECK_LIB(curl, curl_version, LCURL="yes", LCURL="no")
+	if test "$LCURL" = "no"; then
+		echo
+		echo "   ERROR!  Libcurl library/headers not found. Install it or use the"
+		echo "   --with-libcurl-* options, if you have it installed in unusual place."
+		echo
+		exit
+	fi
+	if test "x$libcurl" = xno ; then
+		AC_MSG_CHECKING([checking for curl with SSL])
+		LIBS="$LIBS -lcurl -L/usr/local/ssl/lib -lssl -lcrypto"
+		AC_TRY_LINK([#include <curl/curl.h>], [curl_version();], libcurl=yes,
+		libcurl=no)
+		if test "x$libcurl" = xno ; then
+			AC_MSG_RESULT(no)
+			AC_MSG_ERROR([libcurl required. Go to http://curl.haxx.se/ to download and then install it first])
+		else
+			AC_MSG_RESULT(yes)
+		fi
+	fi 
+else
+	with_submit_mwserv=" "
+fi
+
+
+
 AC_ARG_WITH(postgres,
 	[  --with-postgres          Store attack data in PostgreSQL database])
 AM_CONDITIONAL(BUILD_POSTGRES_PLUGIN, test x$with_postgres = xyes)
@@ -504,12 +552,14 @@ INCLUDES='-I$(top_srcdir) -I$(top_srcdir)/src'
 
 AC_SUBST(INCLUDES)
 
-if test $with_ipq_mon != "yes" -a $with_nfq_mon != "yes" -a $with_ipfw_mon != "yes" -a $with_pcap_mon != "yes"; then
+if test ! $with_ipq_mon -a ! $with_nfq_mon -a ! $with_ipfw_mon -a ! $with_pcap_mon; then
   echo
   echo "   ERROR! No connection monitor selected. Please reconfigure with --with-pcap-mon, --with-nfq-mon  or --with-ipq-mon."
   echo
   exit 1
 fi
+
+echo $with_ipq_mon, $sith_nfq_mon, $with_ipfw_mon, $with_pcap_mon
 
 
 AC_PROG_INSTALL
@@ -523,18 +573,19 @@ AC_OUTPUT
 echo
 echo "--- honeytrap configuration ---"
 echo "General options"
-echo -e "  \x5b$enable_debug]  Debugging"
-echo -e "  \x5b$enable_profiling]  Profiling"
-echo -e "  \x5b$with_efence]  Electric Fence"
+echo -e "  ($enable_debug)  Debugging"
+echo -e "  ($enable_profile)  Profiling"
+echo -e "  ($with_efence)  Electric Fence"
 echo
 echo "Connection monitor"
-echo -e "  \x5b$with_ipq_mon]  Linux ip_queue (ipq)"
-echo -e "  \x5b$with_ipfw_mon]  FreeBSD ipfw (ipfw)"
-echo -e "  \x5b$with_nfq_mon]  Linux libnetfilter_queue (nfq)"
-echo -e "  \x5b$with_pcap_mon]  Libpcap (pcap)"
+echo -e "  ($with_ipq_mon)  Linux ip_queue (ipq)"
+echo -e "  ($with_ipfw_mon)  FreeBSD ipfw (ipfw)"
+echo -e "  ($with_nfq_mon)  Linux libnetfilter_queue (nfq)"
+echo -e "  ($with_pcap_mon)  Libpcap (pcap)"
 echo
 echo "Optional plugins"
-echo -e "  \x5b$with_clamav]  ClamAV"
-echo -e "  \x5b$with_cpuemu]  cpuEmu"
-echo -e "  \x5b$with_postgres]  PostgeSQL"
-echo -e "  \x5b$with_spamsum]  SpamSum"
+echo -e "  ($with_clamav)  ClamAV"
+echo -e "  ($with_cpuemu)  cpuEmu"
+echo -e "  ($with_postgres)  PostgeSQL"
+echo -e "  ($with_spamsum)  SpamSum"
+echo -e "  ($with_submit_mwserv)  submitMwserv"

@@ -27,7 +27,7 @@
 
 #include "htm_vncDownload.h"
 
-const char module_name[]="htm_vncDownload";
+const char module_name[]="vncDownload";
 const char module_version[]="0.3";
 
 

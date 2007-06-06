@@ -73,6 +73,11 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 			port_mode	= port_flags_udp[dport] ? port_flags_udp[dport]->mode : 0;
 		} else {
 			logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip->ip_p);
+			if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
+				logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+				nfq_destroy_queue(qh);
+				exit(EXIT_FAILURE);
+			}
 			return(-1);
 		}
 	}

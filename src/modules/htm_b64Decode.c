@@ -33,7 +33,7 @@
 
 #include "htm_b64Decode.h"
 
-const char module_name[]="htm_b64Decode";
+const char module_name[]="b64Decode";
 const char module_version[]="0.3.1";
 
 

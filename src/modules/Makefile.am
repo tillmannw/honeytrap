@@ -31,6 +31,10 @@ if BUILD_CLAMAV_PLUGIN
 lib_LTLIBRARIES += htm_ClamAV.la
 endif
 
+if BUILD_SUBMIT_MWSERV_PLUGIN
+lib_LTLIBRARIES += htm_submitMwserv.la
+endif
+
 htm_SaveFile_la_SOURCES = htm_SaveFile.c htm_SaveFile.h
 htm_SaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
 
@@ -64,6 +68,11 @@ endif
 if BUILD_CLAMAV_PLUGIN
 htm_ClamAV_la = htm_ClamAV.c htm_ClamAV.h
 htm_ClamAV_la_LDFLAGS = -module -no-undefined -avoid-version
+endif
+
+if BUILD_SUBMIT_MWSERV_PLUGIN
+htm_submitMwserv_la = htm_submitMwserv.c htm_submitMwserv.h
+htm_submitMwserv_la_LDFLAGS = -module -no-undefined -avoid-version
 endif
 
 install-exec-am:

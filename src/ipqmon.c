@@ -33,11 +33,6 @@
  * no data on the SYNs */
 #define BUFSIZE 1500
 
-static void die(struct ipq_handle *h) {
-	logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
-	ipq_destroy_handle(h);
-	clean_exit(EXIT_SUCCESS);
-}
 
 int start_ipq_mon(void) {
 	int status, process;
@@ -58,13 +53,14 @@ int start_ipq_mon(void) {
 
 	logmsg(LOG_DEBUG, 1, "Creating ipq connection monitor.\n");
 	if ((h = ipq_create_handle(0, PF_INET)) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Could not create IPQ handle.\n");
-		die(h);
+		logmsg(LOG_ERR, 1, "Error - Could not create IPQ handle: %s.\n", ipq_errstr());
+		clean_exit(EXIT_FAILURE);
 	}
 
 	if ((status = ipq_set_mode(h, IPQ_COPY_PACKET, BUFSIZE)) < 0) {
-		logmsg(LOG_ERR, 1, "Error - Could not set IPQ mode.\n");
-		die(h);
+		logmsg(LOG_ERR, 1, "Error - Could not set IPQ mode: %s.\n", ipq_errstr());
+		ipq_destroy_handle(h);
+		clean_exit(EXIT_FAILURE);
 	}
 
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via IPQ. ----\n");
@@ -72,8 +68,9 @@ int start_ipq_mon(void) {
 	for (;;) {
 		process	= 1;
 		if ((status = ipq_read(h, buf, BUFSIZE, 0)) < 0) {
-			logmsg(LOG_ERR, 1, "Error - Could not read queued packet.\n");
-			die(h);
+			logmsg(LOG_ERR, 1, "Error - Could not read queued packet: %s.\n", ipq_errstr());
+			ipq_destroy_handle(h);
+			clean_exit(EXIT_FAILURE);
 		}
 		switch (ipq_message_type(buf)) {
 			case NLMSG_ERROR:
@@ -94,6 +91,11 @@ int start_ipq_mon(void) {
 					port_mode	= port_flags_udp[dport] ? port_flags_udp[dport]->mode : 0;
 				} else {
 					logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip->ip_p);
+					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
+						ipq_destroy_handle(h);
+						clean_exit(EXIT_FAILURE);
+					}
 					break;
 				}
 
@@ -107,8 +109,9 @@ int start_ipq_mon(void) {
 					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n",
 						dport, PROTO(ip->ip_p));
 					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
-						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
-						die(h);
+						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
+						ipq_destroy_handle(h);
+						clean_exit(EXIT_FAILURE);
 					}
 					process = 0;
 					break;
@@ -128,8 +131,9 @@ int start_ipq_mon(void) {
 					logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n",
 						dport, PROTO(ip->ip_p));
 					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
-						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
-						die(h);
+						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
+						ipq_destroy_handle(h);
+						clean_exit(EXIT_FAILURE);
 					}
 					process = 0;
 					break;
