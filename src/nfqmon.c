@@ -150,6 +150,7 @@ int start_nfq_mon(void) {
 
 	if (nfq_unbind_pf(h, AF_INET) < 0) {
 		logmsg(LOG_ERR, 1, "Error - Could not unbind existing NFQ handle: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Do you have root privileges?\n");
 		clean_exit(EXIT_FAILURE);
 	}
 

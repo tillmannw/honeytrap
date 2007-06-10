@@ -37,13 +37,19 @@ int load_plugin(const char *dir, const char* plugname) {
 	plugin_list	= NULL;
 
 	if (strlen(plugname) > 265) {
-		logmsg(LOG_ERR, 1, "  Error - Plugin name exceeds maximum length of 256 charakters: %s\n", plugname);
+		fprintf(stderr, "  Error - Plugin name exceeds maximum length of 256 charakters: %s\n", plugname);
 		return(-1);
+	}
+
+	/* plugin directory must be configured */
+	if (!dir) {
+		fprintf(stderr, "  Error - Plugin directory not set while trying to load plugin %s.\n", plugname);
+		exit(EXIT_FAILURE);
 	}
 
 	if ((plugindir = opendir(dir)) == NULL) {
 		fprintf(stderr, "  Error - Unable to open plugin directory: %s.\n", strerror(errno));
-		return(-1);
+		exit(EXIT_FAILURE);
 	}
 	
 	DEBUG_FPRINTF(stdout, "  Looking for plugin %s in %s\n", plugname, dir);

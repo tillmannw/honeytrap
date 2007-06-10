@@ -1,5 +1,5 @@
-/* dynsrv.c
- * Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>
+/* attack.c
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -126,10 +126,10 @@ int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, co
 		return(-1);
 	}
 
-	if (((a->download[a->dl_count].dl_type = strdup(dl_type)) == NULL) ||
-	    ((a->download[a->dl_count].user = strdup(user)) == NULL) ||
-	    ((a->download[a->dl_count].pass = strdup(pass)) == NULL) ||
-	    ((a->download[a->dl_count].filename = strdup(filename)) == NULL) ||
+	if ((dl_type && ((a->download[a->dl_count].dl_type = strdup(dl_type)) == NULL)) ||
+	    (filename && ((a->download[a->dl_count].filename = strdup(filename)) == NULL)) ||
+	    (user && ((a->download[a->dl_count].user = strdup(user)) == NULL)) ||
+	    (pass && ((a->download[a->dl_count].pass = strdup(pass)) == NULL)) ||
 	    ((a->download[a->dl_count].dl_payload.data = (u_char *) malloc(size)) == NULL)) { 
 		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
 		free(a->download[a->dl_count].dl_type);

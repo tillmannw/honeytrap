@@ -38,23 +38,23 @@ int arg_c;
 
 // global variables regarding configuration
 
-char *pidfile_name;
-char *logfile_name;
-char *dev;
-char *response_dir;
-char *plugin_dir;
-int daemonize;
-int mirror_mode;
-int promisc_mode;
-uid_t u_id;
-gid_t g_id;
-uint32_t conn_timeout;
-uint32_t read_timeout;
-uint32_t m_read_timeout;
-uint32_t read_limit;
-
+char	*pidfile_name;
+char	*logfile_name;
+char	*dev;
+char	*response_dir;
+char	*plugin_dir;
+int	daemonize;
+int	promisc_mode;
+uid_t	u_id;
+gid_t	g_id;
+int32_t	conn_timeout;
+int32_t	read_timeout;
+int32_t	m_read_timeout;
+int32_t read_limit;
 
 /* explicit port configurations */
+u_char	portconf_default;
+
 typedef struct sport_flag {
 	u_int8_t tcp;
 	u_int8_t udp;

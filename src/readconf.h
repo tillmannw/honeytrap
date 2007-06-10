@@ -51,8 +51,8 @@ struct pconfmap {
 portcfg *port_flags_tcp[0xffff];	// explicit port configuration for each tcp port
 portcfg *port_flags_udp[0xffff];	// explicit port configuration for each udp port
 
-#define OPT_IS(A)	(strncmp(node->keyword, (A), strlen(node->keyword) > strlen(A) ?  strlen(node->keyword) : strlen(A)) == 0)
-#define OPT_SET(A, B)	{ free(B); B = value; DEBUG_FPRINTF(stdout, A, B); }
+#define OPT_IS(A)	(strcmp(node->keyword, (A)) == 0)
+#define OPT_SET(A, B)	{ free(B); B = value; if (B) DEBUG_FPRINTF(stdout, A, B); }
 
 
 typedef conf_node *(*process_confopt_fn)(conf_node *tree, conf_node *node, void *opt_data);

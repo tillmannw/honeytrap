@@ -153,7 +153,7 @@ conf_node *check_keyword(conf_node *tree, const char *keyword) {
 	}
 	while (cur_node) {
 		/* compare current node's keyword with prefix */
-		if (strncmp(cur_node->keyword, subkey, strlen(subkey)) == 0) {
+		if (strcmp(cur_node->keyword, subkey) == 0) {
 			if ((subkey = strsep(key, ".")) == NULL) return(cur_node);
 			cur_node = cur_node->first_leaf;
 		} else cur_node = cur_node->next;

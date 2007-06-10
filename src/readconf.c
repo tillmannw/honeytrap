@@ -46,6 +46,36 @@
   #define OPTSTRING	"vh?pDmL:P:C:l:r:u:g:t:"
 #endif
 
+/* allowed configuration keywords
+ * use dots separate hierarchy levels */
+static const char *config_keywords[] = {
+	"logfile",
+	"pidfile",
+	"response_dir",
+	"plugin_dir",
+	"read_limit",
+#ifdef USE_PCAP_MON
+	"promisc",
+#endif
+	"user",
+	"group",
+	"include",
+	"portconf_default",
+	"portconf",
+	"portconf.ignore.protocol",
+	"portconf.ignore.port",
+	"portconf.normal.protocol",
+	"portconf.normal.port",
+	"portconf.proxy",
+	"portconf.proxy.map.protocol",
+	"portconf.proxy.map.port",
+	"portconf.proxy.map.target_host",
+	"portconf.proxy.map.target_protocol",
+	"portconf.proxy.map.target_port",
+	"portconf.mirror.protocol",
+	"portconf.mirror.port"
+};
+
 /* global config tree */
 struct lcfg *confkeys_tree;
 
@@ -93,34 +123,6 @@ enum lcfg_status check_conffile(const char *key, void *data, size_t len, void *t
 }
 
 
-static const char *config_keywords[] = {
-	"logfile",
-	"pidfile",
-	"response_dir",
-	"plugin_dir",
-	"mirror",
-#ifdef USE_PCAP_MON
-	"promisc",
-#endif
-	"user",
-	"group",
-	"include",
-	"portconf",
-	"portconf.ignore.protocol",
-	"portconf.ignore.port",
-	"portconf.normal.protocol",
-	"portconf.normal.port",
-	"portconf.proxy",
-	"portconf.proxy.map.protocol",
-	"portconf.proxy.map.port",
-	"portconf.proxy.map.target_host",
-	"portconf.proxy.map.target_protocol",
-	"portconf.proxy.map.target_port",
-	"portconf.mirror.protocol",
-	"portconf.mirror.port"
-};
-
-
 int configure(int my_argc, char *my_argv[]) {
 #ifdef USE_PCAP_MON
 	char			*bpf_cmd_ext, errbuf[PCAP_ERRBUF_SIZE];
@@ -156,8 +158,6 @@ int configure(int my_argc, char *my_argv[]) {
 
 	/* initialization of plugin hooks */
 	init_plugin_hooks();
-
-
 	/* scan command line options to determine logging level or print version number or usage */
 	while((option = getopt(my_argc, my_argv, OPTSTRING)) > 0) {
 		switch(option) {
@@ -222,104 +222,99 @@ int configure(int my_argc, char *my_argv[]) {
 	}
 
 
-	if (first_init) {	
-		/* scan command line options to get logfile name */
-		optind = 1;
-		while((option = getopt(my_argc, my_argv, OPTSTRING)) > 0) {
-			switch(option) {
-				case 'L':
-					logfile_name = strdup(optarg);
-					DEBUG_FPRINTF(stdout, "  Logfile is %s.\n", logfile_name);
-					break;
-				default:
-					break;
-			}
+	/* scan command line options to get logfile name */
+	optind = 1;
+	while((option = getopt(my_argc, my_argv, OPTSTRING)) > 0) {
+		switch(option) {
+			case 'L':
+				logfile_name = strdup(optarg);
+				DEBUG_FPRINTF(stdout, "  Logfile is %s.\n", logfile_name);
+				break;
+			default:
+				break;
 		}
-
-
-		/* process remaining options now */
-		optind = 1;
-		while((option = getopt(my_argc, my_argv, OPTSTRING)) > 0) {
-			switch(option) {
-#ifdef USE_PCAP_MON
-				case 'i':
-					dev = strdup(optarg);
-					break;
-				case 'a':
-					if ((ip_cmd_opt = gethostbyname(optarg)) == NULL) {
-						perror("  Error - Invalid hostname or ip address\n");
-						exit(EXIT_FAILURE);
-					}
-					break;
-				case 'p':
-					promisc_mode = 1;
-					break;
-#endif
-				case 'm':
-					mirror_mode = 1;
-					break;
-				case 'l':
-					conn_timeout = strtoul(optarg, NULL, 0);
-					if((conn_timeout < 0) || (conn_timeout > 255)) {
-						fprintf(stderr,
-							"  Error - Listen timeout must be a value between 0 and 255.\n");
-						exit(EXIT_FAILURE);
-					}
-					break;
-				case 'r':
-					read_timeout = strtoul(optarg, NULL, 0);
-					if((read_timeout < 0) || (read_timeout > 255)) {
-						fprintf(stderr,
-							"  Error - Read timeout must be a value between 0 and 255.\n");
-						exit(EXIT_FAILURE);
-					}
-					break;
-				case 'u':
-					if ((pwd_entry = getpwnam(optarg)) == NULL) {
-						if (errno) fprintf(stderr, "  Invalid user: %s\n", strerror(errno));
-						else fprintf(stderr, "  User %s not found.\n", optarg);
-						exit(EXIT_FAILURE);
-					} else {
-						u_id = pwd_entry->pw_uid;
-						user = strdup(optarg);
-					}
-					break;
-				case 'g':
-					if ((grp_entry = getgrnam(optarg)) == NULL) {
-						if (errno) fprintf(stderr, "  Invalid group: %s\n", strerror(errno));
-						else fprintf(stderr, "  Group %s not found.\n", optarg);
-						exit(EXIT_FAILURE);
-					} else {
-						g_id = grp_entry->gr_gid;
-						group = strdup(optarg);
-					}
-					break;
-				case 'P':
-					/* pid file */
-					free(pidfile_name);
-					pidfile_name = strdup(optarg);
-					DEBUG_FPRINTF(stdout, "  Pid file is %s.\n", pidfile_name);
-					break;
-				case 'D':
-				case 'L':
-				case 't':
-				default:
-					break;
-			}
-		}
-
-#ifdef USE_PCAP_MON
-		/* get IPv4 address from interface */
-		if (dev == NULL) {
-			DEBUG_FPRINTF(stdout, "  No device given, trying to use default device.\n");
-			if ((dev = pcap_lookupdev(errbuf)) == NULL) {
-				fprintf(stderr, "  Error - Unable to determine default network device: %s.\n", errbuf);
-				exit(EXIT_FAILURE);
-			}
-			fprintf(stdout, "  Default device is %s.\n", dev);
-		}
-#endif
 	}
+
+
+	/* process remaining options now */
+	optind = 1;
+	while((option = getopt(my_argc, my_argv, OPTSTRING)) > 0) {
+		switch(option) {
+#ifdef USE_PCAP_MON
+			case 'i':
+				dev = strdup(optarg);
+				break;
+			case 'a':
+				if ((ip_cmd_opt = gethostbyname(optarg)) == NULL) {
+					perror("  Error - Invalid hostname or ip address\n");
+					exit(EXIT_FAILURE);
+				}
+				break;
+			case 'p':
+				promisc_mode = 1;
+				break;
+#endif
+			case 'l':
+				conn_timeout = strtoul(optarg, NULL, 0);
+				if((conn_timeout < 0) || (conn_timeout > 255)) {
+					fprintf(stderr,
+						"  Error - Listen timeout must be a value between 0 and 255.\n");
+					exit(EXIT_FAILURE);
+				}
+				break;
+			case 'r':
+				read_timeout = strtoul(optarg, NULL, 0);
+				if((read_timeout < 0) || (read_timeout > 255)) {
+					fprintf(stderr,
+						"  Error - Read timeout must be a value between 0 and 255.\n");
+					exit(EXIT_FAILURE);
+				}
+				break;
+			case 'u':
+				if ((pwd_entry = getpwnam(optarg)) == NULL) {
+					if (errno) fprintf(stderr, "  Invalid user: %s\n", strerror(errno));
+					else fprintf(stderr, "  User %s not found.\n", optarg);
+					exit(EXIT_FAILURE);
+				} else {
+					u_id = pwd_entry->pw_uid;
+					user = strdup(optarg);
+				}
+				break;
+			case 'g':
+				if ((grp_entry = getgrnam(optarg)) == NULL) {
+					if (errno) fprintf(stderr, "  Invalid group: %s\n", strerror(errno));
+					else fprintf(stderr, "  Group %s not found.\n", optarg);
+					exit(EXIT_FAILURE);
+				} else {
+					g_id = grp_entry->gr_gid;
+					group = strdup(optarg);
+				}
+				break;
+			case 'P':
+				/* pid file */
+				free(pidfile_name);
+				pidfile_name = strdup(optarg);
+				DEBUG_FPRINTF(stdout, "  Pid file is %s.\n", pidfile_name);
+				break;
+			case 'D':
+			case 'L':
+			case 't':
+			default:
+				break;
+		}
+	}
+
+#ifdef USE_PCAP_MON
+	/* get IPv4 address from interface */
+	if (dev == NULL) {
+		DEBUG_FPRINTF(stdout, "  No device given, trying to use default device.\n");
+		if ((dev = pcap_lookupdev(errbuf)) == NULL) {
+			fprintf(stderr, "  Error - Unable to determine default network device: %s.\n", errbuf);
+			exit(EXIT_FAILURE);
+		}
+		fprintf(stdout, "  Default device is %s.\n", dev);
+	}
+#endif
 
 	fprintf(stdout, "  Servers will run as user %s (%d).\n", user, u_id);
 	fprintf(stdout, "  Servers will run as group %s (%d).\n", group, g_id);
@@ -332,8 +327,7 @@ int configure(int my_argc, char *my_argv[]) {
 			fprintf(stdout, "  Warning - Unable to load default responses.\n");
 	}
 
-
-	if(mirror_mode) fprintf(stdout,"  Mirror mode enabled.\n");
+	fprintf(stdout,"  Connections will be handled in %s mode by default.\n", MODE(portconf_default));
 
 
 #ifdef USE_PCAP_MON
@@ -425,6 +419,17 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 				lcfg_delete(confkeys_subtree);
 				exit(EXIT_FAILURE);
 			}
+		} else if (OPT_IS("portconf_default")) {
+			if (strcmp(value, "ignore") == 0) portconf_default = PORTCONF_IGNORE;
+			else if (strcmp(value, "normal") == 0) portconf_default = PORTCONF_NORMAL;
+			else if (strcmp(value, "mirror") == 0) portconf_default = PORTCONF_MIRROR;
+			else if (strcmp(value, "proxy") == 0) {
+				fprintf(stderr, "  Error - Proxy mode as default port configuration is currently not supported.\n");
+				exit(EXIT_FAILURE);
+			} else {
+				fprintf(stderr, "  Error - Unsupported default port configuration: %s .\n", value);
+				exit(EXIT_FAILURE);
+			}
 		} else if (strstr(node->keyword, "plugin-") == node->keyword) {
 			/* load plugins */
 			value = strchr(node->keyword, '-') + 1;
@@ -432,14 +437,6 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 			process_conftree(node, node->first_leaf, process_confopt_plugin, NULL);
 			node->first_leaf = NULL;
 			conftree_children_free(node);
-		} else if (OPT_IS("mirror")) {
-			if (strcmp(value, "on") == 0) mirror_mode = 1;
-			else if (strcmp(value, "off") == 0) mirror_mode = 0;
-			else {
-				fprintf(stderr, "  Error - Invalid value '%s' for option '%s'.\n", value, node->keyword);
-				exit(EXIT_FAILURE);
-			}
-			DEBUG_FPRINTF(stdout, "  Activating mirror mode.\n");
 	#ifdef USE_PCAP_MON
 		} else if (OPT_IS("promisc")) {
 			if (strcmp(value, "on") == 0) promisc_mode = 1;
@@ -448,34 +445,38 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 				fprintf(stderr, "  Error - Invalid value '%s' for option '%s'.\n", value, node->keyword);
 				exit(EXIT_FAILURE);
 			}
-			DEBUG_FPRINTF(stdout, "  Activating promiscuous mode.\n");
+			DEBUG_FPRINTF(stdout, "  Setting promiscuous mode to on.\n");
 	#endif
 		} else if (OPT_IS("read_limit")) {
 			read_limit = atol(value);
+			if (read_limit <= 0) {
+				fprintf(stderr, "  Error - Read limit must be a positive value.\n");
+				exit(EXIT_FAILURE);
+			}
 			free(value);
 			DEBUG_FPRINTF(stdout, "  Setting read limit to %d.\n", read_limit);
-		} else if (OPT_IS("pidfile")) OPT_SET("  Pid file is %s.\n", pidfile_name)
-		else if (OPT_IS("logfile")) OPT_SET("  Logfile is %s.\n", logfile_name)
+		} else if (OPT_IS("pidfile")) OPT_SET("  Setting process id file to %s.\n", pidfile_name)
+		else if (OPT_IS("logfile")) OPT_SET("  Setting logfile to %s.\n", logfile_name)
 		else if (OPT_IS("response_dir")) OPT_SET("  Loading default responses from %s.\n", response_dir)
 		else if (OPT_IS("plugin_dir")) OPT_SET("  Loading plugins from %s.\n", plugin_dir)
 		else if (OPT_IS("user")) {
 			if ((pwd_entry = getpwnam(value)) == NULL) {
-				if (errno) fprintf(stderr, "  Invalid user '%s': %s\n", value, strerror(errno));
-				else fprintf(stderr, "  User %s not found.\n", value);
+				if (errno) fprintf(stderr, "  Error - Invalid user '%s': %s\n", value, strerror(errno));
+				else fprintf(stderr, "  Error - User %s not found.\n", value);
 				exit(EXIT_FAILURE);
 			}
 			u_id = pwd_entry->pw_uid;
 			user = value;
-			DEBUG_FPRINTF(stdout, "  Server processes will run as user %s\n", user);
+			DEBUG_FPRINTF(stdout, "  Setting user to %s\n", user);
 		} else if (OPT_IS("group")) {
 			if ((grp_entry = getgrnam(value)) == NULL) {
-				if (errno) fprintf(stderr, "  Invalid group '%s': %s\n", value, strerror(errno));
-				else fprintf(stderr, "  Group %s not found.\n", value);
+				if (errno) fprintf(stderr, "  Error - Invalid group '%s': %s\n", value, strerror(errno));
+				else fprintf(stderr, "  Error - Group %s not found.\n", value);
 				exit(EXIT_FAILURE);
 			}
 			g_id = grp_entry->gr_gid;
 			group = value;
-			DEBUG_FPRINTF(stdout, "  Server processes will run as group %s\n", group);
+			DEBUG_FPRINTF(stdout, "  Setting group to %s\n", group);
 		} else if (OPT_IS("portconf")) {
 			if (process_conftree(node, node->first_leaf, process_confopt_portconf, NULL) == NULL) return(NULL);
 			node->first_leaf = NULL;

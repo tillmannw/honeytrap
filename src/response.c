@@ -114,20 +114,20 @@ int load_default_responses(char *dir) {
 
 	if ((respdir = opendir(dir)) == NULL) {
 		perror("  Error - Unable to open response directory");
-		return(-1);
+		exit(EXIT_FAILURE);
 	}
 	
 	DEBUG_FPRINTF(stdout, "  Searching for response files in %s\n", dir);
 	if ((n = scandir(dir, &namelist, 0, alphasort)) < 0) {
 		perror("  Error - Unable to scan response directory");
-		return(-1);
+		exit(EXIT_FAILURE);
 	} else while(n--) {
 		stat(namelist[n]->d_name, &statbuf);
 		if ((fnmatch("*_tcp", namelist[n]->d_name, 0) == 0) || (fnmatch("*_udp", namelist[n]->d_name, 0) == 0)) {
 			/* found a default response file */
 			if ((full_path = (char *) malloc(strlen(dir) + strlen(namelist[n]->d_name) + 2)) == NULL) {
 				perror("  Error - Unable to allocate memory");
-				return(-1);
+				exit(EXIT_FAILURE);
 			}
 			snprintf(full_path, strlen(dir)+strlen(namelist[n]->d_name)+2, "%s/%s", dir, namelist[n]->d_name);
 			DEBUG_FPRINTF(stdout, "  Response file found: %s\n", full_path);

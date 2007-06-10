@@ -59,7 +59,7 @@ int drop_privileges(void) {
 void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr ip_l, uint16_t port_l, uint16_t proto) {
 	pid_t			pid;
 	int			listen_fd, mirror_sock_fd, proxy_sock_fd, connection_fd, disconnect,
-				total_bytes, select_return, mirror_this, proxy_this, established;
+				total_bytes, select_return, established;
 #ifdef USE_IPQ_MON
 	int			status;
 #endif
@@ -85,10 +85,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	connection_fd	= -1;
 	mirror_sock_fd	= -1;
 	proxy_sock_fd	= -1;
-	proxy_this	= 0;
-	mirror_this	= mirror_mode;
 	established	= 0;
-	port_mode	= PORTCONF_NONE;
+	port_mode	= portconf_default;
 
 	if (!((proto == TCP) || (proto == UDP))) {
 		logmsg(LOG_DEBUG, 1, "Unsupported protocol type.\n");
@@ -207,8 +205,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 						/* handle connection in normal mode if this port configured to be handled 'normal' */
 						logmsg(LOG_DEBUG, 1,
 						       "   %s  Handling connection in normal mode.\n", portstr);
-						mirror_this = 0;
-						proxy_this = 0;
 					} else if (port_mode & PORTCONF_PROXY) {
 						/* get proxy server address for port */
 						logmsg(LOG_DEBUG, 1,
@@ -248,14 +244,14 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							logmsg(LOG_INFO, 1,
 							       "== %s  Proxy connection rejected, falling back to normal mode.\n",
 							       portstr);
-							proxy_this = 0;
+								port_mode = PORTCONF_NORMAL;
 						} else
 							logmsg(LOG_NOTICE, 1,
 							       "== %s  Proxy connection to %s:%u established.\n",
 							       portstr,
 							       inet_ntoa(*(struct in_addr *) proxy_addr->
 									 h_addr_list[0]), proxy_dst->port);
-					} else if ((mirror_this) || (port_mode & PORTCONF_MIRROR)) {
+					} else if (port_mode & PORTCONF_MIRROR) {
 						/* try to establish mirror connection back to the client */
 						logmsg(LOG_DEBUG, 1,
 						       "   %s  Handling connection in mirror mode.\n", portstr);
@@ -271,7 +267,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							logmsg(LOG_INFO, 1,
 							       "<> %s  Mirror connection rejected, falling back to normal mode.\n",
 							       portstr);
-							mirror_this = 0;
+								port_mode = PORTCONF_NORMAL;
 						} else
 							logmsg(LOG_NOTICE, 1,
 							       "<> %s  Mirror connection to %s:%u established.\n",
@@ -362,7 +358,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							disconnect = 0;
 							total_bytes = 0;
 
-							if ((proxy_this) || (port_mode & PORTCONF_PROXY)) {
+							if (port_mode & PORTCONF_PROXY) {
 								logmsg(LOG_DEBUG, 1,
 								       "   %s  Handling connection from %s:%u in proxy mode.\n",
 								       portstr,
@@ -377,8 +373,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 											  proto,
 											  m_read_timeout,
 											  read_timeout, attack);
-							} else if ((mirror_this)
-								   || (port_mode & PORTCONF_MIRROR)) {
+							} else if (port_mode & PORTCONF_MIRROR) {
 								logmsg(LOG_DEBUG, 1,
 								       "   %s  Handling connection from %s:%u in mirror mode.\n",
 								       portstr,
@@ -407,11 +402,11 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							exit(EXIT_SUCCESS);
 
 						} else if (pid == -1)
-							logmsg(LOG_ERR, 1,
-							       "Error - forking connection handler failed.\n");
+							logmsg(LOG_ERR, 1, "Error - forking connection handler failed.\n");
 						close(mirror_sock_fd);
 						close(connection_fd);
 						free(attack);
+						port_mode = portconf_default;
 					}	/* connection accepted */
 				}	/* FD_ISSET - incoming connection */
 			}	/* select return for listen_fd */
@@ -480,10 +475,10 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 				memcpy(attack_string + total_bytes - bytes_read, buffer, bytes_read);
 				disconnect = 0;
 				/* check if read limit was hit */
-				if (bytes_read >= read_limit) {
+				if (read_limit) if (total_bytes >= read_limit) {
 					/* read limit hit, process attack string */
 					logmsg(LOG_WARN, 1,
-					       "   %s  Warning - Byte limit (%d) hit. Closing connection.\n",
+					       "   %s  Warning - Read limit (%d bytes) hit. Closing connection.\n",
 					       portstr, read_limit);
 					close(connection_fd);
 					return(process_data
@@ -569,10 +564,10 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 				       "%s %s* %u (of %u) bytes copied from %s connection to %s:%u.\n",
 				       logpre, portstr, bytes_sent, bytes_read, logact, inet_ntoa(ipaddr), sport);
 				total_from_server += bytes_read;
-				if (total_from_server >= read_limit) {
+				if (read_limit) if (total_from_server >= read_limit) {
 					/* read limit hit, process attack string */
 					logmsg(LOG_WARN, 1,
-					       "%s %s  Warning - Byte limit (%d) hit. Closing %s connections.\n",
+					       "%s %s  Warning - Read limit (%u bytes) hit. Closing %s connections.\n",
 					       logpre, portstr, read_limit, logact);
 					shutdown(server_sock_fd, SHUT_RDWR);
 					shutdown(connection_fd, SHUT_RDWR);
@@ -617,10 +612,10 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 				       "%s %s* %u (of %u) bytes copied from client connection to %s:%u.\n",
 				       logpre, portstr, bytes_sent, bytes_read, inet_ntoa(ipaddr), dport);
 				total_bytes += bytes_read;
-				if (total_from_server >= read_limit) {
+				if (read_limit) if (total_from_server >= read_limit) {
 					/* read limit hit, process attack string */
 					logmsg(LOG_WARN, 1,
-					       "%s %s  Warning - Byte limit (%d) hit. Closing %s connections.\n",
+					       "%s %s  Warning - Read limit (%u bytes) hit. Closing %s connections.\n",
 					       logpre, portstr, read_limit, logact);
 					shutdown(server_sock_fd, SHUT_RDWR);
 					shutdown(connection_fd, SHUT_RDWR);

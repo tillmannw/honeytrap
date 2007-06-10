@@ -1,16 +1,22 @@
 Version 1.0.0
 - New configuration concept with hierarchically organized file format
+- Default port configuration can be set to "ignore", "normal" or "mirror"
 - New plugin: libclamav-based virus scanner module
-- New plugin: PostgreSQL module for commits into mwcollect database
 - New plugin: Saving attack data in files is performed by a module now
-- New plugin: x86 CPU emulation module for generic shellcode analysis
-              based on libemu by Markus and Paul
+- malloc(NULL) segfault bug in tftpDownload plugin fixed
+- Try to download from the attacking host in case of failed ftp connect()s
 - Improved connection request handling in the nfq stream monitor
+- Reconfiguration on SIGHUP fixed
+Version 0.7.0
 - Plugins can be prioritized
-- SHA512 hashing support
+- x86 CPU emulation module for generic shellcode analysis
+  based on libemu by Markus and Paul
+- PostgreSQL module for commits into mwcollect database
+- SHA512 hash support
+- Performance improvements
+- Improved connection request handling in the nfq stream monitor
 - FTP download plugin is now source-based routing safe
 - Changed autotools process to make module builts optional
-- Performance improvements
 Version 0.6.5
 - Introduced an nfnetlink_queue-based connection monitor
 - Some compile errors fixed

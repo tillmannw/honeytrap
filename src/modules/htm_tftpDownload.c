@@ -181,6 +181,12 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 		return(-1);
 	}
 
+	/* 0.0.0.0 is an invalid ip address - set it to the attacker's address */
+	if (0 == *(u_int32_t *)host) {
+		logmsg(LOG_DEBUG, 1, "  TFTP download - TFTP server IP addres corrected to %s.\n", inet_ntoa(*host));
+		host = (struct in_addr *) &attack->a_conn.r_addr;
+	}
+
 	/* connect to server */
 	logmsg(LOG_DEBUG, 1, "TFTP download - Initializing connection.\n");
 	if (!(data_sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))) {

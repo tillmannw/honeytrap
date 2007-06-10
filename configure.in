@@ -559,8 +559,6 @@ if test ! $with_ipq_mon -a ! $with_nfq_mon -a ! $with_ipfw_mon -a ! $with_pcap_m
   exit 1
 fi
 
-echo $with_ipq_mon, $sith_nfq_mon, $with_ipfw_mon, $with_pcap_mon
-
 
 AC_PROG_INSTALL
 AC_CONFIG_FILES([Makefile

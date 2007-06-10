@@ -35,7 +35,7 @@
 #include <conftree.h>
 #include <md5.h>
 #include <sha512.h>
-#include <ip.h>
+#include <tcpip.h>
 
 #include "htm_SavePostgres.h"
 
@@ -202,26 +202,55 @@ char *build_uri(struct s_download *download) {
 		logmsg(LOG_WARN, 1, "SavePostgres warning - Could not build URI: Unknown protocol type.\n");
 		return(NULL);
 	}
-	logmsg(LOG_DEBUG, 1, "Postgres client - Adding Type to URI: %s\n",download->dl_type);
-	snprintf(uri + strlen(uri), strlen(download->dl_type) + 4, "%s://", download->dl_type);
+	logmsg(LOG_DEBUG, 1, "SavePostges - Adding Type to URI: %s\n",download->dl_type);
+	if (snprintf(uri + strlen(uri), strlen(download->dl_type) + 4, "%s://", download->dl_type)
+	    >= MAX_URI_SIZE - strlen(uri)) {
+		logmsg(LOG_ERR, 1, "  SavePostgres error - Unable to build URI: Type string too large.\n");
+		return(NULL);
+	}
 
-	if(strlen(download->user)) {
-		logmsg(LOG_NOISY, 1, "Postgres client - Adding user and pass to URI: %s:%s\n", download->user, download->pass);
-		snprintf(uri + strlen(uri), strlen(download->user) + strlen(download->pass) + 3, "%s:%s@", download->user, download->pass);
+	if (download->user) {
+		logmsg(LOG_NOISY, 1, "SavePostgres - Adding user to URI: %s\n", download->user);
+		if (snprintf(uri + strlen(uri), strlen(download->user), "%s", download->user)
+		    >= MAX_URI_SIZE - strlen(uri)) {
+			logmsg(LOG_ERR, 1, "  SavePostgres error - Unable to build URI: User string too large.\n");
+			return(NULL);
+		}
+		if (download->pass) {
+			logmsg(LOG_NOISY, 1, "SavePostgres - Adding user and pass to URI: %s\n", download->pass);
+			if (snprintf(uri + strlen(uri), strlen(download->pass) + 1, ":%s", download->pass)
+			    >= MAX_URI_SIZE - strlen(uri)) {
+				logmsg(LOG_ERR, 1, "  SavePostgres error - Unable to build URI: Password string too large.\n");
+				return(NULL);
+			}
+		}
+		if (strlen(uri) < MAX_URI_SIZE) strncat(uri, "@", 1);
 	}
 
 	logmsg(LOG_NOISY, 1, "SavePostgres - Adding host to URI: %s\n", inet_ntoa(*(struct in_addr*)&download->r_addr));
 	strncat(uri, inet_ntoa(*(struct in_addr*)&download->r_addr), strlen(inet_ntoa(*(struct in_addr*)&download->r_addr)));
 
-	if (download->filename) {
-		logmsg(LOG_NOISY, 1, "SavePostgres - Adding filename to URI: %s\n", download->filename);
-		snprintf(uri + strlen(uri), strlen(download->filename) + 2, "/%s", download->filename);
-	}
-
 	if (download->r_port) {
 		logmsg(LOG_NOISY, 1, "SavePostgre - Adding port to URI: %d\n", download->r_port);
-		snprintf(uri + strlen(uri), 7, ":%d/", download->r_port);
+		if (snprintf(uri + strlen(uri), 7, ":%d/", download->r_port)
+		    >= MAX_URI_SIZE - strlen(uri)) {
+			logmsg(LOG_ERR, 1, "  SavePostgres error - Unable to build URI: Port string too large.\n");
+			return(NULL);
+		}
+		if (MAX_URI_SIZE - strlen(uri) < strlen(PROTO(download->protocol))) {
+			logmsg(LOG_ERR, 1, "  SavePostgres error - Unable to build URI: Protocol string too large.\n");
+			return(NULL);
+		}
 		strcat(uri + strlen(uri), PROTO(download->protocol));
+	}
+
+	if (download->filename) {
+		logmsg(LOG_NOISY, 1, "SavePostgres - Adding filename to URI: %s\n", download->filename);
+		if (snprintf(uri + strlen(uri), strlen(download->filename) + 2, ":%s", download->filename)
+		    >= MAX_URI_SIZE - strlen(uri)) {
+			logmsg(LOG_ERR, 1, "  SavePostgres error - Unable to build URI: Filename too large.\n");
+			return(NULL);
+		}
 	}
 
 
@@ -258,6 +287,7 @@ int db_submit(Attack *attack) {
 
 	/* upload malware */
 	if (attack->dl_count) {
+		logmsg(LOG_DEBUG, 1, "SavePostgres - Processing %d. sample.\n", attack->dl_count+1);
 		if ((query = malloc(MAX_SQL_BUFFER + 1)) == NULL) {
 			logmsg(LOG_ERR, 1, "SavePostgres error - Unable to allocate memory: %s.\n", strerror(errno));
 			return(-1);
@@ -282,6 +312,7 @@ int db_submit(Attack *attack) {
 		if (*PQgetvalue(res, 0, 0) == 't') {
 			logmsg(LOG_NOISY, 1, "SavePostgres - Malware sample exists in database, increasing counter.\n");
 		} else {
+			logmsg(LOG_NOISY, 1, "SavePostgres - Malware sample does not exist in database, submitting it.\n");
 			/* escape byte data to prevent sql injection */
 			if ((esc_bytea = PQescapeByteaConn(db_connection, attack->download->dl_payload.data,
 							   attack->download->dl_payload.size, &length)) == NULL) {
@@ -292,10 +323,8 @@ int db_submit(Attack *attack) {
 				return(-1);
 			}
 
-			if ((uri = build_uri(attack->download)) == NULL) {
-				logmsg(LOG_WARN, 1, "SavePostgres warning - Unable to build generic malware URI.\n");
-				free(uri);
-			} else logmsg(LOG_NOISY, 1, "SavePostgres - Generic malware URI assembled: %s\n", uri);
+			if ((uri = build_uri(attack->download)) == NULL) free(uri);
+			else logmsg(LOG_NOISY, 1, "SavePostgres - Generic malware URI assembled: %s\n", uri);
 
 			if (((l_ip = strdup(inet_ntoa(*(struct in_addr*)&(attack->a_conn.l_addr)))) == NULL) ||
 			    ((r_ip = strdup(inet_ntoa(*(struct in_addr*)&(attack->a_conn.r_addr)))) == NULL)) {
@@ -311,8 +340,8 @@ int db_submit(Attack *attack) {
 				esc_bytea,
 //				"honeytrap-default",
 //				"dynamic-generic",
-				inet_ntoa(*(struct in_addr*)&(attack->a_conn.l_addr)),
-				inet_ntoa(*(struct in_addr*)&(attack->a_conn.r_addr)),
+				l_ip,
+				r_ip,
 				uri
 //				attack->a_conn.l_port,
 //				attack->download->r_port,

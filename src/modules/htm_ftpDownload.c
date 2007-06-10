@@ -15,16 +15,16 @@
  *   It performs the downloads with an own ftp implementation.
  */
 
+#include <arpa/inet.h>
+#include <ctype.h>
+#include <errno.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <errno.h>
 #include <sys/stat.h>
-#include <netdb.h>
 #include <sys/socket.h>
-#include <ctype.h>
+#include <unistd.h>
 
 #include <honeytrap.h>
 #include <logging.h>
@@ -346,10 +346,28 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
 	control_socket.sin_port            = htons(port);
 	if (connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket)) != 0) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to connect to %s:%d: %s\n",
-			inet_ntoa(*rhost), port, strerror(errno));
-		close(control_sock_fd);
-		return(-1);
+		/* if network or host is unreachable try attacking address instead */
+		switch(errno) {
+		case ECONNREFUSED:
+		case ENETUNREACH:
+		case ETIMEDOUT:
+			rhost = (struct in_addr *) &attack->a_conn.r_addr;
+			control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
+			logmsg(LOG_NOISY, 1, "FTP download - FTP server could not be reached, trying the attacking address (%s) instead.\n",
+				inet_ntoa(*rhost));
+			if (connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket)) != 0) {
+				logmsg(LOG_ERR, 1, "FTP download error - Unable to connect to %s:%d: %s\n",
+					inet_ntoa(*rhost), port, strerror(errno));
+				close(control_sock_fd);
+				return(-1);
+			}
+			break;
+		default:
+			logmsg(LOG_ERR, 1, "FTP download error - Unable to connect to %s:%d: %s\n",
+				inet_ntoa(*rhost), port, strerror(errno));
+			close(control_sock_fd);
+			return(-1);
+		}
 	}
 	logmsg(LOG_DEBUG, 1, "FTP download - Ftp control connection to %s:%d established.\n",
 		inet_ntoa(*rhost), port);
