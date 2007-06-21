@@ -113,6 +113,7 @@ int init_plugin(char *plugin_name) {
 	} else { 
 		if ((new_plugin->handle = (void *) malloc(sizeof(int))) == NULL) { 
 			fprintf(stderr, "  Error loading plugin - Unable to allocate memory: %s\n", strerror(errno));
+			free(new_plugin);
 			return(-1);
 		} else new_plugin->filename = (char *) strdup(plugin_name);
 	}
@@ -121,7 +122,7 @@ int init_plugin(char *plugin_name) {
 	if (((new_plugin->handle = dlopen(new_plugin->filename, RTLD_NOW)) == NULL) &&
 	    ((plugin_error_str = (char *) dlerror()) != NULL)) {
 		fprintf(stderr, "  Unable to initialize plugin: %s\n", plugin_error_str);
-		unload_at_err(new_plugin);
+		unload_on_err(new_plugin);
 		exit(EXIT_FAILURE);
 	}
 
@@ -131,7 +132,7 @@ int init_plugin(char *plugin_name) {
 		/* handle error, the symbol wasn't found */
 		fprintf(stderr, "  Unable to initialize plugin: %s\n", plugin_error_str);
 		fprintf(stderr, "  %s seems not to be a honeytrap plugin.\n", new_plugin->filename);
-		unload_at_err(new_plugin);
+		unload_on_err(new_plugin);
 		return(-1);
 	}
 	if (((new_plugin->version = (char *) dlsym(new_plugin->handle, "module_version")) == NULL) &&
@@ -139,7 +140,7 @@ int init_plugin(char *plugin_name) {
 		/* handle error, the symbol wasn't found */
 		fprintf(stderr, "  Unable to initialize plugin %s: %s\n", new_plugin->name, plugin_error_str);
 		fprintf(stderr, "  %s seems not to be a honeytrap plugin.\n", new_plugin->filename);
-		unload_at_err(new_plugin);
+		unload_on_err(new_plugin);
 		return(-1);
 	}
 	fprintf(stdout, "  Loading plugin %s v%s\n", new_plugin->name, new_plugin->version);
@@ -151,12 +152,12 @@ int init_plugin(char *plugin_name) {
 		/* handle error, the symbol wasn't found */
 		fprintf(stderr, "    Unable to initialize plugin %s: %s\n", new_plugin->name, plugin_error_str);
 		fprintf(stderr, "    %s seems not to be a honeytrap plugin.\n", new_plugin->filename);
-		unload_at_err(new_plugin);
+		unload_on_err(new_plugin);
 		return(-1);
 	}
 	if (!add_unload_func_to_list(new_plugin->name, "plugin_unload", unload_plugin)) {
 		fprintf(stderr, "    Unable to register module for hook 'unload_plugins': %s\n", plugin_error_str);
-		unload_at_err(new_plugin);
+		unload_on_err(new_plugin);
 		return(-1);
 	}
 
@@ -204,7 +205,7 @@ void unload_plugins(void) {
 }
 
 
-void unload_at_err(Plugin *plugin) {
+void unload_on_err(Plugin *plugin) {
 	fprintf(stderr, "  Unloading plugin on initialization error.\n");
 	if (plugin) {
 		if (plugin->handle) dlclose(plugin->handle);

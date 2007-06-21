@@ -133,17 +133,16 @@ PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plug
 
 
 void plughook_process_attack(PlugFuncList *func_list, Attack *attack) {
-	PlugFuncList *func_tmp = NULL;
-
-	func_tmp = func_list;
-	while(func_tmp) {
-		if (func_tmp->func) {
-			logmsg(LOG_DEBUG, 1, "Calling %s::%s().\n", func_tmp->plugnam, func_tmp->funcnam);
-			func_tmp->func((void *)attack);
+	current_plugfunc = func_list;
+	while(current_plugfunc) {
+		if (current_plugfunc->func) {
+			logmsg(LOG_DEBUG, 1, "Calling %s::%s().\n", current_plugfunc->plugnam, current_plugfunc->funcnam);
+			current_plugfunc->func((void *)attack);
 		} else logmsg(LOG_ERR, 1, "Error - Function %s::%s is not registered.\n",
-			func_tmp->plugnam, func_tmp->funcnam);
-		func_tmp = func_tmp->next;
+			current_plugfunc->plugnam, current_plugfunc->funcnam);
+		current_plugfunc = current_plugfunc->next;
 	}
+	current_plugfunc = NULL;
 	return;
 }
 

@@ -1,5 +1,5 @@
 /* ctrl.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -68,24 +68,24 @@ void clean_exit(int status) {
 	/* unloading plugins */
 	logmsg(LOG_DEBUG, 1, "Unloading plugins.\n");
 	unload_plugins();
-	
+
 	if (pidfile_fd >= 0) {
 		logmsg(LOG_DEBUG, 1, "Unlocking pid file.\n");
 		if (lockf(pidfile_fd, F_ULOCK, 0) < 0) 
-			logmsg(LOG_ERR, 1, "Error - Unable to unlock pid file: %s\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - Unable to unlock pid file: %s.\n", strerror(errno));
 
 		logmsg(LOG_DEBUG, 1, "Closing pid file.\n");
 		if (close(pidfile_fd) == -1)
-			logmsg(LOG_ERR, 1, "Error - Unable to close pid file: %s\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - Unable to close pid file: %s.\n", strerror(errno));
 
 		logmsg(LOG_DEBUG, 1, "Removing pid file.\n");
-		if (unlink(pidfile_name) != 0)
-			logmsg(LOG_ERR, 1, "Error - Unable to remove pid file: %s\n", strerror(errno));
+		if (unlink(pidfile_name) == -1)
+			logmsg(LOG_ERR, 1, "Error - Unable to remove pid file: %s.\n", strerror(errno));
 	} else logmsg(LOG_DEBUG, 1, "No pid file installed.\n");
 
 	logmsg(LOG_NOTICE, 1, "---- honeytrap stopped ----\n");
 	
-	if (close(logfile_fd) == -1) logmsg(LOG_ERR, 1, "Error - Unable to close logfile: %s\n", strerror(errno));
+	if (close(logfile_fd) == -1) logmsg(LOG_ERR, 1, "Error - Unable to close logfile: %s.\n", strerror(errno));
 
 	exit(status);
 }

@@ -44,10 +44,8 @@ void logmsg(int level, int add_time, const char *format, ...) {
 
 		/* log to stdout as well if we are not running as daemon */
 		if ((STDOUT_FILENO != logfile_fd) && (daemonize != 1)) {
-			if ((bytes_written = write(STDOUT_FILENO, logline, logline_size)) != logline_size) {
-				fsync(STDOUT_FILENO);
+			if ((bytes_written = write(STDOUT_FILENO, logline, logline_size)) != logline_size) 
 				perror("Error while logging to stdout");
-			}
 		}
 		va_end(ap);
 	}

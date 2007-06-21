@@ -1,5 +1,5 @@
 /* util.c
- * Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -10,15 +10,18 @@
  * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <string.h>
-#include <stdio.h>
-#include <netdb.h>
-#include <errno.h>
 #include <ctype.h>
+#include <errno.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include "honeytrap.h"
 #include "util.h"
+#include "signals.h"
 #include "logging.h"
 
 int valid_ipaddr(uint32_t address) {
@@ -31,11 +34,10 @@ int read_line(int socket, char *line, ssize_t len, int timeout) {
 	/* reads a line from 'socket' into buffer 'line' */
 	/* 'timeout' is optional, 0 means read without timeout */
 
-	int read_chars = 0;
-	int retval = 0;
-	int select_return = -1;
-	struct timeval r_timeout;
-	fd_set rfds;
+	int		read_chars = 0;
+	int		rv = 0;
+	fd_set		rfds;
+	struct timeval	r_timeout;
 
 	memset(line, 0, len);
 
@@ -43,6 +45,7 @@ int read_line(int socket, char *line, ssize_t len, int timeout) {
 	if (timeout) {
 		FD_ZERO(&rfds);
 		FD_SET(socket, &rfds);
+		FD_SET(sigpipe[0], &rfds);
 		r_timeout.tv_sec = timeout;
 		r_timeout.tv_usec = 0;
 
@@ -50,36 +53,37 @@ int read_line(int socket, char *line, ssize_t len, int timeout) {
 		logmsg(LOG_DEBUG, 1, "Trying to read a line from socket, timeout is %d seconds.\n",
 			(uint16_t) r_timeout.tv_sec);
 		
-		select_return = select(socket + 1, &rfds, NULL, NULL, &r_timeout);
-		while ((select_return > 0) || (errno == EINTR)) {
-			if (FD_ISSET(socket, &rfds)) {
-				if (read_chars >= len-1) {
-					logmsg(LOG_DEBUG, 1, "Error while reading from socket - Line exceeds buffer.\n");
-					return(-2);
+		for (;;) {
+			switch (select(MAX(sigpipe[0], socket) + 1, &rfds, NULL, NULL, &r_timeout)) {
+			case -1:
+				if (errno == EINTR) {
+					if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+					break;
 				}
-				retval = recv(socket, &line[read_chars], 1, 0);
-				if (retval == 0) return(read_chars);
-				if (retval < 0) return(-1);
-				if (line[read_chars] == '\n') {
-					line[read_chars] = '\0';
-					logmsg(LOG_DEBUG, 1, "Line read: %s\n", line);
-					return(read_chars);
-				}
-				read_chars++;
-			}
-			select_return = select(socket + 1, &rfds, NULL, NULL, &r_timeout);
-		}
-		if (select_return < 0) {
-			if (errno != EINTR) {
 				logmsg(LOG_DEBUG, 1, "Error while reading a line from socket - select() failed.\n");
 				return(-1);
+			case 0:
+				logmsg(LOG_DEBUG, 1, "Error while reading a line from socket - Connection timed out.\n");
+				return(-1);
+			default:
+				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
+					exit(EXIT_FAILURE);
+				if (FD_ISSET(socket, &rfds)) {
+					if (read_chars >= len-1) {
+						logmsg(LOG_DEBUG, 1, "Error while reading from socket - Line exceeds buffer.\n");
+						return(-2);
+					}
+					rv = recv(socket, &line[read_chars], 1, 0);
+					if (rv == 0) return(read_chars);
+					if (rv < 0) return(-1);
+					if (line[read_chars] == '\n') {
+						line[read_chars] = '\0';
+						logmsg(LOG_DEBUG, 1, "Line read: %s\n", line);
+						return(read_chars);
+					}
+					read_chars++;
+				}
 			}
-			/* select again, it was interrupted */
-			select_return = select(socket + 1, &rfds, NULL, NULL, &r_timeout);
-		}
-		if (select_return == 0) {
-			logmsg(LOG_DEBUG, 1, "Error while reading a line from socket - Connection timed out.\n");
-			return(-1);
 		}
 	}
 
@@ -89,9 +93,9 @@ int read_line(int socket, char *line, ssize_t len, int timeout) {
 			logmsg(LOG_DEBUG, 1, "Error while reading from socket - Line exceeds buffer.\n");
 			return(-2);
 		}
-		retval = recv(socket, &line[read_chars], 1, 0);
-		if (retval == 0) return(read_chars);
-		if (retval < 0) return(-1);
+		rv = recv(socket, &line[read_chars], 1, 0);
+		if (rv == 0) return(read_chars);
+		if (rv < 0) return(-1);
 		if (line[read_chars] == '\n') {
 			line[read_chars] = '\0';
 			return(read_chars);
@@ -106,31 +110,31 @@ struct strtk extract_token(char *parse_string) {
 	/* returns substring (string until next occurrence of '>', '&' or '\n' and its offset in a struct */
 	/* used to extract tokens from shell commands */
 	int length;
-	struct strtk retval;
+	struct strtk rv;
 
-	retval.string	= parse_string;
-	retval.offset	= 0;
+	rv.string	= parse_string;
+	rv.offset	= 0;
 	
 	length = strlen(parse_string);
 
 	while(isspace(*parse_string)) {
-		retval.string++;
-		retval.offset++;
+		rv.string++;
+		rv.offset++;
 		parse_string++;
 	}
 
-	while (	(retval.offset < length) &&
+	while (	(rv.offset < length) &&
 		(!isspace(*parse_string)) &&
 		(*parse_string != '>') &&
 		(*parse_string != '&') &&
 		(*parse_string != '\n')) {
-		retval.offset++;
+		rv.offset++;
 		parse_string++;
 	}
 	*parse_string = 0;
-	retval.offset++;
+	rv.offset++;
 
-	return(retval);
+	return(rv);
 }
 
 

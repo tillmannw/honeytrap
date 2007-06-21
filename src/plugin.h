@@ -29,6 +29,6 @@ Plugin *plugin_list;
 int load_plugin(const char *dir, const char *plugname);
 int init_plugin(char *plugin_name);
 void unload_plugins(void);
-void unload_at_err(Plugin *plugin);
+void unload_on_err(Plugin *plugin);
 
 #endif

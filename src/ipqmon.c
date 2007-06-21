@@ -24,6 +24,7 @@
 #include "dynsrv.h"
 #include "ctrl.h"
 #include "readconf.h"
+#include "signals.h"
 #include "ipqmon.h"
 
 /* Set BUFSIZE to 1500 (ethernet frame size) to prevent
@@ -35,13 +36,15 @@
 
 
 int start_ipq_mon(void) {
-	int status, process;
-	u_int8_t port_mode;
-	uint16_t sport, dport;
-	unsigned char buf[BUFSIZE];
-	struct ip_header *ip;
-	struct tcp_header *tcp;
-	struct udp_header *udp;
+	int			status, process;
+	u_int8_t		port_mode;
+	uint16_t		sport, dport;
+	fd_set			rfds;
+	struct timeval		mainloop_timeout;
+	unsigned char		buf[BUFSIZE];
+	struct ip_header	*ip;
+	struct tcp_header	*tcp;
+	struct udp_header	*udp;
 
 	sport		= 0;
 	dport		= 0;
@@ -66,88 +69,114 @@ int start_ipq_mon(void) {
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via IPQ. ----\n");
 
 	for (;;) {
-		process	= 1;
-		if ((status = ipq_read(h, buf, BUFSIZE, 0)) < 0) {
-			logmsg(LOG_ERR, 1, "Error - Could not read queued packet: %s.\n", ipq_errstr());
-			ipq_destroy_handle(h);
-			clean_exit(EXIT_FAILURE);
-		}
-		switch (ipq_message_type(buf)) {
-			case NLMSG_ERROR:
-				logmsg(LOG_WARN, 1, "IPQ Warning - ipq_read() returned status NLMSG_ERROR: %s\n", strerror(ipq_get_msgerr(buf)));
-				break;
-			case IPQM_PACKET:
-				packet	= ipq_get_packet(buf);
-				ip	= (struct ip_header*) packet->payload;
-				if (ip->ip_p == TCP) {
-					tcp		= (struct tcp_header*) (packet->payload + (4 * ip->ip_hlen));
-					sport		= ntohs(tcp->th_sport);
-					dport		= ntohs(tcp->th_dport);
-					port_mode	= port_flags_tcp[dport] ? port_flags_tcp[dport]->mode : 0;
-				} else if (ip->ip_p == UDP) {
-					udp		= (struct udp_header*) (packet->payload + (4 * ip->ip_hlen));
-					sport		= ntohs(udp->uh_sport);
-					dport		= ntohs(udp->uh_dport);
-					port_mode	= port_flags_udp[dport] ? port_flags_udp[dport]->mode : 0;
-				} else {
-					logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip->ip_p);
-					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
-						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
-						ipq_destroy_handle(h);
-						clean_exit(EXIT_FAILURE);
-					}
-					break;
-				}
+		FD_ZERO(&rfds);
+		FD_SET(sigpipe[0], &rfds);
+		FD_SET(h->fd, &rfds);
 
-				/* Got a connection request, start dynamic server and pass packet processing back to the kernel */
-				switch (port_mode) {
-				case PORTCONF_NONE:
-					logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n",
-							dport, PROTO(ip->ip_p));
+		mainloop_timeout.tv_sec = 360;
+		mainloop_timeout.tv_usec = 0;
+
+		switch (select(MAX(h->fd, sigpipe[0]) + 1, &rfds, NULL, NULL, &mainloop_timeout)) {
+		case -1:
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
+			/* error */
+			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		case 0:
+			break;
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
+				exit(EXIT_FAILURE);
+			if (FD_ISSET(h->fd, &rfds)) {
+				/* incoming connection request */
+				process	= 1;
+				if ((status = ipq_read(h, buf, BUFSIZE, 0)) < 0) {
+					logmsg(LOG_ERR, 1, "Error - Could not read queued packet: %s.\n", ipq_errstr());
+					ipq_destroy_handle(h);
+					clean_exit(EXIT_FAILURE);
+				}
+				switch (ipq_message_type(buf)) {
+				case NLMSG_ERROR:
+					logmsg(LOG_WARN, 1, "IPQ Warning - ipq_read() returned status NLMSG_ERROR: %s\n",
+						strerror(ipq_get_msgerr(buf)));
 					break;
-				case PORTCONF_IGNORE:
-					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n",
-						dport, PROTO(ip->ip_p));
-					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
-						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
-						ipq_destroy_handle(h);
-						clean_exit(EXIT_FAILURE);
+				case IPQM_PACKET:
+					packet	= ipq_get_packet(buf);
+					ip	= (struct ip_header*) packet->payload;
+					if (ip->ip_p == TCP) {
+						tcp		= (struct tcp_header*) (packet->payload + (4 * ip->ip_hlen));
+						sport		= ntohs(tcp->th_sport);
+						dport		= ntohs(tcp->th_dport);
+						port_mode	= port_flags_tcp[dport] ? port_flags_tcp[dport]->mode : 0;
+					} else if (ip->ip_p == UDP) {
+						udp		= (struct udp_header*) (packet->payload + (4 * ip->ip_hlen));
+						sport		= ntohs(udp->uh_sport);
+						dport		= ntohs(udp->uh_dport);
+						port_mode	= port_flags_udp[dport] ? port_flags_udp[dport]->mode : 0;
+					} else {
+						logmsg(LOG_ERR, 1, "Error - Protocol %u is not supported.\n", ip->ip_p);
+						if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+							logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
+							ipq_destroy_handle(h);
+							clean_exit(EXIT_FAILURE);
+						}
+						break;
 					}
-					process = 0;
-					break;
-				case PORTCONF_NORMAL:
-					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in normal mode.\n",
-						dport, PROTO(ip->ip_p));
-					break;
-				case PORTCONF_MIRROR:
-					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in mirror mode.\n",
-						dport, PROTO(ip->ip_p));
-					break;
-				case PORTCONF_PROXY:
-					logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in proxy mode\n",
-						dport, PROTO(ip->ip_p));
+
+					/* Got a connection request, start dynamic server and pass packet processing back to the kernel */
+					switch (port_mode) {
+					case PORTCONF_NONE:
+						logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n",
+								dport, PROTO(ip->ip_p));
+						break;
+					case PORTCONF_IGNORE:
+						logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n",
+							dport, PROTO(ip->ip_p));
+						if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+							logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
+							ipq_destroy_handle(h);
+							clean_exit(EXIT_FAILURE);
+						}
+						process = 0;
+						break;
+					case PORTCONF_NORMAL:
+						logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in normal mode.\n",
+							dport, PROTO(ip->ip_p));
+						break;
+					case PORTCONF_MIRROR:
+						logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in mirror mode.\n",
+							dport, PROTO(ip->ip_p));
+						break;
+					case PORTCONF_PROXY:
+						logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be handled in proxy mode\n",
+							dport, PROTO(ip->ip_p));
+						break;
+					default:
+						logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n",
+							dport, PROTO(ip->ip_p));
+						if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+							logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
+							ipq_destroy_handle(h);
+							clean_exit(EXIT_FAILURE);
+						}
+						process = 0;
+						break;
+					}
+					
+					if (process == 0) break;
+
+					logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
+						inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), dport, PROTO(ip->ip_p));
+					start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 					break;
 				default:
-					logmsg(LOG_ERR, 1, "Error - Invalid explicit configuration for port %u/%s.\n",
-						dport, PROTO(ip->ip_p));
-					if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
-						logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
-						ipq_destroy_handle(h);
-						clean_exit(EXIT_FAILURE);
-					}
-					process = 0;
+					logmsg(LOG_DEBUG, 1, "IPQ Warning - Unknown message type.\n");
 					break;
 				}
-				
-				if (process == 0) break;
-
-				logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
-					inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), dport, PROTO(ip->ip_p));
-				start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
-				break;
-			default:
-				logmsg(LOG_DEBUG, 1, "IPQ Warning - Unknown message type.\n");
-				break;
+			}
 		}
 	}
 

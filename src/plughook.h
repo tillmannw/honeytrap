@@ -31,6 +31,9 @@ typedef struct plugin_func_list {
 	struct plugin_func_list *next;
 } PlugFuncList;
 
+/* func_current is a global variable that can be accessed from within a signal handler
+ * to find out whether a signal was caught during executing a plugin function */
+PlugFuncList *current_plugfunc;
 
 PlugFuncList *funclist_unload_plugins;
 PlugFuncList *funclist_attack_preproc;

@@ -37,6 +37,7 @@
 #include "nfqmon.h"
 #include "tcpip.h"
 #include "sock.h"
+#include "signals.h"
 #include "dynsrv.h"
 
 
@@ -59,7 +60,7 @@ int drop_privileges(void) {
 void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr ip_l, uint16_t port_l, uint16_t proto) {
 	pid_t			pid;
 	int			listen_fd, mirror_sock_fd, proxy_sock_fd, connection_fd, disconnect,
-				total_bytes, select_return, established;
+				total_bytes, established;
 #ifdef USE_IPQ_MON
 	int			status;
 #endif
@@ -80,7 +81,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	ip_l_str	= NULL;
 	ip_r_str	= NULL;
 	attack		= NULL;
-	select_return	= -1;
 	listen_fd	= -1;
 	connection_fd	= -1;
 	mirror_sock_fd	= -1;
@@ -95,7 +95,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
 	/* fork server process */
 	if ((pid = fork()) == 0) {
-
 		/* use this port string as log prefix */
 		memset(portstr, 0, 16);
 		if (snprintf(portstr, 16, "%u/%s\t", ntohs(port_l), PROTO(proto)) > 15) {
@@ -171,15 +170,18 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		/* wait for incoming connections */
 		for (;;) {
 			FD_ZERO(&rfds);
+			FD_SET(sigpipe[0], &rfds);
 			FD_SET(listen_fd, &rfds);
 
 			c_timeout.tv_sec = conn_timeout;
 			c_timeout.tv_usec = 0;
 
-			switch (select_return = select(listen_fd + 1, &rfds, NULL, NULL, &c_timeout)) {
+			switch (select(MAX(sigpipe[0], listen_fd) + 1, &rfds, NULL, NULL, &c_timeout)) {
 			case -1:
-				if (errno == EINTR)
+				if (errno == EINTR) {
+					if (check_sigpipe() == -1) exit(EXIT_FAILURE);
 					break;
+				}
 				logmsg(LOG_ERR, 1,
 				       "   %s  Error - select() call failed: %s.\n", portstr, strerror(errno));
 				exit(EXIT_FAILURE);
@@ -191,6 +193,10 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 				       portstr, conn_timeout);
 				exit(EXIT_SUCCESS);
 			default:
+				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) {
+					logmsg(LOG_ERR, 1, "Error - Signal handling failed in dynamic server process.\n");
+					exit(EXIT_FAILURE);
+				}
 				if (FD_ISSET(listen_fd, &rfds)) {
 					logmsg(LOG_NOISY, 1,
 					       "   %s  Connection request from %s.\n", portstr, inet_ntoa(ip_r));
@@ -407,10 +413,10 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 						close(connection_fd);
 						free(attack);
 						port_mode = portconf_default;
-					}	/* connection accepted */
-				}	/* FD_ISSET - incoming connection */
-			}	/* select return for listen_fd */
-		}		/* for - incoming connections */
+					} // connection accepted
+				} // FD_ISSET - incoming connection
+			} // select return for listen_fd
+		} // for - incoming connections
 	} /* fork - server process */
 	else if (pid == -1) logmsg(LOG_ERR, 1, "Error - forking server process failed.\n");
 	return;
@@ -421,7 +427,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u_char timeout, Attack * attack) {
 	fd_set		rfds;
 	struct timeval	r_timeout;
-	int		disconnect, bytes_read, total_bytes, retval;
+	int		disconnect, bytes_read, total_bytes;
 
 	total_bytes	= 0;
 	disconnect	= 0;
@@ -429,17 +435,22 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 	/* read data from sockets */
 	for (;;) {
 		FD_ZERO(&rfds);
+		FD_SET(sigpipe[0], &rfds);
 		FD_SET(connection_fd, &rfds);
 
 		r_timeout.tv_sec = (u_char) timeout;
 		r_timeout.tv_usec = 0;
 
-		if (((retval = select(connection_fd + 1, &rfds, NULL, NULL, &r_timeout)) < 0)
-		    && (errno != EINTR)) {
+		switch (select(MAX(connection_fd, sigpipe[0]) + 1, &rfds, NULL, NULL, &r_timeout)) {
+		case -1:
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
 			logmsg(LOG_ERR, 1, "   %s  Error - select() failed: %s.\n", portstr, strerror(errno));
 			close(connection_fd);
 			return(process_data(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
-		} else if (retval == 0) {
+		case 0:
 			/* no data available, select() timed out */
 			disconnect++;
 			if (disconnect > 10) {
@@ -458,47 +469,49 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 						(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 				}
 			}
-		}
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
+				exit(EXIT_FAILURE);
+			if (FD_ISSET(connection_fd, &rfds)) {
+				/* handle data on server connection */
+				if ((bytes_read = read(connection_fd, buffer, sizeof(buffer))) > 0) {
+					logmsg(LOG_INFO, 1, "   %s* %d bytes read.\n", portstr, bytes_read);
+					total_bytes += bytes_read;
+					if (!(attack_string = (u_char *) realloc(attack_string, total_bytes))) {
+						logmsg(LOG_ERR, 1,
+						       "   %s  Error - Reallocating buffer size failed: %s.\n",
+						       portstr, strerror(errno));
+						free(attack_string);
+						exit(EXIT_FAILURE);
+					}
+					memcpy(attack_string + total_bytes - bytes_read, buffer, bytes_read);
+					disconnect = 0;
+					/* check if read limit was hit */
+					if (read_limit) if (total_bytes >= read_limit) {
+						/* read limit hit, process attack string */
+						logmsg(LOG_WARN, 1,
+						       "   %s  Warning - Read limit (%d bytes) hit. Closing connection.\n",
+						       portstr, read_limit);
+						close(connection_fd);
+						return(process_data
+							(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
+					}
+				} else if (bytes_read == 0) {
+					logmsg(LOG_INFO, 1, "   %s  Connection closed by foreign host.\n", portstr);
 
-		/* handle data on server connection */
-		if (FD_ISSET(connection_fd, &rfds)) {
-			if ((bytes_read = read(connection_fd, buffer, sizeof(buffer))) > 0) {
-				logmsg(LOG_INFO, 1, "   %s* %d bytes read.\n", portstr, bytes_read);
-				total_bytes += bytes_read;
-				if (!(attack_string = (u_char *) realloc(attack_string, total_bytes))) {
-					logmsg(LOG_ERR, 1,
-					       "   %s  Error - Reallocating buffer size failed: %s.\n",
-					       portstr, strerror(errno));
-					free(attack_string);
-					exit(EXIT_FAILURE);
-				}
-				memcpy(attack_string + total_bytes - bytes_read, buffer, bytes_read);
-				disconnect = 0;
-				/* check if read limit was hit */
-				if (read_limit) if (total_bytes >= read_limit) {
-					/* read limit hit, process attack string */
-					logmsg(LOG_WARN, 1,
-					       "   %s  Warning - Read limit (%d bytes) hit. Closing connection.\n",
-					       portstr, read_limit);
+					/* process attack string */
+					close(connection_fd);
+					return(process_data
+						(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
+				} else {
+					logmsg(LOG_NOISY, 1, "   %s  Could not read data: %s.\n", portstr, strerror(errno));
 					close(connection_fd);
 					return(process_data
 						(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 				}
-			} else if (bytes_read == 0) {
-				logmsg(LOG_INFO, 1, "   %s  Connection closed by foreign host.\n", portstr);
-
-				/* process attack string */
-				close(connection_fd);
-				return(process_data
-					(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
-			} else {
-				logmsg(LOG_NOISY, 1, "   %s  Could not read data: %s.\n", portstr, strerror(errno));
-				close(connection_fd);
-				return(process_data
-					(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
-			}
-		}		/* FD_ISSER(connection_fd) */
-	}			/* for */
+			} // FD_ISSET
+		} // switch
+	} // for
 }
 
 
@@ -509,7 +522,7 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 			  struct in_addr ipaddr, uint16_t proto, u_char timeout, u_char fb_timeout, Attack * attack) {
 	fd_set		rfds;
 	struct timeval	r_timeout;
-	int		disconnect, bytes_read, bytes_sent, total_bytes, total_from_server, retval, max_read_fd;
+	int		disconnect, bytes_read, bytes_sent, total_bytes, total_from_server, rv;
 	u_char		*server_string;
 	char		*logstr, *Logstr, *logact, *logpre;
 
@@ -541,107 +554,20 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 		FD_SET(connection_fd, &rfds);
 		FD_SET(server_sock_fd, &rfds);
 
-		max_read_fd = server_sock_fd > connection_fd ? server_sock_fd : connection_fd;
-
 		r_timeout.tv_sec = (u_char) timeout;
 		r_timeout.tv_usec = 0;
-		if ((select(max_read_fd + 1, &rfds, NULL, NULL, &r_timeout) < 0)
-		    && (errno != EINTR)) {
+		switch (select(MAX(MAX(server_sock_fd, connection_fd), sigpipe[0]) + 1, &rfds, NULL, NULL, &r_timeout)) {
+		case -1:
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
 			logmsg(LOG_INFO, 1, "%s %s  Error - Select failed: %s.\n", logpre, portstr, strerror(errno));
 			shutdown(server_sock_fd, SHUT_RDWR);
 			shutdown(connection_fd, SHUT_RDWR);
 			return(process_data
 				(attack_string, total_bytes, server_string, total_from_server, dport, attack));
-		}
-
-		if (FD_ISSET(server_sock_fd, &rfds)) {
-			/* read data and proxy it to client connection */
-			bytes_read = 0;
-			if ((retval =
-			     copy_data(connection_fd, server_sock_fd, &server_string,
-				       total_from_server, &bytes_read, &bytes_sent)) > 0) {
-				logmsg(LOG_INFO, 1,
-				       "%s %s* %u (of %u) bytes copied from %s connection to %s:%u.\n",
-				       logpre, portstr, bytes_sent, bytes_read, logact, inet_ntoa(ipaddr), sport);
-				total_from_server += bytes_read;
-				if (read_limit) if (total_from_server >= read_limit) {
-					/* read limit hit, process attack string */
-					logmsg(LOG_WARN, 1,
-					       "%s %s  Warning - Read limit (%u bytes) hit. Closing %s connections.\n",
-					       logpre, portstr, read_limit, logact);
-					shutdown(server_sock_fd, SHUT_RDWR);
-					shutdown(connection_fd, SHUT_RDWR);
-					return(process_data
-						(attack_string, total_bytes, server_string,
-						 total_from_server, dport, attack));
-				}
-			} else if (retval == 0) {
-				/* first UDP packet was rejected, fall back to normal mode */
-				if ((proto == UDP) && (total_bytes == bytes_sent))
-					return(handle_connection_normal
-						(connection_fd, dport, proto, read_timeout, attack));
-
-				/* remote host closed server connection */
-				logmsg(LOG_INFO, 1,
-				       "%s %s  %s connection closed by foreign host.\n", logpre, portstr, Logstr);
-				shutdown(server_sock_fd, SHUT_RDWR);
-				shutdown(connection_fd, SHUT_RDWR);
-				return(process_data
-					(attack_string, total_bytes, server_string, total_from_server, dport, attack));
-			} else {
-				/* copy_data error */
-				logmsg(LOG_INFO, 1,
-				       "%s %s  Error - Unable to %s data to client connection.\n",
-				       logpre, portstr, logact);
-				if (close(server_sock_fd) == -1)
-					logmsg(LOG_ERR, 1,
-					       "%s %s  Error - Unable to close %s sockt.\n", logpre, portstr, logstr);
-				else
-					logmsg(LOG_NOISY, 1, "%s %s  %s connection closed.\n", logpre, portstr, Logstr);
-				shutdown(connection_fd, SHUT_RDWR);
-				return(process_data
-					(attack_string, total_bytes, server_string, total_from_server, dport, attack));
-			}
-		} else if (FD_ISSET(connection_fd, &rfds)) {
-			/* read data and proxy it to server connection */
-			bytes_read = 0;
-			if ((retval =
-			     copy_data(server_sock_fd, connection_fd, &attack_string,
-				       total_bytes, &bytes_read, &bytes_sent)) > 0) {
-				logmsg(LOG_INFO, 1,
-				       "%s %s* %u (of %u) bytes copied from client connection to %s:%u.\n",
-				       logpre, portstr, bytes_sent, bytes_read, inet_ntoa(ipaddr), dport);
-				total_bytes += bytes_read;
-				if (read_limit) if (total_from_server >= read_limit) {
-					/* read limit hit, process attack string */
-					logmsg(LOG_WARN, 1,
-					       "%s %s  Warning - Read limit (%u bytes) hit. Closing %s connections.\n",
-					       logpre, portstr, read_limit, logact);
-					shutdown(server_sock_fd, SHUT_RDWR);
-					shutdown(connection_fd, SHUT_RDWR);
-					return(process_data
-						(attack_string, total_bytes, server_string,
-						 total_from_server, dport, attack));
-				}
-			} else if (retval == 0) {
-				/* remote host closed client connection */
-				shutdown(server_sock_fd, SHUT_RDWR);
-				logmsg(LOG_INFO, 1, "%s %s  Connection closed by foreign host.\n", logpre, portstr);
-				shutdown(server_sock_fd, SHUT_RDWR);
-				logmsg(LOG_NOISY, 1, "%s %s  %s connection closed.\n", logpre, portstr, Logstr);
-				return(process_data
-					(attack_string, total_bytes, server_string, total_from_server, dport, attack));
-			} else {
-				/* copy_data error */
-				logmsg(LOG_INFO, 1,
-				       "%s %s  Error - Unable to %s data to %s connection.\n",
-				       logpre, portstr, logact, logstr);
-				shutdown(server_sock_fd, SHUT_RDWR);
-				shutdown(connection_fd, SHUT_RDWR);
-				return(process_data
-					(attack_string, total_bytes, server_string, total_from_server, dport, attack));
-			}
-		} else {
+		case 0:
 			/* select() timed out, close connections */
 			logmsg(LOG_INFO, 1,
 			       "%s %s  %s connection timed out, closing connections.\n", logpre, portstr, Logstr);
@@ -649,7 +575,97 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 			shutdown(connection_fd, SHUT_RDWR);
 			return(process_data
 				(attack_string, total_bytes, server_string, total_from_server, dport, attack));
-		}
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
+				exit(EXIT_FAILURE);
+			if (FD_ISSET(server_sock_fd, &rfds)) {
+				/* read data and proxy it to client connection */
+				bytes_read = 0;
+				if ((rv = copy_data(connection_fd, server_sock_fd, &server_string,
+					       total_from_server, &bytes_read, &bytes_sent)) > 0) {
+					logmsg(LOG_INFO, 1,
+					       "%s %s* %u (of %u) bytes copied from %s connection to %s:%u.\n",
+					       logpre, portstr, bytes_sent, bytes_read, logact, inet_ntoa(ipaddr), sport);
+					total_from_server += bytes_read;
+					if (read_limit) if (total_from_server >= read_limit) {
+						/* read limit hit, process attack string */
+						logmsg(LOG_WARN, 1,
+						       "%s %s  Warning - Read limit (%u bytes) hit. Closing %s connections.\n",
+						       logpre, portstr, read_limit, logact);
+						shutdown(server_sock_fd, SHUT_RDWR);
+						shutdown(connection_fd, SHUT_RDWR);
+						return(process_data
+							(attack_string, total_bytes, server_string,
+							 total_from_server, dport, attack));
+					}
+				} else if (rv == 0) {
+					/* first UDP packet was rejected, fall back to normal mode */
+					if ((proto == UDP) && (total_bytes == bytes_sent))
+						return(handle_connection_normal
+							(connection_fd, dport, proto, read_timeout, attack));
+
+					/* remote host closed server connection */
+					logmsg(LOG_INFO, 1,
+					       "%s %s  %s connection closed by foreign host.\n", logpre, portstr, Logstr);
+					shutdown(server_sock_fd, SHUT_RDWR);
+					shutdown(connection_fd, SHUT_RDWR);
+					return(process_data
+						(attack_string, total_bytes, server_string, total_from_server, dport, attack));
+				} else {
+					/* copy_data error */
+					logmsg(LOG_INFO, 1,
+					       "%s %s  Error - Unable to %s data to client connection.\n",
+					       logpre, portstr, logact);
+					if (close(server_sock_fd) == -1)
+						logmsg(LOG_ERR, 1,
+						       "%s %s  Error - Unable to close %s sockt.\n", logpre, portstr, logstr);
+					else
+						logmsg(LOG_NOISY, 1, "%s %s  %s connection closed.\n", logpre, portstr, Logstr);
+					shutdown(connection_fd, SHUT_RDWR);
+					return(process_data
+						(attack_string, total_bytes, server_string, total_from_server, dport, attack));
+				}
+			}
+			if (FD_ISSET(connection_fd, &rfds)) {
+				/* read data and proxy it to server connection */
+				bytes_read = 0;
+				if ((rv = copy_data(server_sock_fd, connection_fd, &attack_string,
+					       total_bytes, &bytes_read, &bytes_sent)) > 0) {
+					logmsg(LOG_INFO, 1,
+					       "%s %s* %u (of %u) bytes copied from client connection to %s:%u.\n",
+					       logpre, portstr, bytes_sent, bytes_read, inet_ntoa(ipaddr), dport);
+					total_bytes += bytes_read;
+					if (read_limit) if (total_from_server >= read_limit) {
+						/* read limit hit, process attack string */
+						logmsg(LOG_WARN, 1,
+						       "%s %s  Warning - Read limit (%u bytes) hit. Closing %s connections.\n",
+						       logpre, portstr, read_limit, logact);
+						shutdown(server_sock_fd, SHUT_RDWR);
+						shutdown(connection_fd, SHUT_RDWR);
+						return(process_data
+							(attack_string, total_bytes, server_string,
+							 total_from_server, dport, attack));
+					}
+				} else if (rv == 0) {
+					/* remote host closed client connection */
+					shutdown(server_sock_fd, SHUT_RDWR);
+					logmsg(LOG_INFO, 1, "%s %s  Connection closed by foreign host.\n", logpre, portstr);
+					shutdown(server_sock_fd, SHUT_RDWR);
+					logmsg(LOG_NOISY, 1, "%s %s  %s connection closed.\n", logpre, portstr, Logstr);
+					return(process_data
+						(attack_string, total_bytes, server_string, total_from_server, dport, attack));
+				} else {
+					/* copy_data error */
+					logmsg(LOG_INFO, 1,
+					       "%s %s  Error - Unable to %s data to %s connection.\n",
+					       logpre, portstr, logact, logstr);
+					shutdown(server_sock_fd, SHUT_RDWR);
+					shutdown(connection_fd, SHUT_RDWR);
+					return(process_data
+						(attack_string, total_bytes, server_string, total_from_server, dport, attack));
+				}
+			}
+		} // switch
 	}
 	return(0);	// never reached
 }

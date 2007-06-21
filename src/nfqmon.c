@@ -22,6 +22,7 @@
 #include "dynsrv.h"
 #include "ctrl.h"
 #include "readconf.h"
+#include "signals.h"
 #include "nfqmon.h"
 
 /* Set BUFSIZE to 1500 (ethernet frame size) to prevent
@@ -131,15 +132,17 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 
 int start_nfq_mon(void) {
-	struct nfq_handle *h;
-	struct nfnl_handle *nh;
-	int fd, rv;
-	char buf[4096];
+	struct nfq_handle	*h;
+	struct nfnl_handle	*nh;
+	int			nfq_fd, rv;
+	struct timeval		mainloop_timeout;
+	fd_set			rfds;
+	char			buf[BUFSIZ];
 
 	h	= NULL;
 	qh	= NULL;
 	nh	= NULL;
-	fd	= -1;
+	nfq_fd	= -1;
 	rv	= -1;
 
 	logmsg(LOG_DEBUG, 1, "Creating NFQ connection monitor.\n");
@@ -171,13 +174,44 @@ int start_nfq_mon(void) {
 
 	/* to what is publicly documented checking retvals is unnecessary here
 	 * because these funcs do not perform any tests on validity of passed arguments */
-	nh = nfq_nfnlh(h);
-	fd = nfnl_fd(nh);
+	nh	= nfq_nfnlh(h);
+	nfq_fd	= nfnl_fd(nh);
 
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via NFQ. ----\n");
 
 	/* receive packets */
-	while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) nfq_handle_packet(h, buf, rv);
+	
+	for (;;) {
+		FD_ZERO(&rfds);
+		FD_SET(sigpipe[0], &rfds);
+		FD_SET(nfq_fd, &rfds);
+
+		mainloop_timeout.tv_sec = 360;
+		mainloop_timeout.tv_usec = 0;
+
+		switch (select(MAX(nfq_fd, sigpipe[0]) + 1, &rfds, NULL, NULL, &mainloop_timeout)) {
+		case -1:
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
+			/* error */
+			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		case 0:
+			break;
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
+				exit(EXIT_FAILURE);
+			if (FD_ISSET(nfq_fd, &rfds)) {
+				/* incoming connection request */
+				if ((rv = recv(nfq_fd, buf, sizeof(buf), 0)) >= 0) {
+					nfq_handle_packet(h, buf, rv);
+				}
+			}
+			break;
+		}
+	}
 
 	/* never reached */
 	nfq_destroy_queue(qh);

@@ -1,4 +1,5 @@
 Version 1.0.0
+- Safe signal delivery and handling using per-process pipes
 - New configuration concept with hierarchically organized file format
 - Default port configuration can be set to "ignore", "normal" or "mirror"
 - New plugin: libclamav-based virus scanner module

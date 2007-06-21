@@ -1,5 +1,5 @@
 /* signals.h
- * Copyright (C) 2005 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -19,9 +19,13 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
+int sigpipe[2];
+
 pid_t parent_pid;
 
+void get_signal(int sig);
 void handle_signal(int sig);
 void install_signal_handlers(void);
+int check_sigpipe(void);
 
 #endif

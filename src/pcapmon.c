@@ -38,6 +38,7 @@
 #include "logging.h"
 #include "readconf.h"
 #include "tcpip.h"
+#include "signals.h"
 #include "pcapmon.h"
 
 
@@ -128,10 +129,13 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 
 
 int start_pcap_mon(void) {
-	char errbuf[PCAP_ERRBUF_SIZE];
-	struct bpf_program filter;
-	bpf_u_int32 mask;
-	bpf_u_int32 net;
+	char			errbuf[PCAP_ERRBUF_SIZE];
+	struct bpf_program	filter;
+	bpf_u_int32		mask;
+	bpf_u_int32		net;
+	int			pcap_fd;
+	struct timeval		mainloop_timeout;
+	fd_set			rfds;
 
 	logmsg(LOG_DEBUG, 1, "Creating pcap connection monitor.\n");
 
@@ -151,93 +155,136 @@ int start_pcap_mon(void) {
 		mask = 0;
 	}
 
-	/* sniff RST packets */
-	logmsg(LOG_DEBUG, 1, "Starting pcap sniffer on %s.\n", dev);
-	if ((packet_sniffer = pcap_open_live(dev, BUFSIZ, promisc_mode, 10, errbuf)) != NULL) {
-		switch (pcap_datalink(packet_sniffer)) {
-#ifdef DLT_RAW
-			case DLT_RAW:
-				pcap_offset = 0;
-				break;
-#endif
-#ifdef DLT_SLIP
-			case DLT_SLIP:
-#endif
-#ifdef DLT_PPP
-			case DLT_PPP:
-#endif
-#ifdef DLT_PPP_SERIAL
-			case DLT_PPP_SERIAL:
-				pcap_offset = 2;
-				break;
-#endif
-#ifdef DLT_NULL
-			case DLT_NULL:
-#endif
-#ifdef DLT_LOOP
-			case DLT_LOOP:
-				pcap_offset = 4;
-				break;
-#endif
-#ifdef DLT_SUNATM
-			case DLT_SUNATM:
-				pcap_offset = 8;
-				break;
-#endif
-#ifdef DLT_EN10MB
-			case DLT_EN10MB:
-				pcap_offset = ETHER_HDRLEN;
-				break;
-#endif
-#ifdef DLT_LINUX_SLL
-			case DLT_LINUX_SLL:
-				pcap_offset = 16;
-				break;
-#endif
-#ifdef DLT_FDDI
-			case DLT_FDDI:
-				pcap_offset = 21;
-				break;
-#endif
-#ifdef DLT_IEEE802
-			case DLT_IEEE802:
-				pcap_offset = 22;
-				break;
-#endif
-#ifdef DLT_PFLOG
-			case DLT_PFLOG:
-				pcap_offset = 50;
-				break;
-#endif
-			default:
-				logmsg(LOG_ERR, 1, "Error - Link type of %s is currently not supported.\n", dev);
-				clean_exit(EXIT_FAILURE);
-				break;
-		}
-		logmsg(LOG_DEBUG, 1, "Using a %d bytes offset for %s.\n",
-			pcap_offset, pcap_datalink_val_to_name(pcap_datalink(packet_sniffer)));
-
-		/* compile bpf for tcp RST fragments */
-		if (pcap_compile(packet_sniffer, &filter, bpf_filter_string, 1, net) == -1) {
-                	logmsg(LOG_ERR, 1, "Pcap error - Invalid BPF string: %s.\n", errbuf);
-                	clean_exit(EXIT_FAILURE);
-        	}
-		if (pcap_setfilter(packet_sniffer, &filter) == -1) {
-			logmsg(LOG_ERR, 1, "Pcap error - Unable to start tcp sniffer: %s\n", errbuf);
-			clean_exit(EXIT_FAILURE);
-		}
-		pcap_freecode(&filter);
-
-		logmsg(LOG_NOTICE, 1, "---- Trapping attacks on %s via PCAP. ----\n", dev);
-
-		pcap_loop(packet_sniffer, -1, (void *) server_wrapper, NULL);
-
-		pcap_close(packet_sniffer);
-	} else {
+	/* create pcap sniffer */
+	logmsg(LOG_DEBUG, 1, "Creating pcap sniffer on %s.\n", dev);
+	if ((packet_sniffer = pcap_open_live(dev, BUFSIZ, promisc_mode, 10, errbuf)) == NULL) {
 		logmsg(LOG_ERR, 1, "Error - Could not open %s for sniffing: %s.\n", dev, errbuf);
 		logmsg(LOG_ERR, 1, "Do you have root privileges?\n");
 		clean_exit(EXIT_FAILURE);
 	}
+
+	switch (pcap_datalink(packet_sniffer)) {
+#ifdef DLT_RAW
+		case DLT_RAW:
+			pcap_offset = 0;
+			break;
+#endif
+#ifdef DLT_SLIP
+		case DLT_SLIP:
+#endif
+#ifdef DLT_PPP
+		case DLT_PPP:
+#endif
+#ifdef DLT_PPP_SERIAL
+		case DLT_PPP_SERIAL:
+			pcap_offset = 2;
+			break;
+#endif
+#ifdef DLT_NULL
+		case DLT_NULL:
+#endif
+#ifdef DLT_LOOP
+		case DLT_LOOP:
+			pcap_offset = 4;
+			break;
+#endif
+#ifdef DLT_SUNATM
+		case DLT_SUNATM:
+			pcap_offset = 8;
+			break;
+#endif
+#ifdef DLT_EN10MB
+		case DLT_EN10MB:
+			pcap_offset = ETHER_HDRLEN;
+			break;
+#endif
+#ifdef DLT_LINUX_SLL
+		case DLT_LINUX_SLL:
+			pcap_offset = 16;
+			break;
+#endif
+#ifdef DLT_FDDI
+		case DLT_FDDI:
+			pcap_offset = 21;
+			break;
+#endif
+#ifdef DLT_IEEE802
+		case DLT_IEEE802:
+			pcap_offset = 22;
+			break;
+#endif
+#ifdef DLT_PFLOG
+		case DLT_PFLOG:
+			pcap_offset = 50;
+			break;
+#endif
+		default:
+			logmsg(LOG_ERR, 1, "Error - Link type of %s is currently not supported.\n", dev);
+			clean_exit(EXIT_FAILURE);
+			break;
+	}
+	logmsg(LOG_DEBUG, 1, "Using a %d bytes offset for %s.\n",
+		pcap_offset, pcap_datalink_val_to_name(pcap_datalink(packet_sniffer)));
+
+	/* compile bpf for tcp RST fragments */
+	if (pcap_compile(packet_sniffer, &filter, bpf_filter_string, 1, net) == -1) {
+		logmsg(LOG_ERR, 1, "Pcap error - Invalid BPF string: %s.\n", errbuf);
+		clean_exit(EXIT_FAILURE);
+	}
+	if (pcap_setfilter(packet_sniffer, &filter) == -1) {
+		logmsg(LOG_ERR, 1, "Pcap error - Unable to start tcp sniffer: %s\n", errbuf);
+		clean_exit(EXIT_FAILURE);
+	}
+	pcap_freecode(&filter);
+
+	/* enable non-blocking mode to be able to select() */
+	if (pcap_setnonblock(packet_sniffer, 1, errbuf) == -1) {
+		logmsg(LOG_ERR, 1, "Pcap error - Unable to set capture descriptor to non-blocking: %s\n", errbuf);
+		clean_exit(EXIT_FAILURE);
+	}
+
+	/* get a selectable file descriptor */
+	if ((pcap_fd = pcap_get_selectable_fd(packet_sniffer)) == -1) {
+		logmsg(LOG_ERR, 1, "Pcap error - Capture descriptor does not support select().\n");
+		clean_exit(EXIT_FAILURE);
+	}
+
+	logmsg(LOG_NOTICE, 1, "---- Trapping attacks on %s via PCAP. ----\n", dev);
+
+	for (;;) {
+		FD_ZERO(&rfds);
+		FD_SET(sigpipe[0], &rfds);
+		FD_SET(pcap_fd, &rfds);
+
+		mainloop_timeout.tv_sec = 360;
+		mainloop_timeout.tv_usec = 0;
+
+		switch (select(MAX(pcap_fd, sigpipe[0]) + 1, &rfds, NULL, NULL, &mainloop_timeout)) {
+		case -1:
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
+			/* error */
+			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		case 0:
+			break;
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
+				exit(EXIT_FAILURE);
+			if (FD_ISSET(pcap_fd, &rfds)) {
+				/* incoming connection request */
+				if (pcap_dispatch(packet_sniffer, -1, (void *) server_wrapper, NULL) < 0) {
+					logmsg(LOG_ERR, 1, "Pcap error - Unable to process packet: %s.\n", pcap_geterr(packet_sniffer));
+					exit(EXIT_FAILURE);
+				}
+			}
+			break;
+		}
+	}
+
+	pcap_close(packet_sniffer); // never reached
 	return(1);
 }
 
