@@ -142,7 +142,7 @@ void handle_signal(int sig) {
 void install_signal_handlers(void) {
 	/* create a pipe for process-internal signal delivery */
 	if (pipe(sigpipe) == -1) {
-		logmsg(LOG_ERR, 1, "Error - Unable to create signal pipe: %s.\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to create signal pipe: %s.\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	DEBUG_FPRINTF(stdout, "  Signal pipe successfully created.\n");

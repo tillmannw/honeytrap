@@ -126,29 +126,39 @@ int do_daemonize(void) {
 	} else if (pid != 0) {
 		DEBUG_FPRINTF(stdout, "  Successfully changed into daemon environment.\n");
 		fprintf(stdout, "\nhoneytrap v%s Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
-		fflush(stdout);
+		fflush(NULL);
 		exit(EXIT_SUCCESS);
 	}
 
 
 	/* change working directory to root directory */
-	DEBUG_FPRINTF(stdout, "  Current working directory is %s.\n", old_cwd);
-	DEBUG_FPRINTF(stdout, "  Changing working directory to /.\n");
+	DEBUG_FPRINTF(stdout, "  Current working directory is %s, changing it to /.\n", old_cwd);
 	if (chdir("/") < 0) {
 		fprintf(stderr, "  Error - Cannot change working directory: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
 
-
-	/* close open file descriptors */
+	/* close open file descriptors, only keep logfile and signal pipe */
 	if (rl.rlim_max == RLIM_INFINITY) rl.rlim_max = 1024;
-	for (i=0; i < rl.rlim_max; i++) if (i != logfile_fd) close(i);
+	for (i=0; i < rl.rlim_max; i++)
+		if ((i != logfile_fd) && (i != sigpipe[0]) && (i != sigpipe[1]) && (close(i) == -1))
+			fprintf(stdout, "  Warnging - Could not close file descriptor %d: %s.\n", i, strerror(errno));
 
 	/* attach file descriptors 0, 1 and 2 to /dev/null to prevent accidentally standard IO */
-	fd0 = open("/dev/null", O_RDWR);
-	fd1 = dup(fd0);
-	fd2 = dup(fd0);
+	if ((fd0 = open("/dev/null", O_RDWR)) == -1) {
+		fprintf(stderr, "  Error - Unable to set stdin to /dev/null: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if ((fd1 = dup(fd0)) == -1) {
+		fprintf(stderr, "  Error - Unable to set stdout to /dev/null: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if ((fd2 = dup(fd0)) == -1) {
+		fprintf(stderr, "  Error - Unable to set stderr to /dev/null: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	fflush(NULL);
 
 	return(1);
 }
