@@ -24,11 +24,12 @@
 #include <unistd.h>
 
 #include "honeytrap.h"
-#include "logging.h"
 #include "ipqmon.h"
+#include "logging.h"
 #include "nfqmon.h"
-#include "tcpip.h"
+#include "signals.h"
 #include "sock.h"
+#include "tcpip.h"
 
 
 /* returns a bound socket matching a connection request *
@@ -97,4 +98,63 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 	logmsg(LOG_DEBUG, 1, "Socket created, file descriptor is %d.\n", fd);
 
 	return(fd);
+}
+
+
+/* perform a non-blocking connect() with a given timeoutr
+ * always use this function instead of connect()
+ * or signal processing might get delayed */
+int nb_connect(int sock_fd, const struct sockaddr * sockaddr, socklen_t slen, int sec) {
+	int		flags, rv, error;
+	struct timeval	timeout;
+	fd_set		rfds, wfds;
+	socklen_t	len;
+
+	/* safe fd flags and set socket to non-blocking */
+	if ((flags = fcntl(sock_fd, F_GETFL, 0) < 0)) return(-1);
+	if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) < 0) return(-1);
+	
+	/* try an immediate connect */
+	errno = 0;
+	if ((rv = connect(sock_fd, sockaddr, slen)) < 0) 
+		if (errno != EINPROGRESS) return(-1);
+	
+	if (rv != 0) {
+		/* do a non-blocking connect */
+		FD_ZERO(&rfds);
+		FD_SET(sigpipe[0], &rfds);
+		FD_SET(sock_fd, &rfds);
+
+		wfds		= rfds;
+		timeout.tv_sec	= sec;
+		timeout.tv_usec	= 0;
+
+		switch (select(MAX(sigpipe[0], sock_fd) + 1, &rfds, &wfds, NULL, &timeout)) {
+		case -1:
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
+			close(sock_fd);
+			errno = ETIMEDOUT;
+			return(-1);
+		case 0:
+			/* timeout */
+			close(sock_fd);
+			return(0);
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) {
+				logmsg(LOG_ERR, 1, "Error - Signal handling failed in dynamic server process.\n");
+				exit(EXIT_FAILURE);
+			}
+			if (FD_ISSET(sock_fd, &rfds) || FD_ISSET(sock_fd, &wfds)) {
+				len = sizeof(error);
+				if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) return(-1);
+			}
+		}
+	}
+	if (fcntl(sock_fd, F_SETFL, flags) < 0) return(-1);
+	if (error) return(-1);
+
+	return(sock_fd);
 }

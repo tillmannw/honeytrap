@@ -207,6 +207,82 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 						free(attack);
 						exit(EXIT_FAILURE);
 					}
+
+
+					/* accept connection depending on protocol */
+					bzero(&client_addr, sizeof(client_addr));
+					client_addr_len = sizeof(client_addr);
+					established = 0;
+
+					switch ((uint16_t) proto) {
+					case TCP:
+						/* accept tcp connection request */
+						if ((connection_fd = accept(listen_fd, (struct sockaddr *)
+									    &client_addr, &client_addr_len)) < 0) {
+							if (errno == EINTR)
+								break;
+							else {
+								logmsg(LOG_ERR, 1,
+								       "   %s  Error - Could not accept tcp connection: %s\n",
+								       portstr, strerror(errno));
+								close(mirror_sock_fd);
+								free(attack);
+								exit(EXIT_FAILURE);
+							}
+						}
+						established = 1;
+						break;
+					case UDP:
+						connection_fd = dup(listen_fd);
+						client_addr.sin_family = AF_INET;
+						client_addr.sin_addr = ip_r;
+						client_addr.sin_port = port_r;
+
+						/* connecting our udp socket enables us to use read() and write() */
+						if (connect
+						    (connection_fd, (struct sockaddr *) &client_addr,
+						     client_addr_len) < 0) {
+							if (errno == EINTR)
+								break;
+							else {
+								logmsg(LOG_ERR, 1,
+								       "   %s  Error - Could not connect udp socket: %s\n",
+								       portstr, strerror(errno));
+								close(mirror_sock_fd);
+								free(attack);
+								exit(EXIT_FAILURE);
+							}
+						}
+
+						/* update remote endpoint information for attack structure */
+						if (getpeername
+						    (connection_fd, (struct sockaddr *) &client_addr,
+						     &client_addr_len) < 0) {
+							if (errno == EINTR)
+								break;
+							else {
+								logmsg(LOG_ERR, 1,
+								       "   %s  Error - Could not get remote host information: %s\n",
+								       portstr, strerror(errno));
+								close(mirror_sock_fd);
+								free(attack);
+								exit(EXIT_FAILURE);
+							}
+						}
+						established = 1;
+						break;
+					default:
+						logmsg(LOG_ERR, 1, "Error - Protocol %d not supported.\n", proto);
+						exit(EXIT_FAILURE);
+					}
+					if (!established) continue;
+					
+
+					/* incoming connection accepted, select port mode */
+					logmsg(LOG_NOTICE, 1, "   %s  Connection from %s:%u accepted.\n",
+					       portstr, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+					attack->a_conn.r_port = ntohs(client_addr.sin_port);
+
 					if (port_mode & PORTCONF_NORMAL) {
 						/* handle connection in normal mode if this port configured to be handled 'normal' */
 						logmsg(LOG_DEBUG, 1,
@@ -280,140 +356,63 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							       portstr, inet_ntoa(ip_r), (uint16_t) ntohs(port_l));
 					}
 
-					bzero(&client_addr, sizeof(client_addr));
-					client_addr_len = sizeof(client_addr);
-					established = 0;
 
+					/* fork connection handler */
+					if ((pid = fork()) == 0) {
+						/* close listening socket in child */
+						close(listen_fd);
+						disconnect = 0;
+						total_bytes = 0;
 
-					/* accept connection depending on protocol */
-					switch ((uint16_t) proto) {
-					case TCP:
-						/* accept tcp connection request */
-						if ((connection_fd = accept(listen_fd, (struct sockaddr *)
-									    &client_addr, &client_addr_len)) < 0) {
-							if (errno == EINTR)
-								break;
-							else {
-								logmsg(LOG_ERR, 1,
-								       "   %s  Error - Could not accept tcp connection: %s\n",
-								       portstr, strerror(errno));
-								close(mirror_sock_fd);
-								free(attack);
-								exit(EXIT_FAILURE);
-							}
+						if (port_mode & PORTCONF_PROXY) {
+							logmsg(LOG_DEBUG, 1,
+							       "   %s  Handling connection from %s:%u in proxy mode.\n",
+							       portstr,
+							       inet_ntoa(client_addr.sin_addr),
+							       ntohs(client_addr.sin_port));
+							handle_connection_proxied(connection_fd,
+										  PORTCONF_PROXY,
+										  proxy_sock_fd, (uint16_t)
+										  ntohs(port_l),
+										  client_addr.sin_port,
+										  client_addr.sin_addr,
+										  proto,
+										  m_read_timeout,
+										  read_timeout, attack);
+						} else if (port_mode & PORTCONF_MIRROR) {
+							logmsg(LOG_DEBUG, 1,
+							       "   %s  Handling connection from %s:%u in mirror mode.\n",
+							       portstr,
+							       inet_ntoa(client_addr.sin_addr),
+							       ntohs(client_addr.sin_port));
+							handle_connection_proxied(connection_fd,
+										  PORTCONF_MIRROR,
+										  mirror_sock_fd, (uint16_t)
+										  ntohs(port_l),
+										  client_addr.sin_port,
+										  client_addr.sin_addr,
+										  proto,
+										  m_read_timeout,
+										  read_timeout, attack);
+						} else {
+							logmsg(LOG_DEBUG, 1,
+							       "   %s  Handling connection from %s:%u in normal mode.\n",
+							       portstr,
+							       inet_ntoa(client_addr.sin_addr),
+							       ntohs(client_addr.sin_port));
+							handle_connection_normal(connection_fd, (uint16_t)
+										 ntohs(port_l), proto,
+										 read_timeout, attack);
 						}
-						established = 1;
-						break;
-					case UDP:
-						connection_fd = dup(listen_fd);
-						client_addr.sin_family = AF_INET;
-						client_addr.sin_addr = ip_r;
-						client_addr.sin_port = port_r;
-
-						/* connecting our udp socket enables us to use read() and write() */
-						if (connect
-						    (connection_fd, (struct sockaddr *) &client_addr,
-						     client_addr_len) < 0) {
-							if (errno == EINTR)
-								break;
-							else {
-								logmsg(LOG_ERR, 1,
-								       "   %s  Error - Could not connect udp socket: %s\n",
-								       portstr, strerror(errno));
-								close(mirror_sock_fd);
-								free(attack);
-								exit(EXIT_FAILURE);
-							}
-						}
-
-						/* update remote endpoint information for attack structure */
-						if (getpeername
-						    (connection_fd, (struct sockaddr *) &client_addr,
-						     &client_addr_len) < 0) {
-							if (errno == EINTR)
-								break;
-							else {
-								logmsg(LOG_ERR, 1,
-								       "   %s  Error - Could not get remote host information: %s\n",
-								       portstr, strerror(errno));
-								close(mirror_sock_fd);
-								free(attack);
-								exit(EXIT_FAILURE);
-							}
-						}
-						established = 1;
-						break;
-					default:
-						logmsg(LOG_ERR, 1, "Error - Protocol %d not supported.\n", proto);
-						exit(EXIT_FAILURE);
-					}
-
-
-					if (established) {
-						/* connection successful established, fork handler process */
-
-						logmsg(LOG_NOTICE, 1,
-						       "   %s  Connection from %s:%u accepted.\n",
-						       portstr, inet_ntoa(client_addr.sin_addr),
-						       ntohs(client_addr.sin_port));
-						attack->a_conn.r_port = ntohs(client_addr.sin_port);
-
-						if ((pid = fork()) == 0) {
-							/* close listening socket in child */
-							close(listen_fd);
-							disconnect = 0;
-							total_bytes = 0;
-
-							if (port_mode & PORTCONF_PROXY) {
-								logmsg(LOG_DEBUG, 1,
-								       "   %s  Handling connection from %s:%u in proxy mode.\n",
-								       portstr,
-								       inet_ntoa(client_addr.sin_addr),
-								       ntohs(client_addr.sin_port));
-								handle_connection_proxied(connection_fd,
-											  PORTCONF_PROXY,
-											  proxy_sock_fd, (uint16_t)
-											  ntohs(port_l),
-											  client_addr.sin_port,
-											  client_addr.sin_addr,
-											  proto,
-											  m_read_timeout,
-											  read_timeout, attack);
-							} else if (port_mode & PORTCONF_MIRROR) {
-								logmsg(LOG_DEBUG, 1,
-								       "   %s  Handling connection from %s:%u in mirror mode.\n",
-								       portstr,
-								       inet_ntoa(client_addr.sin_addr),
-								       ntohs(client_addr.sin_port));
-								handle_connection_proxied(connection_fd,
-											  PORTCONF_MIRROR,
-											  mirror_sock_fd, (uint16_t)
-											  ntohs(port_l),
-											  client_addr.sin_port,
-											  client_addr.sin_addr,
-											  proto,
-											  m_read_timeout,
-											  read_timeout, attack);
-							} else {
-								logmsg(LOG_DEBUG, 1,
-								       "   %s  Handling connection from %s:%u in normal mode.\n",
-								       portstr,
-								       inet_ntoa(client_addr.sin_addr),
-								       ntohs(client_addr.sin_port));
-								handle_connection_normal(connection_fd, (uint16_t)
-											 ntohs(port_l), proto,
-											 read_timeout, attack);
-							}
-							free(attack);
-							exit(EXIT_SUCCESS);
-
-						} else if (pid == -1)
-							logmsg(LOG_ERR, 1, "Error - forking connection handler failed.\n");
-						close(mirror_sock_fd);
-						close(connection_fd);
 						free(attack);
-						port_mode = portconf_default;
-					} // connection accepted
+						exit(EXIT_SUCCESS);
+
+					} else if (pid == -1)
+						logmsg(LOG_ERR, 1, "Error - forking connection handler failed.\n");
+					close(mirror_sock_fd);
+					close(connection_fd);
+					free(attack);
+					port_mode = portconf_default;
 				} // FD_ISSET - incoming connection
 			} // select return for listen_fd
 		} // for - incoming connections

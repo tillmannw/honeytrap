@@ -26,18 +26,19 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <conftree.h>
 #include <honeytrap.h>
 #include <logging.h>
-#include <conftree.h>
-#include <plughook.h>
-#include <util.h>
 #include <md5.h>
+#include <plughook.h>
+#include <sock.h>
 #include <tcpip.h>
+#include <util.h>
 
 #include "htm_ftpDownload.h"
 
 const char module_name[]="ftpDownload";
-const char module_version[]="0.5.0";
+const char module_version[]="0.5.2";
 
 char *ftp_host = NULL;
 
@@ -331,6 +332,13 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	select_return = -1;
 	timeout = 60;
 	data_sock_fd = -1;
+
+
+	/* replace private ip? */
+	if (replace_private_ips && private_ipaddr(rhost->s_addr)) {
+		logmsg(LOG_NOISY, 1, "FTP download - Replacing private server address with attacking IP address.\n");
+		rhost = (struct in_addr *) &attack->a_conn.r_addr;
+	}
 	
 	logmsg(LOG_NOTICE, 1, "FTP download - Requesting '%s' from %s:%u.\n", save_file, inet_ntoa(*rhost), port);
 
@@ -345,23 +353,25 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	control_socket.sin_family          = AF_INET;
 	control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
 	control_socket.sin_port            = htons(port);
-	if (connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket)) != 0) {
+	if (nb_connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket), CONNTIMEOUT) != 0) {
 		/* if network or host is unreachable try attacking address instead */
 		switch(errno) {
 		case ECONNREFUSED:
 		case ENETUNREACH:
 		case ETIMEDOUT:
-			rhost = (struct in_addr *) &attack->a_conn.r_addr;
-			control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
-			logmsg(LOG_NOISY, 1, "FTP download - FTP server could not be reached, trying the attacking address (%s) instead.\n",
-				inet_ntoa(*rhost));
-			if (connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket)) != 0) {
-				logmsg(LOG_ERR, 1, "FTP download error - Unable to connect to %s:%d: %s\n",
-					inet_ntoa(*rhost), port, strerror(errno));
-				close(control_sock_fd);
-				return(-1);
+			if (rhost != (struct in_addr *) &attack->a_conn.r_addr) {
+				rhost = (struct in_addr *) &attack->a_conn.r_addr;
+				control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
+				logmsg(LOG_NOISY, 1, "FTP download - FTP server could not be reached, trying the attacking address (%s) instead.\n",
+					inet_ntoa(*rhost));
+				if (nb_connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket), CONNTIMEOUT) != 0) {
+					logmsg(LOG_ERR, 1, "FTP download error - Unable to connect to %s:%d: %s\n",
+						inet_ntoa(*rhost), port, strerror(errno));
+					close(control_sock_fd);
+					return(-1);
+				}
+				break;
 			}
-			break;
 		default:
 			logmsg(LOG_ERR, 1, "FTP download error - Unable to connect to %s:%d: %s\n",
 				inet_ntoa(*rhost), port, strerror(errno));

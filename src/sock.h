@@ -13,7 +13,11 @@
 #ifndef __HONEYTRAP_SOCK_H
 #define __HONEYTRAP_SOCK_H 1
 
+#define CONNTIMEOUT	90
+#define FASTCONNTIMEOUT	3
+
 
 int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type);
+int nb_connect(int sock_fd, const struct sockaddr * sockaddr, socklen_t slen, int sec);
 
 #endif

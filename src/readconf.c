@@ -54,6 +54,7 @@ static const char *config_keywords[] = {
 	"response_dir",
 	"plugin_dir",
 	"read_limit",
+	"replace_private_ips",
 #ifdef USE_PCAP_MON
 	"promisc",
 #endif
@@ -433,7 +434,7 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 			process_conftree(node, node->first_leaf, process_confopt_plugin, NULL);
 			node->first_leaf = NULL;
 			conftree_children_free(node);
-	#ifdef USE_PCAP_MON
+#ifdef USE_PCAP_MON
 		} else if (OPT_IS("promisc")) {
 			if (strcmp(value, "on") == 0) promisc_mode = 1;
 			else if (strcmp(value, "off") == 0) promisc_mode = 0;
@@ -442,7 +443,15 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 				exit(EXIT_FAILURE);
 			}
 			DEBUG_FPRINTF(stdout, "  Setting promiscuous mode to on.\n");
-	#endif
+#endif
+		} else if (OPT_IS("replace_private_ips")) {
+			if (strcmp(value, "yes") == 0) replace_private_ips = 1;
+			else if (strcmp(value, "no") == 0) replace_private_ips = 0;
+			else {
+				fprintf(stderr, "  Error - Invalid value '%s' for option '%s'.\n", value, node->keyword);
+				exit(EXIT_FAILURE);
+			}
+			DEBUG_FPRINTF(stdout, "  Setting promiscuous mode to on.\n");
 		} else if (OPT_IS("read_limit")) {
 			read_limit = atol(value);
 			if (read_limit <= 0) {

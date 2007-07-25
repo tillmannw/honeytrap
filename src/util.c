@@ -10,9 +10,11 @@
  * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,11 +26,26 @@
 #include "signals.h"
 #include "logging.h"
 
+
+/* check if 'address' is an ip address with a reasonable value */
 int valid_ipaddr(uint32_t address) {
-	/* check if 'address' is an ip address with a reasonable value */
-	/* realized as function to be able to add additional checks, i.e. exclude rfc1918 addresses */
-	return(address > 0 ? 1 : 0);
+	return(address > 0xffffff ? 1 : 0);
 }
+
+
+/* test if 'address' is a rfc1918 ip address */
+int private_ipaddr(uint32_t address) {
+	int i;
+
+	for (i=0; i<(sizeof(priv_prefixes)/4); i++)
+		if ((ntohl(address) & priv_prefixes[i]) == ntohl(address)) {
+			printf("match for %s.\n", inet_ntoa(*(struct in_addr *) &priv_prefixes[i]));
+			return(1);
+		}
+
+	return(0);
+}
+
 
 int read_line(int socket, char *line, ssize_t len, int timeout) {
 	/* reads a line from 'socket' into buffer 'line' */

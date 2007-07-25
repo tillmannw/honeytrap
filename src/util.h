@@ -21,7 +21,16 @@ struct strtk {
 	int offset;
 };
 
+/* rfc1918 prefixes */
+static const uint32_t priv_prefixes[] = {
+	0x0affffff,	// 10.x.x.x
+	0xac1fffff,	// 172.16.x.x - 172.31.x.x
+	0xc0a8ffff	// 192.168.x.x
+};
+
+
 int valid_ipaddr(uint32_t address);
+int private_ipaddr(uint32_t address);
 int read_line(int socket, char *line, ssize_t len, int timeout);
 struct strtk extract_token(char *parse_string);
 char *get_next_line(FILE * file);

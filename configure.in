@@ -273,7 +273,7 @@ if test "$with_ipq_mon" = "yes"; then
   fi
 
   AC_DEFINE([USE_IPQ_MON], [], [Define if ip_queue connection monitor is used])
-else with_ipq_mon=" "
+else with_ipq_mon="no"
 fi
 
 AC_ARG_WITH(nfq-mon,
@@ -308,7 +308,7 @@ if test "$with_nfq_mon" = "yes"; then
     exit
   fi
   AC_DEFINE([USE_NFQ_MON], [], [Define if netfilter_queue connection monitor is used])
-else with_nfq_mon=" "
+else with_nfq_mon="no"
 fi
 
 AC_ARG_WITH(ipfw-mon,
@@ -319,7 +319,7 @@ if test "$with_ipfw_mon" = "yes"; then
   echo "ipfw connection monitor is currently not supported."
   exit 1
   AC_DEFINE([USE_IPFW_MON], [], [Define if ipfw connection monitor is used])
-else with_ipfw_mon=" "
+else with_ipfw_mon="no"
 fi
 
 
@@ -491,7 +491,8 @@ if test "$with_postgres" = "yes"; then
   fi
 
   AC_DEFINE([USE_POSTGRES_DB], [], [Define to store attacks in PostgreSQL database])
-else with_postgres=" "
+else
+  with_postgres=" "
 fi
 
 #-------------------------------------------------------------
@@ -533,14 +534,14 @@ else
 fi
 
 # Check for electric fence malloc debugger
-AC_ARG_WITH(efence,
-	[  --with-efence           link with electric fence ])
-	if test "$with_efence" = "yes"
-	then
-		with_efence="X"
-		AC_CHECK_LIB(efence, EF_ALIGNMENT, LIBS="${LIBS} -lefence", AC_MSG_ERROR(libefence not found))
-	else with_efence=" "
-	fi
+AC_ARG_WITH(efence, [  --with-efence           link with electric fence ])
+if test "$with_efence" = "yes"
+then
+	with_efence="X"
+	AC_CHECK_LIB(efence, EF_ALIGNMENT, LIBS="${LIBS} -lefence", AC_MSG_ERROR(libefence not found))
+else
+	with_efence="no"
+fi
 
 
 # let's make some fixes..
@@ -552,12 +553,17 @@ INCLUDES='-I$(top_srcdir) -I$(top_srcdir)/src'
 
 AC_SUBST(INCLUDES)
 
-if test ! $with_ipq_mon -a ! $with_nfq_mon -a ! $with_ipfw_mon -a ! $with_pcap_mon; then
+if test $with_ipq_mon != "X" -a $with_nfq_mon != "X" -a $with_ipfw_mon != "X" -a $with_pcap_mon != "X"; then
   echo
   echo "   ERROR! No connection monitor selected. Please reconfigure with --with-pcap-mon, --with-nfq-mon  or --with-ipq-mon."
   echo
   exit 1
 fi
+
+if test "$with_ipq_mon" != "X"; then with_ipq_mon=" "; fi
+if test "$with_nfq_mon" != "X"; then with_nfq_mon=" "; fi
+if test "$with_ipfw_mon" != "X"; then with_ipfw_mon=" "; fi
+if test "$with_pcap_mon" != "X"; then with_pcap_mon=" "; fi
 
 
 AC_PROG_INSTALL

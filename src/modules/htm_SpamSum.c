@@ -154,7 +154,7 @@ int calc_spamsum(Attack *attack) {
 			fclose(hashfile);
 			return(0);
 		}
-		if ((sig) && (!feof(hashfile))) {
+		if ((sig[0]) && (!feof(hashfile))) {
 			if (sig[32] == '\n') sig[32] = 0;
 			logmsg(LOG_DEBUG, 1, "SpamSum - Comparing with %s.\n", sig);
 			if (strcmp(attack->a_conn.payload.md5sum, sig) == 0) sig_match = 1;
@@ -202,7 +202,7 @@ int calc_spamsum(Attack *attack) {
 			fclose(sigfile);
 			return(0);
 		}
-		if ((sig) && (!feof(sigfile))) {
+		if ((sig[0]) && (!feof(sigfile))) {
 			logmsg(LOG_DEBUG, 1, "SpamSum - Comparing with %s", sig);
 			if (strcmp(sum, sig) == 0) sig_match = 1;
 		}
