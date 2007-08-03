@@ -26,6 +26,7 @@ pid_t parent_pid;
 void get_signal(int sig);
 void handle_signal(int sig);
 void install_signal_handlers(void);
+void create_sigpipe(void);
 int check_sigpipe(void);
 
 #endif

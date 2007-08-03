@@ -29,6 +29,7 @@
 #include <honeytrap.h>
 #include <logging.h>
 #include <plughook.h>
+#include <signals.h>
 #include <util.h>
 #include <md5.h>
 #include <tcpip.h>
@@ -38,7 +39,7 @@
 #define MAX_TRANSMISSION_TRIES  10      /* retransmit 9 times */
 
 const char module_name[]="tftpDownload";
-const char module_version[]="0.4";
+const char module_version[]="0.4.1";
 
 
 void plugin_init(void) {
@@ -111,7 +112,7 @@ int get_tftpcmd(char *attack_string, int string_size, Attack *attack) {
 			logmsg(LOG_DEBUG, 1, "TFTP download - %s resolves to %s.\n", token.string,
 				inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 
-			if (!valid_ipaddr((uint32_t) *(host->h_addr_list[0]))) {
+			if (!replace_private_ips && !valid_ipaddr((uint32_t) *(host->h_addr_list[0]))) {
 				logmsg(LOG_INFO, 1, "TFTP download error - %s is not a valid ip address.\n",
 					inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 				return(-1);
@@ -146,17 +147,15 @@ int get_tftpcmd(char *attack_string, int string_size, Attack *attack) {
 }
 
 
-int tftp_quit(int data_sock_fd, int dumpfile_fd) {
+int tftp_quit(int data_sock_fd) {
 	if (data_sock_fd) close(data_sock_fd);
-	if (dumpfile_fd) close(dumpfile_fd);
 	return(0);
 }
 
 
 int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attack) {
 	struct sockaddr_in data_socket, from;
-	int data_sock_fd, dumpfile_fd,
-	    fromlen, select_return, bytes_sent,
+	int data_sock_fd, fromlen, bytes_sent,
 	    tftp_command_size, socklen, retransmissions, received_last_packet, last_ack_packet;
 	uint8_t *binary_stream;
 	uint16_t tftp_opcode, tftp_errcode, tftp_blockcode, max_blockcode;
@@ -170,9 +169,14 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 	tftp_command = NULL;
 	binary_stream = NULL;
 	max_blockcode = 0;
-	select_return = -1;
-	dumpfile_fd = -1;
 	socklen = sizeof(struct sockaddr_in);
+	
+
+	/* replace private ip? */
+	if (replace_private_ips && (private_ipaddr(host->s_addr) || !(valid_ipaddr(host->s_addr)))) {
+		logmsg(LOG_NOISY, 1, "FTP download - Replacing private/invalid server address with attacking IP address.\n");
+		host = (struct in_addr *) &attack->a_conn.r_addr;
+	}
 	
 	logmsg(LOG_NOTICE, 1, "TFTP download - Requesting '%s' from %s.\n", save_file, inet_ntoa(*host));
 
@@ -213,10 +217,10 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 	received_last_packet = 0;
 
 	FD_ZERO(&rfds);
+	FD_SET(sigpipe[0], &rfds);
 	FD_SET(data_sock_fd, &rfds);
-	select_return = 0;
 
-	while ((retransmissions++ < MAX_TRANSMISSION_TRIES) && !select_return) {
+	while (retransmissions++ < MAX_TRANSMISSION_TRIES) {
 		/* send read request */
 		if ((bytes_sent = sendto(data_sock_fd, tftp_command, tftp_command_size, 0,
 				(struct sockaddr *) &data_socket, socklen)) != tftp_command_size) {
@@ -233,12 +237,26 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 		logmsg(LOG_DEBUG, 1, "TFTP download - Waiting for incoming data, timeout is %d seconds.\n",
 			(u_int16_t) snd_timeout.tv_sec);
 	
-		if (((select_return = select(data_sock_fd + 1, &rfds, NULL, NULL, &snd_timeout)) < 0) && (errno != EINTR)) {
-			logmsg(LOG_ERR, 1, "TFTP download error - 'select' call failed.\n");
+		switch (select(MAX(sigpipe[0], data_sock_fd) + 1, &rfds, NULL, NULL, &snd_timeout)) {
+		case -1:
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
+			logmsg(LOG_ERR, 1, "TFTP download error - Select on TFTP data channel failed: %s.\n", strerror(errno));
+			tftp_quit(data_sock_fd);
 			return(-1);
+		case 0:
+			logmsg(LOG_WARN, 1, "TFTP download - Transfer timeout, no incoming data connection for %d seconds.\n",
+				 (u_int16_t) snd_timeout.tv_sec);
+			tftp_quit(data_sock_fd);
+			return(-1);
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
+			if (FD_ISSET(data_sock_fd, &rfds)) break;
 		}
 	}
-	if (!select_return) {
+	if (retransmissions >= MAX_TRANSMISSION_TRIES) {
 		logmsg(LOG_ERR, 1, "TFTP download error - Connection timed out.\n");
 		return(-1);
 	}
@@ -264,92 +282,109 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 		memcpy(&tftp_opcode, rbuf, 2);
 
 		switch(ntohs(tftp_opcode)) {
-			case 3:
-				/* Got data */
-				memcpy(&tftp_blockcode, rbuf+2, 2);
-				logmsg(LOG_DEBUG, 1, "TFTP download - Data block %u read (%u bytes).\n",
+		case 3:
+			/* Got data */
+			memcpy(&tftp_blockcode, rbuf+2, 2);
+			logmsg(LOG_DEBUG, 1, "TFTP download - Data block %u read (%u bytes).\n",
+				ntohs(tftp_blockcode), bytes_read);
+
+			if (last_ack_packet >= ntohs(tftp_blockcode)) {
+				/* packet already processed and acknowledged */
+				logmsg(LOG_DEBUG, 1, "TFTP download - Data block %u re-received (%u bytes).\n",
 					ntohs(tftp_blockcode), bytes_read);
-
-				if (last_ack_packet >= ntohs(tftp_blockcode)) {
-					/* packet already processed and acknowledged */
-					logmsg(LOG_DEBUG, 1, "TFTP download - Data block %u re-received (%u bytes).\n",
-						ntohs(tftp_blockcode), bytes_read);
-				} else {
-					/* new packet */
-					last_ack_packet = ntohs(tftp_blockcode);
-					total_bytes += bytes_read-4;	/* subtract space for opcode and block number */
-				
-					/* check if we need to insert packet into file */
-					if (ntohs(tftp_blockcode) > ntohs(max_blockcode)) {
-						max_blockcode = tftp_blockcode;
-						binary_stream = (uint8_t *) realloc(binary_stream, total_bytes);
-						/* assemble file */
-						memcpy(binary_stream + total_bytes - bytes_read+4, rbuf+4, bytes_read-4);
-					}
+			} else {
+				/* new packet */
+				last_ack_packet = ntohs(tftp_blockcode);
+				total_bytes += bytes_read-4;	/* subtract space for opcode and block number */
+			
+				/* check if we need to insert packet into file */
+				if (ntohs(tftp_blockcode) > ntohs(max_blockcode)) {
+					max_blockcode = tftp_blockcode;
+					binary_stream = (uint8_t *) realloc(binary_stream, total_bytes);
+					/* assemble file */
+					memcpy(binary_stream + total_bytes - bytes_read+4, rbuf+4, bytes_read-4);
 				}
+			}
 
-				/* send ACK */
+			/* send ACK */
+			bytes_sent = 0;
+			tftp_command = (char *) malloc(4);
+			bzero(tftp_command, 4);
+			tftp_command[1] = 4;			/* ACK opcode */
+			memcpy(tftp_command+2, &tftp_blockcode, 2);
+
+			logmsg(LOG_DEBUG, 1, "TFTP download - ACK %u assembled.\n", ntohs(tftp_blockcode));
+
+			if (bytes_read < 512) { 
+				received_last_packet = 1;
+				logmsg(LOG_DEBUG, 1, "TFTP download - Last data packet recieved.\n");
+				if ((bytes_sent = sendto(data_sock_fd, tftp_command, 4, 0,
+						(struct sockaddr *) &data_socket, socklen)) == -1) {
+					logmsg(LOG_DEBUG, 1, "TFTP download - Unable to send last ACK packet.\n");
+				} else logmsg(LOG_DEBUG, 1, "TFTP download - Data block %d acknowledged.\n",
+					ntohs(tftp_blockcode));
+			} else {
+				retransmissions = 0;
 				bytes_sent = 0;
-				tftp_command = (char *) malloc(4);
-				bzero(tftp_command, 4);
-				tftp_command[1] = 4;			/* ACK opcode */
-				memcpy(tftp_command+2, &tftp_blockcode, 2);
 
-				logmsg(LOG_DEBUG, 1, "TFTP download - ACK %u assembled.\n", ntohs(tftp_blockcode));
-
-				if (bytes_read < 512) { 
-					received_last_packet = 1;
-					logmsg(LOG_DEBUG, 1, "TFTP download - Last data packet recieved.\n");
+				while (retransmissions++ < MAX_TRANSMISSION_TRIES) {
+					/* send read request */
+					logmsg(LOG_DEBUG, 1, "TFTP download - Sending \"ACK %u\" (%u. try)\n",
+						ntohs(tftp_blockcode), retransmissions);
 					if ((bytes_sent = sendto(data_sock_fd, tftp_command, 4, 0,
 							(struct sockaddr *) &data_socket, socklen)) == -1) {
-						logmsg(LOG_DEBUG, 1, "TFTP download - Unable to send last ACK packet.\n");
-					} else logmsg(LOG_DEBUG, 1, "TFTP download - Data block %d acknowledged.\n",
-						ntohs(tftp_blockcode));
-				} else {
-					retransmissions = 0;
-					bytes_sent = 0;
-					select_return = 0;
-
-					while ((retransmissions++ < MAX_TRANSMISSION_TRIES) && !select_return) {
-						logmsg(LOG_DEBUG, 1, "TFTP download - Sending \"ACK %u\" (%u. try)\n",
-							ntohs(tftp_blockcode), retransmissions);
-						if ((bytes_sent = sendto(data_sock_fd, tftp_command, 4, 0,
-								(struct sockaddr *) &data_socket, socklen)) == -1) {
-							logmsg(LOG_ERR, 1,
-								"TFTP download error - Unable to send ACK packet.\n");
-							return(-1);
-						}
-
-						snd_timeout.tv_sec = 5;
-						snd_timeout.tv_usec = 0;
-
-						if (((select_return = select(data_sock_fd + 1, &rfds, NULL, NULL,
-							&snd_timeout)) < 0) && (errno != EINTR)) {
-							logmsg(LOG_ERR, 1, "TFTP download error - 'select' call failed.\n");
-							return(-1);
-						}
-					}
-					if (!select_return) {
-						logmsg(LOG_ERR, 1, "TFTP download error - Connection timed out.\n");
-						free(binary_stream);
+						logmsg(LOG_ERR, 1,
+							"TFTP download error - Unable to send ACK packet.\n");
 						return(-1);
 					}
-					logmsg(LOG_DEBUG, 1, "TFTP download - Data block %d acknowledged.\n",
-						ntohs(tftp_blockcode));
+
+					snd_timeout.tv_sec = 5;
+					snd_timeout.tv_usec = 0;
+
+					/* wait for incoming data, close connection on timeout */
+					logmsg(LOG_DEBUG, 1, "TFTP download - Waiting for incoming data, timeout is %d seconds.\n",
+						(u_int16_t) snd_timeout.tv_sec);
+				
+					switch (select(MAX(sigpipe[0], data_sock_fd) + 1, &rfds, NULL, NULL, &snd_timeout)) {
+					case -1:
+						if (errno == EINTR) {
+							if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+							break;
+						}
+						logmsg(LOG_ERR, 1, "TFTP download error - Select on TFTP data channel failed: %s.\n", strerror(errno));
+						tftp_quit(data_sock_fd);
+						return(-1);
+					case 0:
+						logmsg(LOG_WARN, 1, "TFTP download - Transfer timeout, no incoming data connection for %d seconds.\n",
+							 (u_int16_t) snd_timeout.tv_sec);
+						tftp_quit(data_sock_fd);
+						return(-1);
+					default:
+						if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
+						if (FD_ISSET(data_sock_fd, &rfds)) break;
+					}
 				}
-				break;
-			case 5:
-				/* RRQ failed */
-				memcpy(&tftp_errcode, rbuf+2, 2);
-				if (tftp_errcode == 1) logmsg(LOG_ERR, 1, "TFTP download error - File not found.\n");
-				else logmsg(LOG_ERR, 1, "TFTP download error - Read Request failed.\n");
-				return(-1);
-				break;
-			default:
-				logmsg(LOG_DEBUG, 1, "TFTP download - %d bytes read.\n", bytes_read);
-				logmsg(LOG_WARN, 1,
-					"TFTP download warning - Don't know how to handle opcode %d.\n", tftp_opcode);
-				break;
+				if (retransmissions >= MAX_TRANSMISSION_TRIES) {
+					logmsg(LOG_ERR, 1, "TFTP download error - Connection timed out.\n");
+					free(binary_stream);
+					return(-1);
+				}
+				logmsg(LOG_DEBUG, 1, "TFTP download - Data block %d acknowledged.\n",
+					ntohs(tftp_blockcode));
+			}
+			break;
+		case 5:
+			/* RRQ failed */
+			memcpy(&tftp_errcode, rbuf+2, 2);
+			if (tftp_errcode == 1) logmsg(LOG_ERR, 1, "TFTP download error - File not found.\n");
+			else logmsg(LOG_ERR, 1, "TFTP download error - Read Request failed.\n");
+			return(-1);
+			break;
+		default:
+			logmsg(LOG_DEBUG, 1, "TFTP download - %d bytes read.\n", bytes_read);
+			logmsg(LOG_WARN, 1,
+				"TFTP download warning - Don't know how to handle opcode %d.\n", tftp_opcode);
+			break;
 		}
 	}
 	/* add download to attack record */
@@ -361,5 +396,5 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 	} else logmsg(LOG_NOISY, 1, "TFTP download - No data received.\n");
 	
 	/* close open descriptors and return */
-	return(tftp_quit(data_sock_fd, dumpfile_fd));
+	return(tftp_quit(data_sock_fd));
 }

@@ -33,11 +33,16 @@
 
 void get_signal(int sig) {
 	switch (sig) {
-	case SIGINT:
-	case SIGHUP:
-	case SIGQUIT:
-	case SIGTERM:
+#ifdef HAVE_SIGBUS
+	case SIGBUS:
+#endif
 	case SIGCHLD:
+	case SIGHUP:
+	case SIGILL:
+	case SIGINT:
+	case SIGQUIT:
+	case SIGSEGV:
+	case SIGTERM:
 		/* prevent nested interrupts */
 		if (signal(sig, SIG_IGN) == SIG_IGN) return;
 		break;
@@ -55,9 +60,21 @@ void get_signal(int sig) {
 
 
 void handle_signal(int sig) {
-	pid_t pid;
+	pid_t	pid;
+	int	status;
 
 	switch(sig) {
+#ifdef HAVE_SIGBUS
+	case SIGBUS:
+#endif
+	case SIGILL:
+	case SIGSEGV:
+		if (current_plugfunc)
+			logmsg(LOG_ERR, 1, "Error - Signal %d received in process %d, %s::%s().\n",
+				sig, getpid(), current_plugfunc->plugnam, current_plugfunc->funcnam);
+		else 
+			logmsg(LOG_ERR, 1, "Error - Signal %d received in process %d.\n", sig, getpid());
+		_exit(EXIT_FAILURE);
 	case SIGHUP:
 		if (MASTER_PROCESS) {
 			logmsg(LOG_DEBUG, 1, "SIGHUP received. Reconfiguring honeytrap.\n");
@@ -78,13 +95,6 @@ void handle_signal(int sig) {
 		else logmsg(LOG_DEBUG, 1, "Signal handler for SIGHUP reinstalled.\n");
 	
 		break;
-	case SIGSEGV:
-		if (current_plugfunc)
-			logmsg(LOG_ERR, 1, "Error - Segmentation fault in process %d, %s::%s()  (SIGSEGV received).\n",
-				getpid(), current_plugfunc->plugnam, current_plugfunc->funcnam);
-		else 
-			logmsg(LOG_ERR, 1, "Error - Segmentation fault in process %d (SIGSEGV received).\n", getpid());
-		_exit(EXIT_FAILURE);
 	case SIGINT:
 		logmsg(LOG_DEBUG, 1, "SIGINT received.\n");
 		if (MASTER_PROCESS) {
@@ -124,7 +134,16 @@ void handle_signal(int sig) {
 		} else exit(EXIT_SUCCESS);
 	case SIGCHLD:
 		logmsg(LOG_DEBUG, 1, "SIGCHILD received.\n");
-		while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
+		for (;;) {
+			status = 0;
+			if ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+				logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
+				if WIFSIGNALED(status)
+					logmsg(LOG_WARN, 1, "Warning - Process %d was terminated by signal %d.\n", pid, WTERMSIG(status));
+				else if (WIFEXITED(status) && (WEXITSTATUS(status) == EXIT_FAILURE))
+					logmsg(LOG_WARN, 1, "Warning - Process %d exited on failure.n", pid);
+			else break;
+		}
 
 		/* reinstall original signal handler */
 		if (signal(SIGCHLD, get_signal) == SIG_ERR)
@@ -133,6 +152,7 @@ void handle_signal(int sig) {
 
 		break;
 	default:
+		logmsg(LOG_WARN, 1, "Warning - Don't know how to handle signal %d in process %d.\n", sig, getpid());
 		break;
 	}
 	return;
@@ -140,38 +160,47 @@ void handle_signal(int sig) {
 
 
 void install_signal_handlers(void) {
-	/* create a pipe for process-internal signal delivery */
+	u_char	i;
+	static int sigs[] = {
+#ifdef HAVE_SIGBUS
+		SIGBUS,
+#endif
+		SIGCHLD,
+		SIGHUP,
+		SIGILL,
+		SIGINT,
+		SIGQUIT,
+		SIGSEGV,
+		SIGTERM
+	};
+
+	create_sigpipe();
+	
+	/* install signal handlers */
+	for (i = 0; i < sizeof(sigs)/sizeof(sigs[0]); i++) {
+		if (signal(sigs[i], get_signal) == SIG_ERR)
+			fprintf(stdout, "  Warning - Handler for signal %d was not installed for %u.\n", i, getpid());
+		else DEBUG_FPRINTF(stdout, "  Handler for signal %d installed.\n", i);
+	}
+	return;
+}
+
+
+void create_sigpipe(void) {
+	/* create a pipe for process-internal signal delivery
+	 * this function must be called in every process, e.g. after a fork() 
+	 * as pipes are inherited by childs which would break signal delivery */
+
+	/* make sure there are no open pipe endpoints */
+	close(sigpipe[0]);
+	close(sigpipe[1]);
+
+	/* (re)open pipe */
 	if (pipe(sigpipe) == -1) {
 		fprintf(stderr, "  Error - Unable to create signal pipe: %s.\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
-	DEBUG_FPRINTF(stdout, "  Signal pipe successfully created.\n");
-
-
-	/* install signal handlers */
-	if (signal(SIGHUP, get_signal) == SIG_ERR)
-		fprintf(stdout, "  Warning - Handler for SIGHUP was not installed for %u.\n", getpid());
-	else DEBUG_FPRINTF(stdout, "  Signal handler for SIGHUP installed.\n");
-	
-	if (signal(SIGSEGV, get_signal) == SIG_ERR)
-		fprintf(stdout, "  Warning - Handler for SIGSEGV was not installed for %u.\n", getpid());
-	else DEBUG_FPRINTF(stdout, "  Signal handler for SIGSEGV installed.\n");
-	
-	if (signal(SIGINT, get_signal) == SIG_ERR) 
-		fprintf(stdout, "  Warning - Handler for SIGINT was not installed for %u.\n", getpid());
-	else DEBUG_FPRINTF(stdout, "  Signal handler for SIGINT installed.\n");
-
-	if (signal(SIGQUIT, get_signal) == SIG_ERR) 
-		fprintf(stdout, "  Warning - Handler for SIGQUIT was not installed for %u.\n", getpid());
-	else DEBUG_FPRINTF(stdout, "  Signal handler for SIGQUIT installed.\n");
-	
-	if (signal(SIGTERM, get_signal) == SIG_ERR)
-		fprintf(stdout, "  Warning - Handler for SIGTERM was not installed for %u.\n", getpid());
-	else DEBUG_FPRINTF(stdout, "  Signal handler for SIGTERM installed.\n");
-
-	if (signal(SIGCHLD, get_signal) == SIG_ERR)
-		fprintf(stdout, "  Warning - Handler for SIGCHLD was not installed for %u.\n", getpid());
-	else DEBUG_FPRINTF(stdout, "  Signal handler for SIGCHLD installed.\n");
+	DEBUG_FPRINTF(stdout, "  Signal pipe successfully created for process %d.\n", getpid());
 
 	return;
 }
@@ -183,12 +212,16 @@ void install_signal_handlers(void) {
 int check_sigpipe(void) {
 	int	sig, rv;
 
-	if ((rv = read(sigpipe[0], &sig, sizeof(int))) == sizeof(int)) {
+	switch(rv = read(sigpipe[0], &sig, sizeof(int))) {
+	case sizeof(int):
 		/* caught a signal */
 		logmsg(LOG_DEBUG, 1, "Process %d received signal %d on pipe.\n", getpid(), sig);
 		handle_signal(sig);
-	}
-	if (rv == -1) {
+		break;
+	case 0:
+		logmsg(LOG_WARN, 1, "Warning - Signal pipe ready to read but not enough data available.\n");
+		return(0);
+	case -1:
 		logmsg(LOG_ERR, 1, "Error - Unable to read signal from pipe: %s.\n", strerror(errno));
 		return(-1);
 	}

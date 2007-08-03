@@ -101,7 +101,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 }
 
 
-/* perform a non-blocking connect() with a given timeoutr
+/* perform a non-blocking connect() with a given timeout
  * always use this function instead of connect()
  * or signal processing might get delayed */
 int nb_connect(int sock_fd, const struct sockaddr * sockaddr, socklen_t slen, int sec) {
@@ -131,6 +131,7 @@ int nb_connect(int sock_fd, const struct sockaddr * sockaddr, socklen_t slen, in
 
 		switch (select(MAX(sigpipe[0], sock_fd) + 1, &rfds, &wfds, NULL, &timeout)) {
 		case -1:
+			if (errno == EINPROGRESS) break;
 			if (errno == EINTR) {
 				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
 				break;

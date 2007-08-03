@@ -94,6 +94,11 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 		switch(nb_connect(proxy_sock_fd, (struct sockaddr *) &proxy_socket,
 		       sizeof(proxy_socket), timeout)) {
 		case -1:
+			if (errno == EINPROGRESS) break;
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
 			logmsg(LOG_ERR, 1, "%s %s  Error - select() call failed: %s \n",
 				logpre, portstr, strerror(errno));
 			return(-1);

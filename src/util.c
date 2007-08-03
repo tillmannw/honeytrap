@@ -83,8 +83,7 @@ int read_line(int socket, char *line, ssize_t len, int timeout) {
 				logmsg(LOG_DEBUG, 1, "Error while reading a line from socket - Connection timed out.\n");
 				return(-1);
 			default:
-				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
-					exit(EXIT_FAILURE);
+				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
 				if (FD_ISSET(socket, &rfds)) {
 					if (read_chars >= len-1) {
 						logmsg(LOG_DEBUG, 1, "Error while reading from socket - Line exceeds buffer.\n");

@@ -94,7 +94,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	}
 
 	/* fork server process */
-	if ((pid = fork()) == 0) {
+	if ((pid = myfork()) == 0) {
 		/* use this port string as log prefix */
 		memset(portstr, 0, 16);
 		if (snprintf(portstr, 16, "%u/%s\t", ntohs(port_l), PROTO(proto)) > 15) {
@@ -193,10 +193,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 				       portstr, conn_timeout);
 				exit(EXIT_SUCCESS);
 			default:
-				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) {
-					logmsg(LOG_ERR, 1, "Error - Signal handling failed in dynamic server process.\n");
-					exit(EXIT_FAILURE);
-				}
+				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
 				if (FD_ISSET(listen_fd, &rfds)) {
 					logmsg(LOG_NOISY, 1,
 					       "   %s  Connection request from %s.\n", portstr, inet_ntoa(ip_r));
@@ -358,7 +355,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
 
 					/* fork connection handler */
-					if ((pid = fork()) == 0) {
+					if ((pid = myfork()) == 0) {
 						/* close listening socket in child */
 						close(listen_fd);
 						disconnect = 0;
@@ -468,9 +465,9 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 						(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 				}
 			}
+			break;
 		default:
-			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
-				exit(EXIT_FAILURE);
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
 			if (FD_ISSET(connection_fd, &rfds)) {
 				/* handle data on server connection */
 				if ((bytes_read = read(connection_fd, buffer, sizeof(buffer))) > 0) {
@@ -575,8 +572,7 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 			return(process_data
 				(attack_string, total_bytes, server_string, total_from_server, dport, attack));
 		default:
-			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
-				exit(EXIT_FAILURE);
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
 			if (FD_ISSET(server_sock_fd, &rfds)) {
 				/* read data and proxy it to client connection */
 				bytes_read = 0;

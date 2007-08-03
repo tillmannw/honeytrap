@@ -19,10 +19,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "honeytrap.h"
-#include "pcapmon.h"
-#include "logging.h"
 #include "ctrl.h"
+#include "honeytrap.h"
+#include "logging.h"
+#include "pcapmon.h"
 #include "plugin.h"
 #include "response.h"
 #include "signals.h"
@@ -112,7 +112,7 @@ int do_daemonize(void) {
 	}
 
 	/* become session leader and loose controlling TTY */
-	if ((pid = fork()) < 0) {
+	if ((pid = myfork()) < 0) {
 		fprintf(stderr, "  Error - Unable to daemonize: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	} else if (pid != 0) exit(EXIT_SUCCESS);
@@ -120,7 +120,7 @@ int do_daemonize(void) {
 	setsid();
 		
 	/* fork again, future opens must not allocate controlling TTYs */
-	if ((pid = fork()) < 0) {
+	if ((pid = myfork()) < 0) {
 		fprintf(stderr, "  Error - Unable to daemonize: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	} else if (pid != 0) {
@@ -188,4 +188,13 @@ int create_pid_file(void) {
 	logmsg(LOG_DEBUG, 1, "Master process pid written to %s.\n", pidfile_name);
 
 	return(1);
+}
+
+
+pid_t myfork(void) {
+	pid_t pid;
+
+	/* reopen signal pipe in child process */
+	if ((pid = fork()) == 0) create_sigpipe();
+	return(pid);
 }

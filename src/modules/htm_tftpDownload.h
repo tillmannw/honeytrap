@@ -22,7 +22,7 @@ void plugin_unload(void);
 void plugin_register_hooks(void);
 int cmd_parse_for_tftp(Attack *attack);
 int get_tftpcmd(char *attack_string, int string_size, Attack *attack);
-int tftp_quit(int data_sock_fd, int dumpfile_fd);
+int tftp_quit(int data_sock_fd);
 int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attack);
 
 #endif

@@ -31,6 +31,7 @@
 #include <logging.h>
 #include <md5.h>
 #include <plughook.h>
+#include <signals.h>
 #include <sock.h>
 #include <tcpip.h>
 #include <util.h>
@@ -38,7 +39,7 @@
 #include "htm_ftpDownload.h"
 
 const char module_name[]="ftpDownload";
-const char module_version[]="0.5.2";
+const char module_version[]="0.5.3";
 
 char *ftp_host = NULL;
 
@@ -160,7 +161,7 @@ int get_ftpcmd(char *attack_string, uint32_t string_size, struct in_addr lhost, 
 			logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s.\n", token.string,
 				inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 
-			if (!valid_ipaddr((uint32_t) *(host->h_addr_list[0]))) {
+			if (!replace_private_ips && !valid_ipaddr((uint32_t) *(host->h_addr_list[0]))) {
 				logmsg(LOG_INFO, 1, "FTP download error - %s is not a valid ip address.\n",
 					inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 				return(-1);
@@ -335,8 +336,8 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 
 
 	/* replace private ip? */
-	if (replace_private_ips && private_ipaddr(rhost->s_addr)) {
-		logmsg(LOG_NOISY, 1, "FTP download - Replacing private server address with attacking IP address.\n");
+	if (replace_private_ips && (private_ipaddr(rhost->s_addr) || !(valid_ipaddr(rhost->s_addr)))) {
+		logmsg(LOG_NOISY, 1, "FTP download - Replacing private/invalid server address with attacking IP address.\n");
 		rhost = (struct in_addr *) &attack->a_conn.r_addr;
 	}
 	
@@ -609,37 +610,42 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	logmsg(LOG_DEBUG, 1, "FTP download - Waiting for incoming FTP data connection, timeout is %d seconds.\n",
 		timeout);
 	FD_ZERO(&rfds);
+	FD_SET(sigpipe[0], &rfds);
 	FD_SET(data_sock_listen_fd, &rfds);
-	select_return = select(data_sock_listen_fd + 1, &rfds, NULL, NULL, &r_timeout);
-	if (select_return < 0) {
+	switch (select_return = select(MAX(sigpipe[0], data_sock_fd) + 1, &rfds, NULL, NULL, &r_timeout)) {
+	case -1:
 		if (errno != EINTR) {
 			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s.\n", strerror(errno));
 			ftp_quit(control_sock_fd, data_sock_fd);
 			return(-1);
 		}
-	} else if (select_return == 0) {
+	case 0:
 		logmsg(LOG_WARN, 1, "FTP download - Transfer timeout, no incoming data connection for %d seconds.\n",
 			timeout);
 		ftp_quit(control_sock_fd, data_sock_fd);
 		return(-1);
-	} else if (FD_ISSET(data_sock_listen_fd, &rfds)) { 
-		if ((data_sock_fd = accept(data_sock_listen_fd, (struct sockaddr *) &remote_data_socket, (u_int *) &addr_len)) < 0) {
-			logmsg(LOG_ERR, 1, "FTP download error - Unable to accept FTP data connection: %s\n",
-				strerror(errno));
-			ftp_quit(control_sock_fd, data_sock_fd);
-			return(-1);
-		} else logmsg(LOG_DEBUG, 1, "FTP download - Incoming data connection from %s:%u.\n",
-			inet_ntoa(control_socket.sin_addr), ntohs(remote_data_socket.sin_port));
-		close(data_sock_listen_fd);
-	} else logmsg(LOG_DEBUG, 1, "FTP download - Select on FTP data channel returned but socket is not set.\n");
+	default:
+		if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
+		if (FD_ISSET(data_sock_listen_fd, &rfds)) { 
+			if ((data_sock_fd = accept(data_sock_listen_fd, (struct sockaddr *) &remote_data_socket, (u_int *) &addr_len)) < 0) {
+				logmsg(LOG_ERR, 1, "FTP download error - Unable to accept FTP data connection: %s\n",
+					strerror(errno));
+				ftp_quit(control_sock_fd, data_sock_fd);
+				return(-1);
+			} else logmsg(LOG_DEBUG, 1, "FTP download - Incoming data connection from %s:%u.\n",
+				inet_ntoa(control_socket.sin_addr), ntohs(remote_data_socket.sin_port));
+			close(data_sock_listen_fd);
+		} else logmsg(LOG_DEBUG, 1, "FTP download - Select on FTP data channel returned but socket is not set.\n");
+	}
 
 	/* retrieve file, read timeout is 5 seconds */
 	logmsg(LOG_DEBUG, 1, "FTP download - Waiting for data on FTP data channel, timeout is 10 seconds.\n");
 	FD_ZERO(&rfds);
+	FD_SET(sigpipe[0], &rfds);
 	FD_SET(data_sock_fd, &rfds);
 	r_timeout.tv_sec = 10;
 	r_timeout.tv_usec = 0;
-	select_return = select(data_sock_fd + 1, &rfds, NULL, NULL, &r_timeout);
+	select_return = select(MAX(sigpipe[0], data_sock_fd) + 1, &rfds, NULL, NULL, &r_timeout);
 	if (select_return < 0) {
 		if (errno != EINTR) {
 			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s.\n", strerror(errno));
