@@ -1,5 +1,5 @@
 /* ngram.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -75,8 +75,7 @@ pos avl_find(const u_char *key, avl_tree t, int n) {
 
 
 static int avl_height(pos p) {
-	if(p == NULL) return(-1);
-	return(p->height);
+	return(p == NULL ? -1 : p->height);
 }
 
 
@@ -199,9 +198,9 @@ void calc_lens(avl_tree t, float *len1, float *len2, float *dotproduct) {
 
 
 int main(int argc, char *argv[]) {
-	int fd, bytes_read, n;
-	struct stat fs1, fs2;
-	u_char *content1, *content2;
+	int fd, bytes_read, n, i;
+	struct stat fs[2];
+	u_char *content[2];
 	float dotproduct, len1, len2, result;
 	avl_tree ngtree;
 
@@ -212,8 +211,8 @@ int main(int argc, char *argv[]) {
 	dotproduct	= 0;
 	result		= 0;
 	bytes_read	= 0;
-	content1	= NULL;
-	content2	= NULL;
+	content[0]	= NULL;
+	content[1]	= NULL;
 
 	if (argc < 4) {
 		fprintf(stdout, "Usage: %s n file1 file2\n", argv[0]);
@@ -223,48 +222,30 @@ int main(int argc, char *argv[]) {
 	if ((n = atoi(argv[1])) == 0) n = 3;
 
 
-	/* map first file */
-	if ((fd = open(argv[2], O_RDONLY)) == -1) {
-		fprintf(stderr, "Error - Unable to open file: %s.\n", strerror(errno));
-		exit(1);
+	/* mmap files */
+	for (i=0; i<2; i++) {
+		if ((fd = open(argv[i+2], O_RDONLY)) == -1) {
+			fprintf(stderr, "Error - Unable to open file: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (fstat(fd, &fs[i]) != 0) {
+			fprintf(stderr, "Error - Unable to get file size: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (fs[i].st_size < 1) {
+			fprintf(stdout, "File %s is empty.\n", argv[i+2]);
+			exit(EXIT_SUCCESS);
+		}
+		if ((content[i] = mmap(0, fs[i].st_size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED) {
+			fprintf(stderr, "Error - Unable to map file into memory: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		close(fd);
 	}
-	if (fstat(fd, &fs1) != 0) {
-		fprintf(stderr, "Error - Unable to get file size: %s.\n", strerror(errno));
-		exit(1);
-	}
-	if (fs1.st_size < 1) {
-		fprintf(stdout, "File %s is empty.\n", argv[2]);
-		exit(0);
-	}
-	if ((content1 = mmap(0, fs1.st_size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED) {
-		fprintf(stderr, "Error - Unable to map file into memory: %s.\n", strerror(errno));
-		exit(1);
-	}
-	close(fd);
-
-
-	/* map second file */
-	if ((fd = open(argv[3], O_RDONLY)) == -1) {
-		fprintf(stderr, "Error - Unable to open file: %s.\n", strerror(errno));
-		exit(1);
-	}
-	if (fstat(fd, &fs2) != 0) {
-		fprintf(stderr, "Error - Unable to get file size: %s.\n", strerror(errno));
-		exit(1);
-	}
-	if (fs2.st_size < 1) {
-		fprintf(stdout, "File is empty.\n");
-		exit(0);
-	}
-	if ((content2 = mmap(0, fs2.st_size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED) {
-		fprintf(stderr, "Error - Unable to map file into memory: %s.\n", strerror(errno));
-		exit(1);
-	}
-	close(fd);
 
 
 	/* calculate ngrams */
-	ngtree = calc_ngrams(n, content1, content2, fs1.st_size, fs2.st_size);
+	ngtree = calc_ngrams(n, content[0], content[1], fs[0].st_size, fs[1].st_size);
 
 	/* calculate vector lenghts and delete tree */ 
 	calc_lens(ngtree, &len1, &len2, &dotproduct);
@@ -278,7 +259,7 @@ int main(int argc, char *argv[]) {
 
 	fprintf(stdout, "Similarity: %.2f%%.\n", result);
 
-	if ((munmap(content1, fs1.st_size) != 0) || (munmap(content1, fs1.st_size) != 0)) {
+	if ((munmap(content[0], fs[0].st_size) != 0) || (munmap(content[1], fs[1].st_size) != 0)) {
 		fprintf(stderr, "Unmapping files failed: %s.\n", strerror(errno));
 		exit(1);
 	}
