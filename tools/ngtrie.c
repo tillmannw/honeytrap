@@ -210,9 +210,9 @@ int main(int argc, char *argv[]) {
 
 
 	/* calculate similarity */
+	result = dotprod = sqrnorm1 = sqrnorm2 = 0;
 	if (isnan(result = 100-(100*acos(dotprod/(sqrt(sqrnorm1)*sqrt(sqrnorm2)))/1.5707963))) result = 100;
 	fprintf(stdout, "Similarity: %.2f%%.\n", result);
-
 
 	if ((munmap(content[0], fs[0].st_size) != 0) || (munmap(content[1], fs[1].st_size) != 0)) {
 		fprintf(stderr, "Unmapping files failed: %s.\n", strerror(errno));
