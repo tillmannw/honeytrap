@@ -88,7 +88,7 @@ void ngram_ins(trie t, const u_char *data, ssize_t n, u_char snum) {
 			/* search for key in child list */
 			t = t->childlist;
 			if (t->key != curchar) {
-				while ((t->next) && (t->key) && (t->key != curchar)) t = t->next;
+				while ((t->next) && (t->key != curchar)) t = t->next;
 				/* key not present, create new node */
 				if (t->key != curchar) {
 					if ((t->next = new_trie_node()) == NULL) {
@@ -206,13 +206,14 @@ int main(int argc, char *argv[]) {
 
 
 	/* calculate vector lenghts and delete trie */ 
+	result = dotprod = sqrnorm1 = sqrnorm2 = 0;
 	calc_and_del_trie(ngtrie);
 
 
 	/* calculate similarity */
-	result = dotprod = sqrnorm1 = sqrnorm2 = 0;
 	if (isnan(result = 100-(100*acos(dotprod/(sqrt(sqrnorm1)*sqrt(sqrnorm2)))/1.5707963))) result = 100;
 	fprintf(stdout, "Similarity: %.2f%%.\n", result);
+
 
 	if ((munmap(content[0], fs[0].st_size) != 0) || (munmap(content[1], fs[1].st_size) != 0)) {
 		fprintf(stderr, "Unmapping files failed: %s.\n", strerror(errno));
