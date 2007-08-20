@@ -23,8 +23,12 @@
 # include <config.h>
 #endif
 
-#define MAX(a, b)	(a > b ? a : b)
-#define MIN(a, b)	(a < b ? a : b)
+#ifndef MAX
+#  define MAX(a, b)	((a)>(b)?(a):(b))
+#endif
+#ifndef MIN
+#  define MIN(a, b)	((a)<(b)?(a):(b))
+#endif
 
 #define EXCL_FILE_RW	O_CREAT | O_NOCTTY | O_APPEND | O_WRONLY
 

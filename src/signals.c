@@ -60,8 +60,11 @@ void get_signal(int sig) {
 
 
 void handle_signal(int sig) {
-	pid_t	pid;
-	int	status;
+	pid_t			pid;
+	int			status;
+	struct sigaction	s_action;
+
+	s_action.sa_handler	= get_signal;
 
 	switch(sig) {
 #ifdef HAVE_SIGBUS
@@ -90,9 +93,10 @@ void handle_signal(int sig) {
 		}
 
 		/* reinstall original signal handler */
-		if (signal(SIGHUP, get_signal) == SIG_ERR)
+		if (sigaction(SIGHUP, &s_action, NULL) == -1) {
 			logmsg(LOG_ERR, 1, "Error - Unable to reinstall signal handler for SIGHUP.\n");
-		else logmsg(LOG_DEBUG, 1, "Signal handler for SIGHUP reinstalled.\n");
+			exit(EXIT_FAILURE);
+		} else logmsg(LOG_DEBUG, 1, "Signal handler for SIGHUP reinstalled.\n");
 	
 		break;
 	case SIGINT:
@@ -134,21 +138,21 @@ void handle_signal(int sig) {
 		} else exit(EXIT_SUCCESS);
 	case SIGCHLD:
 		logmsg(LOG_DEBUG, 1, "SIGCHILD received.\n");
-		for (;;) {
+		status = 0;
+		while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+			logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
+			if WIFSIGNALED(status)
+				logmsg(LOG_WARN, 1, "Warning - Process %d was terminated by signal %d.\n", pid, WTERMSIG(status));
+			else if (WIFEXITED(status) && (WEXITSTATUS(status) == EXIT_FAILURE))
+				logmsg(LOG_WARN, 1, "Warning - Process %d exited on failure.n", pid);
 			status = 0;
-			if ((pid = waitpid(-1, &status, WNOHANG)) > 0)
-				logmsg(LOG_DEBUG, 1, "Process %d terminated.\n", pid);
-				if WIFSIGNALED(status)
-					logmsg(LOG_WARN, 1, "Warning - Process %d was terminated by signal %d.\n", pid, WTERMSIG(status));
-				else if (WIFEXITED(status) && (WEXITSTATUS(status) == EXIT_FAILURE))
-					logmsg(LOG_WARN, 1, "Warning - Process %d exited on failure.n", pid);
-			else break;
 		}
 
 		/* reinstall original signal handler */
-		if (signal(SIGCHLD, get_signal) == SIG_ERR)
+		if (sigaction(SIGCHLD, &s_action, NULL) == -1) {
 			logmsg(LOG_ERR, 1, "Error - Unable to reinstall signal handler for SIGCHLD.\n");
-		else logmsg(LOG_DEBUG, 1, "Signal handler for SIGCHLD reinstalled.\n");
+			exit(EXIT_FAILURE);
+		} else logmsg(LOG_DEBUG, 1, "Signal handler for SIGCHLD reinstalled.\n");
 
 		break;
 	default:
@@ -160,8 +164,9 @@ void handle_signal(int sig) {
 
 
 void install_signal_handlers(void) {
-	u_char	i;
-	static int sigs[] = {
+	u_char			i;
+	struct sigaction	s_action;
+	static int		sigs[] = {
 #ifdef HAVE_SIGBUS
 		SIGBUS,
 #endif
@@ -174,12 +179,15 @@ void install_signal_handlers(void) {
 		SIGTERM
 	};
 
+	s_action.sa_handler = get_signal;
+
 	create_sigpipe();
 	
 	/* install signal handlers */
 	for (i = 0; i < sizeof(sigs)/sizeof(sigs[0]); i++) {
-		if (signal(sigs[i], get_signal) == SIG_ERR)
-			fprintf(stdout, "  Warning - Handler for signal %d was not installed for %u.\n", i, getpid());
+//		if (signal(sigs[i], get_signal) == SIG_ERR)
+		if (sigaction(sigs[i], &s_action, NULL) == -1)
+			fprintf(stdout, "  Warning - Handler for signal %d was not installed for %u: %s.\n", i, getpid(), strerror(errno));
 		else DEBUG_FPRINTF(stdout, "  Handler for signal %d installed.\n", i);
 	}
 	return;

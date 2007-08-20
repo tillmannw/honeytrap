@@ -414,7 +414,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			} // select return for listen_fd
 		} // for - incoming connections
 	} /* fork - server process */
-	else if (pid == -1) logmsg(LOG_ERR, 1, "Error - forking server process failed.\n");
+	else if (pid == -1) logmsg(LOG_ERR, 1, "Error - Forking server process failed: %s.\n", strerror(errno));
 	return;
 }
 
