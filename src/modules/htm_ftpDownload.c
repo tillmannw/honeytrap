@@ -354,7 +354,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	control_socket.sin_family          = AF_INET;
 	control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
 	control_socket.sin_port            = htons(port);
-	if (nb_connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket), CONNTIMEOUT) != 0) {
+	if (nb_connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket), CONNTIMEOUT) == -1) {
 		/* if network or host is unreachable try attacking address instead */
 		switch(errno) {
 		case ECONNREFUSED:
@@ -365,7 +365,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 				control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
 				logmsg(LOG_NOISY, 1, "FTP download - FTP server could not be reached, trying the attacking address (%s) instead.\n",
 					inet_ntoa(*rhost));
-				if (nb_connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket), CONNTIMEOUT) != 0) {
+				if (nb_connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket), CONNTIMEOUT) == -1) {
 					logmsg(LOG_ERR, 1, "FTP download error - Unable to connect to %s:%d: %s\n",
 						inet_ntoa(*rhost), port, strerror(errno));
 					close(control_sock_fd);

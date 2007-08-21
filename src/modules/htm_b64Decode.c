@@ -134,11 +134,11 @@ int b64_decode(Attack *attack) {
 		logmsg(LOG_INFO, 1, "Base64 decoder - Encoded attack string found, trying to decode.\n");
 
 		code += 10;
-		bzero(&dec_attack, sizeof(Attack));
-
 		if ((decoded = decode((char *)code, strlen(code))) != NULL) {
 			/* base64 decoded, creating attack structure and call other plugins */
 			logmsg(LOG_INFO, 1, "Calling plugins for decoded attack.\n");
+
+			bzero(&dec_attack, sizeof(Attack));
 			dec_attack.a_conn.payload.data = decoded->str;
 			dec_attack.a_conn.payload.size = decoded->len;
 //			plughook_process_attack(funclist_attack_preproc, &dec_attack);

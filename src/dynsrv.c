@@ -182,8 +182,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					if (check_sigpipe() == -1) exit(EXIT_FAILURE);
 					break;
 				}
-				logmsg(LOG_ERR, 1,
-				       "   %s  Error - select() call failed: %m.\n", portstr);
+				logmsg(LOG_ERR, 1, "   %s  Error - select() call failed: %m.\n", portstr);
 				exit(EXIT_FAILURE);
 			case 0:
 				/* timeout */

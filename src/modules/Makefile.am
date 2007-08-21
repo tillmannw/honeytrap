@@ -11,6 +11,7 @@ libdir=$(DESTDIR)/$(sysconfdir)/honeytrap/plugins
 lib_LTLIBRARIES = \
 	htm_SaveFile.la \
 	htm_ftpDownload.la \
+	htm_httpDownload.la \
 	htm_tftpDownload.la \
 	htm_vncDownload.la \
 	htm_b64Decode.la
@@ -40,6 +41,9 @@ htm_SaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
 
 htm_ftpDownload_la_SOURCES = htm_ftpDownload.c htm_ftpDownload.h
 htm_ftpDownload_la_LDFLAGS = -module -no-undefined -avoid-version
+
+htm_httpDownload_la_SOURCES = htm_httpDownload.c htm_httpDownload.h
+htm_httpDownload_la_LDFLAGS = -module -no-undefined -avoid-version
 
 htm_tftpDownload_la_SOURCES = htm_tftpDownload.c htm_tftpDownload.h
 htm_tftpDownload_la_LDFLAGS = -module -no-undefined -avoid-version

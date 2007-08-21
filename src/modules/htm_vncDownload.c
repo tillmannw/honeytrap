@@ -49,10 +49,10 @@ void plugin_register_hooks(void) {
 }
 
 int cmd_parse_for_vnc(Attack *attack) {
-	int i=0, len = 0;
-	char vnc_str[] = "RFB 003.008";
-	char *readable_chars = NULL, *clean_str = NULL, *curchar = NULL, *cmd = NULL;
-	FILE *f;
+	int	i=0, len = 0;
+	char	vnc_str[] = "RFB 003.008";
+	char	*readable_chars = NULL, *clean_str = NULL, *curchar = NULL;
+	Attack	dec_attack;
 
 	/* no data - nothing todo */
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
@@ -70,7 +70,6 @@ int cmd_parse_for_vnc(Attack *attack) {
 		logmsg(LOG_DEBUG, 1, "VNC download - Found VNC session string, parsing attack string for HTTP URL.\n");
 		for (i=strlen(vnc_str); i<attack->a_conn.payload.size; i++) {
 			if (isprint(attack->a_conn.payload.data[i])) {
-			       	if (isspace(attack->a_conn.payload.data[i])) break;
 				if ((readable_chars = realloc(readable_chars, len+2)) == NULL) {
 					logmsg(LOG_ERR, 1, "VNC download error - Unable to allocate memory: %s.\n", strerror(errno));
 					return(0);
@@ -98,20 +97,17 @@ int cmd_parse_for_vnc(Attack *attack) {
 					clean_str[strlen(clean_str)-1] = 0;
 				}
 
-			/* assemble wget download command and execute it */
-			if (strstr(clean_str, "http://") == clean_str) {
-				if ((cmd = malloc(strlen(clean_str)+19)) == NULL) {
-					logmsg(LOG_ERR, 1, "VNC download error - Unable to allocate memory: %s.\n", strerror(errno));
-					return(0);
-				}
-				sprintf(cmd, "%s %s", "/usr/bin/wget -nv", clean_str);
-				logmsg(LOG_DEBUG, 1, "VNC download - Calling '%s'.\n", cmd);
-				if ((f = popen(cmd, "r")) == NULL) {
-					logmsg(LOG_ERR, 1, "VNC download error - Cannot call download command: %s.\n", strerror(errno));
-					return(0);
-				}
-				pclose(f);
-				free(cmd);
+			if (strlen(clean_str)) {
+				/* base64 decoded, creating attack structure and call other plugins */
+				logmsg(LOG_INFO, 1, "Calling plugins for decoded attack.\n");
+
+				memcpy(&dec_attack, attack, sizeof(Attack));
+				dec_attack.a_conn.payload.data = (u_char *) clean_str;
+				dec_attack.a_conn.payload.size = strlen(clean_str);
+//				plughook_process_attack(funclist_attack_preproc, &dec_attack);
+				plughook_process_attack(funclist_attack_analyze, &dec_attack);
+				plughook_process_attack(funclist_attack_savedata, &dec_attack);
+				plughook_process_attack(funclist_attack_postproc, &dec_attack);
 			}
 		}
 		free(readable_chars);

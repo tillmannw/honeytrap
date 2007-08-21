@@ -174,7 +174,7 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 
 	/* replace private ip? */
 	if (replace_private_ips && (private_ipaddr(host->s_addr) || !(valid_ipaddr(host->s_addr)))) {
-		logmsg(LOG_NOISY, 1, "FTP download - Replacing private/invalid server address with attacking IP address.\n");
+		logmsg(LOG_NOISY, 1, "TFTP download - Replacing private/invalid server address with attacking IP address.\n");
 		host = (struct in_addr *) &attack->a_conn.r_addr;
 	}
 	

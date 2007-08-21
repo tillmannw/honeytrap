@@ -1,4 +1,6 @@
 Version 1.0.0
+- Basic http download wrapper plugin added
+- VNC plugin redesigned to generate virtual attacks
 - Safe signal delivery and handling using per-process pipes
 - New configuration concept with hierarchically organized file format
 - Default port configuration can be set to "ignore", "normal" or "mirror"

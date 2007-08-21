@@ -51,7 +51,21 @@ void handle_termsig(int sig) {
 	s_action.sa_flags	= 0;
 	s_action.sa_handler	= SIG_IGN;
 
-	logmsg(LOG_DEBUG, 1, "Terminating signal (%d) received.\n", sig);
+	switch (sig) {
+	case SIGSEGV:
+	case SIGILL:
+#ifdef HAVE_SIGBUS
+	case SIGBUS:
+#endif
+		if (current_plugfunc)
+			logmsg(LOG_ERR, 1, "Error - Terminating signal (%d) received by process %u while processing %s::%s().\n",
+				sig, getpid(), current_plugfunc->plugnam, current_plugfunc->funcnam);
+		else
+			logmsg(LOG_ERR, 1, "Error - Terminating signal (%d) received by process %u.\n", sig, getpid());
+		break;
+	default:
+		logmsg(LOG_DEBUG, 1, "Terminating signal (%d) received.\n", sig);
+	}
 	if (MASTER_PROCESS) {
 		if (kill(0-getpgrp(), SIGINT) == 0) {
 			logmsg(LOG_DEBUG, 1, "Signal was successfully forwarded to process group.\n");
