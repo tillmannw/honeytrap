@@ -72,20 +72,20 @@ void clean_exit(int status) {
 	if (pidfile_fd >= 0) {
 		logmsg(LOG_DEBUG, 1, "Unlocking pid file.\n");
 		if (lockf(pidfile_fd, F_ULOCK, 0) < 0) 
-			logmsg(LOG_ERR, 1, "Error - Unable to unlock pid file: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - Unable to unlock pid file: %m.\n");
 
 		logmsg(LOG_DEBUG, 1, "Closing pid file.\n");
 		if (close(pidfile_fd) == -1)
-			logmsg(LOG_ERR, 1, "Error - Unable to close pid file: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - Unable to close pid file: %m.\n");
 
 		logmsg(LOG_DEBUG, 1, "Removing pid file.\n");
 		if (unlink(pidfile_name) == -1)
-			logmsg(LOG_ERR, 1, "Error - Unable to remove pid file: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - Unable to remove pid file: %m.\n");
 	} else logmsg(LOG_DEBUG, 1, "No pid file installed.\n");
 
 	logmsg(LOG_NOTICE, 1, "---- honeytrap stopped ----\n");
 	
-	if (close(logfile_fd) == -1) logmsg(LOG_ERR, 1, "Error - Unable to close logfile: %s.\n", strerror(errno));
+	if (close(logfile_fd) == -1) logmsg(LOG_ERR, 1, "Error - Unable to close logfile: %m.\n");
 
 	exit(status);
 }
@@ -107,13 +107,13 @@ int do_daemonize(void) {
 	umask(0);
 
 	if (getrlimit(RLIMIT_NOFILE, &rl) < 0) {
-		fprintf(stderr, "  Error - Unable to daemonize: %s\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to daemonize: %m.\n");
 		exit(EXIT_FAILURE);
 	}
 
 	/* become session leader and loose controlling TTY */
 	if ((pid = myfork()) < 0) {
-		fprintf(stderr, "  Error - Unable to daemonize: %s\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to daemonize: %m.\n");
 		exit(EXIT_FAILURE);
 	} else if (pid != 0) exit(EXIT_SUCCESS);
 		
@@ -121,7 +121,7 @@ int do_daemonize(void) {
 		
 	/* fork again, future opens must not allocate controlling TTYs */
 	if ((pid = myfork()) < 0) {
-		fprintf(stderr, "  Error - Unable to daemonize: %s\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to daemonize: %m.\n");
 		exit(EXIT_FAILURE);
 	} else if (pid != 0) {
 		DEBUG_FPRINTF(stdout, "  Successfully changed into daemon environment.\n");
@@ -134,7 +134,7 @@ int do_daemonize(void) {
 	/* change working directory to root directory */
 	DEBUG_FPRINTF(stdout, "  Current working directory is %s, changing it to /.\n", old_cwd);
 	if (chdir("/") < 0) {
-		fprintf(stderr, "  Error - Cannot change working directory: %s\n", strerror(errno));
+		fprintf(stderr, "  Error - Cannot change working directory: %m.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -143,19 +143,19 @@ int do_daemonize(void) {
 	if (rl.rlim_max == RLIM_INFINITY) rl.rlim_max = 1024;
 	for (i=0; i < rl.rlim_max; i++)
 		if ((i != logfile_fd) && (i != sigpipe[0]) && (i != sigpipe[1]) && (close(i) == -1))
-			fprintf(stdout, "  Warnging - Could not close file descriptor %d: %s.\n", i, strerror(errno));
+			fprintf(stdout, "  Warnging - Could not close file descriptor %d: %m.\n", i);
 
 	/* attach file descriptors 0, 1 and 2 to /dev/null to prevent accidentally standard IO */
 	if ((fd0 = open("/dev/null", O_RDWR)) == -1) {
-		fprintf(stderr, "  Error - Unable to set stdin to /dev/null: %s.\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to set stdin to /dev/null: %m.\n");
 		exit(EXIT_FAILURE);
 	}
 	if ((fd1 = dup(fd0)) == -1) {
-		fprintf(stderr, "  Error - Unable to set stdout to /dev/null: %s.\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to set stdout to /dev/null: %m.\n");
 		exit(EXIT_FAILURE);
 	}
 	if ((fd2 = dup(fd0)) == -1) {
-		fprintf(stderr, "  Error - Unable to set stderr to /dev/null: %s.\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to set stderr to /dev/null: %m.\n");
 		exit(EXIT_FAILURE);
 	}
 	fflush(NULL);
@@ -169,20 +169,20 @@ int create_pid_file(void) {
 	char pid_str[5];
 
 	if ((pidfile_fd = open(pidfile_name, O_EXCL | O_CREAT | O_NOCTTY | O_RDWR, 0640)) == -1) {
-		logmsg(LOG_ERR, 1, "Error - Unable to open pid file: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to open pid file: %m.\n");
 		exit(EXIT_SUCCESS);
 	}
 	if (lockf(pidfile_fd, F_TLOCK, 0) < 0) {
-		logmsg(LOG_ERR, 1, "Error - Unable to lock pid file: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to lock pid file: %m.\n");
 		clean_exit(EXIT_SUCCESS);
 	}
 
-	parent_pid = getpid();
+	master_pid = getpid();
 
 	bzero(pid_str, 5);
-	snprintf(pid_str, 5,"%d\n", parent_pid);
+	snprintf(pid_str, 5,"%d\n", master_pid);
 	if (!(write(pidfile_fd, pid_str, strlen(pid_str)))) {
-		logmsg(LOG_ERR, 1, "Error - Unable to write pid file: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to write pid file: %m.\n");
 		return(0);
 	}
 	logmsg(LOG_DEBUG, 1, "Master process pid written to %s.\n", pidfile_name);

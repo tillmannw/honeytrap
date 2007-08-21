@@ -92,14 +92,14 @@ list_entry *add_list_item(conf_node *node, const void *data, ssize_t size) {
 
 	/* create new element */
 	if ((new_entry = malloc(sizeof(list_entry))) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 		return(NULL);
 	}
 	memset(new_entry, 0, sizeof(list_entry));
 
 	/* copy data */
 	if ((new_entry->data = malloc(size+1)) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 		return(NULL);
 	}
 	memset(new_entry->data, 0, size+1);
@@ -142,7 +142,7 @@ conf_node *check_keyword(conf_node *tree, const char *keyword) {
 
 
 	if (((key = (char **) malloc(sizeof(char *))) == NULL) || ((*key = strdup(keyword)) ==  NULL)) {
-		fprintf(stderr, "  Error - Unable to allocate memory: %s.\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to allocate memory: %m.\n");
 		return(NULL);
 	}
 
@@ -184,7 +184,7 @@ conf_node *add_keyword(conf_node **tree, const char *keyword, const void *data, 
 
 	// check whether a prefix does already exist and if not, add it recursively
 	if ((key = strdup(keyword)) ==  NULL) {
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 		return(NULL);
 	}
 
@@ -208,14 +208,14 @@ conf_node *add_keyword(conf_node **tree, const char *keyword, const void *data, 
 
 	// create new node and insert it into tree
 	if ((new_node = malloc(sizeof(conf_node))) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 		free(key);
 		return(NULL);
 	}
 	memset(new_node, 0, sizeof(conf_node));
 	// if keyword is a toplevel key, add it, else add subkey
 	if ((new_node->keyword = strdup(subkey ? subkey : key)) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 		free(key);
 		return(NULL);
 	}

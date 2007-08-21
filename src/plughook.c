@@ -52,7 +52,7 @@ void register_plugin_confopts(const char *plugname, const char **keywords, int n
 
 		/* assemble full config option path */
 		if ((confopt = malloc(strlen(full_name)+strlen(keywords[i])+2)) == NULL) {
-			fprintf(stderr, "  Error - Unable to allocate memory: %s.\n", strerror(errno));
+			fprintf(stderr, "  Error - Unable to allocate memory: %m.\n");
 			exit(EXIT_FAILURE);
 		}
 		memset(confopt, 0, strlen(plugname)+strlen(keywords[i])+2);
@@ -79,7 +79,7 @@ PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plug
 
 	DEBUG_FPRINTF(stdout, "    Hooking %s::%s() to 'process_attack' (priority: %d).\n", plugname, funcname, priority);
 	if ((func_new = (PlugFuncList *) malloc(sizeof(PlugFuncList))) == NULL) {
-		logmsg(LOG_ERR, 1, "    Error - Unable to allocate memory: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "    Error - Unable to allocate memory: %m.\n");
 		return(NULL);
 	}
 	func_new->next = NULL;
@@ -152,7 +152,7 @@ PlugFuncList *add_unload_func_to_list(const char *plugname, const char *funcname
 
 	DEBUG_FPRINTF(stdout, "    Hooking plugin %s to 'unload_plugins'.\n", plugname);
 	if ((func_new = (PlugFuncList *) malloc(sizeof(PlugFuncList))) == NULL) {
-		logmsg(LOG_ERR, 1, "    Error - Unable to allocate memory: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "    Error - Unable to allocate memory: %m.\n");
 		return(NULL);
 	}
 	func_new->next = NULL;

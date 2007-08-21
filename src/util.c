@@ -38,10 +38,7 @@ int private_ipaddr(uint32_t address) {
 	int i;
 
 	for (i=0; i<(sizeof(priv_prefixes)/4); i++)
-		if ((ntohl(address) & priv_prefixes[i]) == ntohl(address)) {
-			printf("match for %s.\n", inet_ntoa(*(struct in_addr *) &priv_prefixes[i]));
-			return(1);
-		}
+		if ((ntohl(address) & priv_prefixes[i]) == ntohl(address)) return(1);
 
 	return(0);
 }

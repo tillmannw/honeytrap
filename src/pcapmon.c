@@ -266,7 +266,7 @@ int start_pcap_mon(void) {
 				break;
 			}
 			/* error */
-			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %m.\n");
 			exit(EXIT_FAILURE);
 		case 0:
 			break;
@@ -379,7 +379,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 	if (bpf_cmd_ext) {
 		if (!(bpf_filter_string = (char *)realloc(bpf_filter_string,
 			strlen(bpf_filter_string)+strlen(bpf_cmd_ext)+8))) {
-			fprintf(stderr, "  Error - Unable to allocate memory: %s\n", strerror(errno));
+			fprintf(stderr, "  Error - Unable to allocate memory: %m.\n");
 			exit(EXIT_FAILURE);
 		}	
 		snprintf(bpf_filter_string+strlen(bpf_filter_string), strlen(bpf_cmd_ext)+8,

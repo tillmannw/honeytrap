@@ -146,7 +146,7 @@ int configure(int my_argc, char *my_argv[]) {
 	}
 
 	/* initialilzation of variables */
-	default_response	= NULL;	/* initialize default response list */
+	response_list		= NULL;	/* initialize default response list */
 	pidfile_fd		= 0;
 #ifdef USE_PCAP_MON
 	bpf_cmd_ext		= NULL;	/* bpf string extension ('expression' from command line) */
@@ -237,6 +237,10 @@ int configure(int my_argc, char *my_argv[]) {
 	}
 
 
+	/* install signal handlers */
+	install_signal_handlers();
+
+
 	/* process remaining options now */
 	optind = 1;
 	while((option = getopt(my_argc, my_argv, OPTSTRING)) > 0) {
@@ -273,7 +277,7 @@ int configure(int my_argc, char *my_argv[]) {
 				break;
 			case 'u':
 				if ((pwd_entry = getpwnam(optarg)) == NULL) {
-					if (errno) fprintf(stderr, "  Invalid user: %s\n", strerror(errno));
+					if (errno) fprintf(stderr, "  Invalid user: %m.\n");
 					else fprintf(stderr, "  User %s not found.\n", optarg);
 					exit(EXIT_FAILURE);
 				} else {
@@ -283,7 +287,7 @@ int configure(int my_argc, char *my_argv[]) {
 				break;
 			case 'g':
 				if ((grp_entry = getgrnam(optarg)) == NULL) {
-					if (errno) fprintf(stderr, "  Invalid group: %s\n", strerror(errno));
+					if (errno) fprintf(stderr, "  Invalid group: %m.\n");
 					else fprintf(stderr, "  Group %s not found.\n", optarg);
 					exit(EXIT_FAILURE);
 				} else {
@@ -304,6 +308,7 @@ int configure(int my_argc, char *my_argv[]) {
 				break;
 		}
 	}
+
 
 #ifdef USE_PCAP_MON
 	/* get IPv4 address from interface */
@@ -367,7 +372,7 @@ int configure(int my_argc, char *my_argv[]) {
 
 	/* open logfile */
 	if((logfile_fd = open(logfile_name, EXCL_FILE_RW, 0644)) == -1) {
-		fprintf(stderr, "  Error - Unable to open logfile %s: %s.\n", logfile_name, strerror(errno));
+		fprintf(stderr, "  Error - Unable to open logfile %s: %m.\n", logfile_name);
 		exit(EXIT_FAILURE);
 	}
 	fprintf(stdout, "  Logging to %s.\n", logfile_name);
@@ -466,7 +471,7 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 		else if (OPT_IS("plugin_dir")) OPT_SET("  Loading plugins from %s.\n", plugin_dir)
 		else if (OPT_IS("user")) {
 			if ((pwd_entry = getpwnam(value)) == NULL) {
-				if (errno) fprintf(stderr, "  Error - Invalid user '%s': %s\n", value, strerror(errno));
+				if (errno) fprintf(stderr, "  Error - Invalid user '%s': %m.\n", value);
 				else fprintf(stderr, "  Error - User %s not found.\n", value);
 				exit(EXIT_FAILURE);
 			}
@@ -475,7 +480,7 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 			DEBUG_FPRINTF(stdout, "  Setting user to %s\n", user);
 		} else if (OPT_IS("group")) {
 			if ((grp_entry = getgrnam(value)) == NULL) {
-				if (errno) fprintf(stderr, "  Error - Invalid group '%s': %s\n", value, strerror(errno));
+				if (errno) fprintf(stderr, "  Error - Invalid group '%s': %m.\n", value);
 				else fprintf(stderr, "  Error - Group %s not found.\n", value);
 				exit(EXIT_FAILURE);
 			}

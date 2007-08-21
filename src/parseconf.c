@@ -189,7 +189,7 @@ struct lcfg_scanner {
 
 static enum lcfg_status lcfg_scanner_buffer_fill(struct lcfg_scanner *s) {
 	if( (s->size = read(s->fd, s->buffer, LCFG_BUFSIZ)) < 0 ) {
-		lcfg_error_set(s->lcfg, "read(): %s", strerror(errno));
+		lcfg_error_set(s->lcfg, "read(): %m");
 		return lcfg_status_error;
 	} else if( s->size == 0 ) s->eof = !0;
 	else s->offset = 0;
@@ -581,7 +581,6 @@ static enum lcfg_status lcfg_parser_parse(struct lcfg_parser *p) {
 		case exp_value:
 			if( t.type == lcfg_string ) {
 				lcfg_parser_add_value(p, lcfg_string_cstr(current_path), t.string);
-				/*printf("adding string value for single statement\n");*/
 				STATE_STACK_POP();
 				PATH_POP();
 			} else if( t.type == lcfg_sbracket_open ) state_stack[ssi].s = in_list;
@@ -598,16 +597,13 @@ static enum lcfg_status lcfg_parser_parse(struct lcfg_parser *p) {
 				PATH_PUSH_INT(state_stack[ssi].list_counter);
 				lcfg_parser_add_value(p, lcfg_string_cstr(current_path), t.string);
 				PATH_POP();
-				/*printf("adding string to list pos %d\n", state_stack[ssi].list_counter);*/
 				state_stack[ssi].list_counter++;
 			} else if( t.type == lcfg_sbracket_open ) {
 				PATH_PUSH_INT(state_stack[ssi].list_counter);
-				/*printf("adding list to list pos %d\n", state_stack[ssi].list_counter);*/
 				state_stack[ssi].list_counter++;
 				STATE_STACK_PUSH(in_list);
 			} else if( t.type == lcfg_brace_open ) {
 				PATH_PUSH_INT(state_stack[ssi].list_counter);
-				/*printf("adding map to list pos %d\n", state_stack[ssi].list_counter);*/
 				state_stack[ssi].list_counter++;
 				STATE_STACK_PUSH(in_map);
 			} else if( t.type == lcfg_sbracket_close ) {
@@ -624,8 +620,6 @@ static enum lcfg_status lcfg_parser_parse(struct lcfg_parser *p) {
 		}
 		
 		lcfg_string_delete(t.string);
-		
-		/*printf(" *** pda: read %s, state is now %s\n", lcfg_token_map[t.type], state_map[state_stack[ssi].s]);*/
 	}
 
 	lcfg_string_delete(current_path);	
@@ -644,7 +638,7 @@ enum lcfg_status lcfg_parser_run(struct lcfg_parser *p) {
 	enum lcfg_status status;
 	
 	if( fd < 0 ) {
-		lcfg_error_set(p->lcfg, "open(): %s", strerror(errno));
+		lcfg_error_set(p->lcfg, "open(): %m");
 		return lcfg_status_error;
 	}
 	

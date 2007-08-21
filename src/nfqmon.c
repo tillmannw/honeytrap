@@ -147,23 +147,23 @@ int start_nfq_mon(void) {
 
 	logmsg(LOG_DEBUG, 1, "Creating NFQ connection monitor.\n");
 	if ((h = nfq_open()) < 0) {
-		logmsg(LOG_ERR, 1, "Error - Could not create NFQ handle: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Could not create NFQ handle: %m.\n");
 		clean_exit(EXIT_FAILURE);
 	}
 
 	if (nfq_unbind_pf(h, AF_INET) < 0) {
-		logmsg(LOG_ERR, 1, "Error - Could not unbind existing NFQ handle: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Could not unbind existing NFQ handle: %m.\n");
 		logmsg(LOG_ERR, 1, "Do you have root privileges?\n");
 		clean_exit(EXIT_FAILURE);
 	}
 
 	if (nfq_bind_pf(h, AF_INET) < 0) {
-		logmsg(LOG_ERR, 1, "Error - Could not bind existing NFQ handle: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Could not bind existing NFQ handle: %m.\n");
 		clean_exit(EXIT_FAILURE);
 	}
 
 	if ((qh = nfq_create_queue(h,  0, &server_wrapper, NULL)) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Could not create NFQ queue handle: %s\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Could not create NFQ queue handle: %m.\n");
 		clean_exit(EXIT_FAILURE);
 	}
 
@@ -196,7 +196,7 @@ int start_nfq_mon(void) {
 				break;
 			}
 			/* error */
-			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %m.\n");
 			exit(EXIT_FAILURE);
 		case 0:
 			break;

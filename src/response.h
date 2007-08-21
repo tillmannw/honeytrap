@@ -20,13 +20,15 @@
 
 #include <netinet/in.h>
 
-struct default_resp {
+typedef struct def_resp {
 	uint16_t port;
 	uint16_t proto;
 	uint32_t size;
 	u_char *response;
-	struct default_resp *next;
-} *default_response;
+	struct def_resp *next;
+} def_resp;
+
+def_resp *response_list;
 
 
 void unload_default_responses(void);

@@ -18,7 +18,6 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
-//#include <unistd.h>
 
 #include "honeytrap.h"
 #include "logging.h"
@@ -94,14 +93,21 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 		switch(nb_connect(proxy_sock_fd, (struct sockaddr *) &proxy_socket,
 		       sizeof(proxy_socket), timeout)) {
 		case -1:
-			if (errno == EINPROGRESS) break;
-			if (errno == EINTR) {
+			switch(errno) {
+			case EINPROGRESS:
+				break;
+			case EINTR:
 				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
 				break;
+			case ECONNREFUSED:
+				logmsg(LOG_DEBUG, 1, "%s %s  select() call failed: %m.\n",
+					logpre, portstr);
+				return(-1);
+			default:
+				logmsg(LOG_ERR, 1, "%s %s  Error - select() call failed: %m.\n",
+					logpre, portstr);
+				return(-1);
 			}
-			logmsg(LOG_ERR, 1, "%s %s  Error - select() call failed: %s \n",
-				logpre, portstr, strerror(errno));
-			return(-1);
 		case 0:
 			logmsg(LOG_DEBUG, 1, "%s %s  Unable to establish %s connection: %s.\n",
 				logpre, portstr, logact, strerror(ETIMEDOUT));
@@ -112,8 +118,8 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 		
 		local_addr_len = 0;
 		if (getsockname(proxy_sock_fd, (struct sockaddr *) &local_socket, (socklen_t *) &local_addr_len) != 0) {
-			logmsg(LOG_ERR, 1, "%s %s  Error - Unable to get local address from %s socket: %s\n",
-				logpre, portstr, logact, strerror(errno));
+			logmsg(LOG_ERR, 1, "%s %s  Error - Unable to get local address from %s socket: %m.\n",
+				logpre, portstr, logact);
 			return(-1);
 		}
 		memcpy(&(attack->p_conn.l_addr), &local_socket.sin_addr, sizeof(uint32_t));
@@ -133,7 +139,7 @@ int copy_data(int to_fd, int from_fd, u_char **save_string, uint32_t offset, int
 	if ((*bytes_read = read(from_fd, buffer, sizeof(buffer))) > 0) {
 		/* write read bytes to save_string at offset */
 		if (!(*save_string = (u_char *) realloc(*save_string, offset+(*bytes_read)))) {
-			logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 			close(from_fd);
 			close(to_fd);
 			return(-1);

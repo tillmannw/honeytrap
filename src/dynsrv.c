@@ -130,7 +130,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		/* create listener when handling tcp connection request */
 		/* a backlog queue size of 10 should give us enough time to fork */
 		if ((proto == TCP) && ((listen(listen_fd, 10)) < 0)) {
-			logmsg(LOG_ERR, 1, "Error - Could not listen on socket: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - Could not listen on socket: %m.\n");
 			close(listen_fd);
 			exit(EXIT_FAILURE);
 		}
@@ -156,7 +156,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		 * but digging the source of libnetfilter_queue and libnfnetlink reveals
 		 * that it's just the passed-through value of a sendmsg() */
 		if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
-			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %m.\n");
 			nfq_destroy_queue(qh);
 			exit(EXIT_FAILURE);
 		}
@@ -183,7 +183,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					break;
 				}
 				logmsg(LOG_ERR, 1,
-				       "   %s  Error - select() call failed: %s.\n", portstr, strerror(errno));
+				       "   %s  Error - select() call failed: %m.\n", portstr);
 				exit(EXIT_FAILURE);
 			case 0:
 				/* timeout */
@@ -220,8 +220,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 								break;
 							else {
 								logmsg(LOG_ERR, 1,
-								       "   %s  Error - Could not accept tcp connection: %s\n",
-								       portstr, strerror(errno));
+								       "   %s  Error - Could not accept tcp connection: %m.\n",
+								       portstr);
 								close(mirror_sock_fd);
 								free(attack);
 								exit(EXIT_FAILURE);
@@ -243,8 +243,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 								break;
 							else {
 								logmsg(LOG_ERR, 1,
-								       "   %s  Error - Could not connect udp socket: %s\n",
-								       portstr, strerror(errno));
+								       "   %s  Error - Could not connect udp socket: %m.\n",
+								       portstr);
 								close(mirror_sock_fd);
 								free(attack);
 								exit(EXIT_FAILURE);
@@ -259,8 +259,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 								break;
 							else {
 								logmsg(LOG_ERR, 1,
-								       "   %s  Error - Could not get remote host information: %s\n",
-								       portstr, strerror(errno));
+								       "   %s  Error - Could not get remote host information: %m.\n",
+								       portstr);
 								close(mirror_sock_fd);
 								free(attack);
 								exit(EXIT_FAILURE);
@@ -414,7 +414,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			} // select return for listen_fd
 		} // for - incoming connections
 	} /* fork - server process */
-	else if (pid == -1) logmsg(LOG_ERR, 1, "Error - Forking server process failed: %s.\n", strerror(errno));
+	else if (pid == -1) logmsg(LOG_ERR, 1, "Error - Forking server process failed: %m.\n");
 	return;
 }
 
@@ -443,7 +443,7 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
 				break;
 			}
-			logmsg(LOG_ERR, 1, "   %s  Error - select() failed: %s.\n", portstr, strerror(errno));
+			logmsg(LOG_ERR, 1, "   %s  Error - select() failed: %m.\n", portstr);
 			close(connection_fd);
 			return(process_data(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 		case 0:
@@ -458,8 +458,7 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 			} else {
 				if ((!send_default_response(connection_fd, port, proto, read_timeout)) == -1) {
 					logmsg(LOG_ERR, 1,
-					       "   %s  Error - Sending response failed: %s.\n",
-					       portstr, strerror(errno));
+					       "   %s  Error - Sending response failed: %m.\n", portstr);
 					close(connection_fd);
 					return(process_data
 						(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
@@ -475,8 +474,7 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 					total_bytes += bytes_read;
 					if (!(attack_string = (u_char *) realloc(attack_string, total_bytes))) {
 						logmsg(LOG_ERR, 1,
-						       "   %s  Error - Reallocating buffer size failed: %s.\n",
-						       portstr, strerror(errno));
+						       "   %s  Error - Reallocating buffer size failed: %m.\n", portstr);
 						free(attack_string);
 						exit(EXIT_FAILURE);
 					}
@@ -500,7 +498,7 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 					return(process_data
 						(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 				} else {
-					logmsg(LOG_NOISY, 1, "   %s  Could not read data: %s.\n", portstr, strerror(errno));
+					logmsg(LOG_NOISY, 1, "   %s  Could not read data: %m.\n", portstr);
 					close(connection_fd);
 					return(process_data
 						(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
@@ -558,7 +556,7 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
 				break;
 			}
-			logmsg(LOG_INFO, 1, "%s %s  Error - Select failed: %s.\n", logpre, portstr, strerror(errno));
+			logmsg(LOG_INFO, 1, "%s %s  Error - Select failed: %m.\n", logpre, portstr);
 			shutdown(server_sock_fd, SHUT_RDWR);
 			shutdown(connection_fd, SHUT_RDWR);
 			return(process_data

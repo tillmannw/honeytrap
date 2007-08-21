@@ -35,13 +35,13 @@
 
 
 void unload_default_responses(void) {
-	struct default_resp *cur_response;
+	def_resp *cur_response;
 	
-	while(default_response) {
-		cur_response = default_response->next;
-		free(default_response->response);
-		free(default_response);
-		default_response = cur_response;
+	while(response_list) {
+		cur_response = response_list->next;
+		free(response_list->response);
+		free(response_list);
+		response_list = cur_response;
 	}
 	return;
 }
@@ -50,10 +50,10 @@ int prepare_default_response(char *filename, uint16_t port, uint16_t proto) {
 	int answer_fd, ccopy;
         u_char buffer[100];
 	FILE* answer_file = NULL;
-	struct default_resp *last_response, *new_response;
+	def_resp *last_response, *new_response;
 
 	/* allocate memory for new response */
-	if ((new_response = (struct default_resp *) malloc(sizeof(struct default_resp))) == NULL) {
+	if ((new_response = (def_resp *) malloc(sizeof(struct def_resp))) == NULL) {
 		perror("  Error - Unable to allocate memory");
 		return(-1);
 	} else {
@@ -63,14 +63,13 @@ int prepare_default_response(char *filename, uint16_t port, uint16_t proto) {
 		new_response->response	= NULL;
 		new_response->next	= NULL;
 	}
-	if (!default_response) default_response = new_response;
+	if (!response_list) response_list = new_response;
 	else { 
 		/* spool to end of the list and attach new response */
-		last_response = default_response;
+		last_response = response_list;
 		while (last_response->next) last_response = last_response->next;
 		last_response->next = new_response;
 	}
-
 
 	/* read response */
 	if ((proto != TCP) && (proto != UDP)) {
@@ -146,7 +145,7 @@ int load_default_responses(char *dir) {
 
 
 int send_default_response(int connection_fd, uint16_t port, uint16_t proto, u_char timeout) {
-	struct default_resp *cur_response;
+	def_resp *cur_response = NULL;
 
 	if ((proto != TCP) && (proto != UDP)) {
 		fprintf(stderr, "  Error - Protocol %u is not supported.\n", proto);
@@ -156,8 +155,8 @@ int send_default_response(int connection_fd, uint16_t port, uint16_t proto, u_ch
 	logmsg(LOG_DEBUG, 1, "Searching for default response for port %s.\n", portstr);
 	
 	/* advance through list to find response for port */
-	cur_response = default_response;
-	while(cur_response && (cur_response->port != port) && (cur_response->proto != proto))
+	cur_response = response_list;
+	while(cur_response && ((cur_response->port != port) || (cur_response->proto != proto)))
 		cur_response = cur_response->next;
 	
 	if (cur_response && (cur_response->port == port) && (cur_response->proto == proto)) {

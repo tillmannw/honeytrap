@@ -138,14 +138,16 @@ avl_tree avl_ins(const u_char *key, avl_tree t, int n, int id) {
 		}
 	} else if (memcmp(key, t->ng->key, n) < 0) {
 		t->left = avl_ins(key, t->left, n, id);
-		if (avl_height(t->left) - avl_height(t->right) == 2)
+		if (avl_height(t->left) - avl_height(t->right) == 2) {
 			if (memcmp(key, t->left->ng->key, n) < 0) t = avl_single_lrot(t);
 			else t = avl_double_lrot(t);
+		}
 	} else if (memcmp(key, t->ng->key, n) > 0) {
 		t->right = avl_ins(key, t->right, n, id);
-		if (avl_height(t->right) - avl_height(t->left) == 2)
+		if (avl_height(t->right) - avl_height(t->left) == 2) {
 			if (memcmp(key, t->right->ng->key, n) > 0) t = avl_single_rrot(t);
 			else t = avl_double_rrot(t);
+		}
 	} else {
 		/* ngram already in tree, just update key's frequency */
 		t = avl_find(key, t, n);
@@ -252,10 +254,7 @@ int main(int argc, char *argv[]) {
 	avl_del_tree(ngtree);
 
 	/* calculate similarity */
-	len1 = sqrt(len1);
-	len2 = sqrt(len2);
-
-	if (isnan(result = 100-(100*acos(dotproduct/(len1*len2))/1.5707963))) result = 100;
+	if (isnan(result = 100-(100*acos(dotproduct/(sqrt(len1)*sqrt(len2)))/1.5707963))) result = 100;
 
 	fprintf(stdout, "Similarity: %.2f%%.\n", result);
 

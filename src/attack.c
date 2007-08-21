@@ -49,7 +49,7 @@ Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port
 	a->dl_count		= 0;
 	a->download		= NULL;
 	if (time(&(a->start_time)) == ((time_t)-1)) 
-		logmsg(LOG_WARN, 1, "Warning - Could not set attack start time: %s.\n", strerror(errno));
+		logmsg(LOG_WARN, 1, "Warning - Could not set attack start time: %m.\n");
 
 	return(a);
 }
@@ -66,7 +66,7 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 
 	/* save end time and payload data in attack record */
 	if (time(&(a->end_time)) == ((time_t)-1)) 
-		logmsg(LOG_WARN, 1, "Warning - Could not set attack end time: %s.\n", strerror(errno));
+		logmsg(LOG_WARN, 1, "Warning - Could not set attack end time: %m.\n");
 
 	/* attack string */
 	a->a_conn.payload.size = a_size;
@@ -122,7 +122,7 @@ int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, co
 	}
 
 	if ((a->download = realloc(a->download, sizeof(struct s_download) * (a->dl_count + 1))) == NULL) {
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 		return(-1);
 	}
 
@@ -131,7 +131,7 @@ int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, co
 	    (user && ((a->download[a->dl_count].user = strdup(user)) == NULL)) ||
 	    (pass && ((a->download[a->dl_count].pass = strdup(pass)) == NULL)) ||
 	    ((a->download[a->dl_count].dl_payload.data = (u_char *) malloc(size)) == NULL)) { 
-		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 		free(a->download[a->dl_count].dl_type);
 		free(a->download[a->dl_count].user);
 		free(a->download[a->dl_count].pass);

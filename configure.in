@@ -540,7 +540,7 @@ then
 	with_efence="X"
 	AC_CHECK_LIB(efence, EF_ALIGNMENT, LIBS="${LIBS} -lefence", AC_MSG_ERROR(libefence not found))
 else
-	with_efence="no"
+	with_efence=" "
 fi
 
 

@@ -83,10 +83,6 @@ int main(int argc, char **argv) {
 	portconf_default = PORTCONF_NONE;
 
 
-	/* install signal handlers */
-	install_signal_handlers();
-	
-
 	/* configure honeytrap */
 	configure(arg_c, arg_v);
 

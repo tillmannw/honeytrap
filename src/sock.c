@@ -47,7 +47,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 	}
 
 	if (!(fd = socket(AF_INET, type, 0))) {
-	    logmsg(LOG_ERR, 1, "Error - Could not create socket: %s\n", strerror(errno));
+	    logmsg(LOG_ERR, 1, "Error - Could not create socket: %m.\n");
 	    exit(EXIT_FAILURE);
 	}
 
@@ -61,7 +61,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 	server_addr->sin_port		= port;
 	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) < 0) {
 	    /* we already got one server process */
-	    logmsg(LOG_DEBUG, 1, "Unable to bind to port %s: %s.\n", portstr, strerror(errno));
+	    logmsg(LOG_DEBUG, 1, "Unable to bind to port %s: %m.\n", portstr);
 #ifdef USE_IPQ_MON
 	    /* hand packet processing back to the kernel */
 	    if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
@@ -90,7 +90,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 #else
 	    /* if bind() did not fail for 'port already in use' but for some other reason,
 	     *  we're in troubles and want a verbose error message */
-	    if (errno != 98) logmsg(LOG_NOISY, 1, "Warning - Could not bind to port %s: %s.\n", portstr, strerror(errno));
+	    if (errno != 98) logmsg(LOG_NOISY, 1, "Warning - Could not bind to port %s: %m.\n", portstr);
 	    exit(EXIT_FAILURE);
 #endif
 #endif
@@ -151,11 +151,18 @@ int nb_connect(int sock_fd, const struct sockaddr * sockaddr, socklen_t slen, in
 			if (FD_ISSET(sock_fd, &rfds) || FD_ISSET(sock_fd, &wfds)) {
 				len = sizeof(error);
 				if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) return(-1);
+				if (error) {
+					errno = error;
+					return(-1);
+				}
 			}
 		}
 	}
 	if (fcntl(sock_fd, F_SETFL, flags) < 0) return(-1);
-	if (error) return(-1);
+	if (error) {
+		errno = error;
+		return(-1);
+	}
 
 	return(sock_fd);
 }

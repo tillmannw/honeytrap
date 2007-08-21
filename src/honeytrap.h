@@ -72,7 +72,6 @@ port_flag port_flags[0x10000];
 // end of global config variables
 
 int pidfile_fd, first_init;
-pid_t parent_pid;
 char old_cwd[1024];
 
 

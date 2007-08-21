@@ -83,7 +83,7 @@ int start_ipq_mon(void) {
 				break;
 			}
 			/* error */
-			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %s.\n", strerror(errno));
+			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %m.\n");
 			exit(EXIT_FAILURE);
 		case 0:
 			break;

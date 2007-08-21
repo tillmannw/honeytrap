@@ -21,10 +21,12 @@
 
 int sigpipe[2];
 
-pid_t parent_pid;
+pid_t master_pid;
 
 void get_signal(int sig);
-void handle_signal(int sig);
+void handle_sigchld(int sig);
+void handle_sighup(int sig);
+void handle_termsig(int sig);
 void install_signal_handlers(void);
 void create_sigpipe(void);
 int check_sigpipe(void);

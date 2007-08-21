@@ -19,6 +19,7 @@
  * The similarity in percent is printed to stdout.
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -35,9 +36,9 @@ typedef struct trie_node *trie;
 
 typedef struct trie_node {
 	u_char key;
+	u_int16_t array_size;
 	u_int32_t freq1;
 	u_int32_t freq2;
-	trie next;
 	trie childlist;
 } trie_node;
 
@@ -45,11 +46,60 @@ typedef struct trie_node {
 double sqrnorm1, sqrnorm2, dotprod;
 
 
-trie new_trie_node(void) {
-	trie t;
+trie find_node(trie t, u_int16_t size, u_char key) {
+	u_int16_t i=0;
+	u_int16_t high, low;
+	
+	if (t == NULL) return(NULL);
 
-	if ((t = malloc(sizeof(trie_node))) != NULL)
-		memset(t, 0, sizeof(trie_node));
+	for (low=0, high=(size-1); high-low>0; ) {
+		i = (high+low)/2;
+		if (key <= (t+i)->key) high = i;
+		else{
+			i = (high+low+1)/2;
+			low = i;
+		}
+	}
+	return(t[i].key == key ? &t[i] : NULL);
+}
+
+trie insert_new_child_node(trie parent, u_char key, u_char snum) {
+	u_int16_t i = 0;
+	int high, low;
+	trie t = NULL;
+
+	if ((t = realloc(parent->childlist, sizeof(trie_node)*(parent->array_size+1))) == NULL) {
+		fprintf(stderr, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	parent->childlist = t;
+	parent->array_size++;
+
+	if (parent->array_size > 1) {
+		/* multiple nodes, binary-search array position and memmove */
+		i = 0;
+		for (low=0, high=(parent->array_size-1); high-low>0; ) {
+			i = (high+low)/2;
+			if (key <= (t+i)->key) high = i;
+			else {
+				i = (high+low+1)/2;
+				low = i;
+			}
+		}
+		if (key < t[i].key) memmove(&t[i+1], &t[i], (parent->array_size-i-1)*(sizeof(trie_node)));
+		else  {
+			if (i != parent->array_size-2) {
+				memmove(&t[i+2], &t[i+1], (parent->array_size-i-1)*(sizeof(trie_node)));
+			}
+		}
+		t = &t[i];
+		
+	}
+
+	memset(t, 0, sizeof(trie_node));
+	t->key = key;	// set first element
+	if (snum) t->freq2=1;
+	else t->freq1=1;
 
 	return(t);
 }
@@ -58,7 +108,7 @@ trie new_trie_node(void) {
 /* inserts an ngram into the trie or update its frequency */
 void ngram_ins(trie t, const u_char *data, ssize_t n, u_char snum) {
 	ssize_t k;
-	u_char curchar;
+	trie target_node;
 
 	if (t == NULL) {
 		fprintf(stderr, "Error - Cannot insert into empty trie.\n");
@@ -66,87 +116,55 @@ void ngram_ins(trie t, const u_char *data, ssize_t n, u_char snum) {
 	}
 
 	for (k=0; k<n; k++) {
-		curchar = data[k];
-
-		/*
-		if (t && t->freq1 == 0 && t->freq2 == 0) {
-			// both frequencies are zero, thus we're at the root node
-			// just set pointer to child list
-			t = t->childlist;
-		}
-		*/
-
-		if (t->childlist == NULL) {
-			/* need to create a first child */
-			if ((t->childlist = new_trie_node()) == NULL) {
+		/* search for key in child list */
+		if ((target_node = find_node(t->childlist, t->array_size, data[k])) == NULL) {
+			if ((t = insert_new_child_node(t, data[k], snum)) == NULL) {
 				fprintf(stderr, "Error - Unable to create new trie node: %s.\n", strerror(errno));
 				exit(EXIT_FAILURE);
 			} 
-			t = t->childlist;
-			t->key = curchar;
 		} else {
-			/* search for key in child list */
-			t = t->childlist;
-			if (t->key != curchar) {
-				while ((t->next) && (t->key != curchar)) t = t->next;
-				/* key not present, create new node */
-				if (t->key != curchar) {
-					if ((t->next = new_trie_node()) == NULL) {
-						fprintf(stderr, "Error - Unable to create new trie node: %s.\n", strerror(errno));
-						exit(EXIT_FAILURE);
-					} 
-					t = t->next;
-					t->key = curchar;
-				}
-			}
+			t = target_node;
+			/* we're always at the right node here, update frequency */
+			(snum == 0) ? t->freq1++ : t->freq2++;
 		}
-
-		/* we're always at the right node here, update frequency */
-		(snum == 0) ? t->freq1++ : t->freq2++;
 	}
 	return;
 }
 
-
-/* calculates needed values and free processed trie nodes */
-void calc_and_del_trie(trie t) {
-	if (t) {
-		if (t->childlist) calc_and_del_trie(t->childlist);
-		else {
-			/* it's a leaf node, update result */
-			sqrnorm1 += pow(t->freq1, 2);
-			sqrnorm2 += pow(t->freq2, 2);
-			dotprod += t->freq1 * t->freq2;
-		}
-
-		if (t->next) calc_and_del_trie(t->next);
-	
-		free(t);
-	}
-	return;
-}
 
 
 /* builds a trie of ngrams */
-trie build_ngram_trie(int n, const u_char *data1, const u_char *data2, ssize_t len1, ssize_t len2) {
-	trie ngtrie = NULL;
+trie build_ngram_trie(trie t, int n, const u_char *data1, const u_char *data2, ssize_t len1, ssize_t len2) {
 	ssize_t pos = 0;
-
-	if ((ngtrie = new_trie_node()) == NULL) {
-		fprintf(stderr, "Error - Unable to initialize trie: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	} 
 
 	/* process data strings */
 	if (len1 < len2) {
-		for (pos=0; pos < len1-n+1; pos++) ngram_ins(ngtrie, &data1[pos], n, 0);
-		for (pos=0; pos < len2-n+1; pos++) ngram_ins(ngtrie, &data2[pos], n, 1);
+		for (pos=0; pos < len1-n+1; pos++) ngram_ins(t, &data1[pos], n, 0);
+		for (pos=0; pos < len2-n+1; pos++) ngram_ins(t, &data2[pos], n, 1);
 	} else {
-		for (pos=0; pos < len2-n+1; pos++) ngram_ins(ngtrie, &data2[pos], n, 0);
-		for (pos=0; pos < len1-n+1; pos++) ngram_ins(ngtrie, &data1[pos], n, 1);
+		for (pos=0; pos < len2-n+1; pos++) ngram_ins(t, &data2[pos], n, 0);
+		for (pos=0; pos < len1-n+1; pos++) ngram_ins(t, &data1[pos], n, 1);
 	}
 
-	return(ngtrie);
+	return(t);
+}
+
+
+void calc_and_del_trie(trie t, u_int16_t node_size, int depth) {
+	u_int16_t i = 0;
+
+	if (t == NULL) return;
+
+	for (i=0; i<node_size; i++) {
+		if (t->childlist == NULL) {
+			sqrnorm1 += pow(t[i].freq1, 2);
+			sqrnorm2 += pow(t[i].freq2, 2);
+			dotprod += t[i].freq1 * t[i].freq2;
+		} else calc_and_del_trie(t[i].childlist, t[i].array_size, depth+1);
+	}
+	free(t);
+
+	return;
 }
 
 
@@ -155,7 +173,7 @@ int main(int argc, char *argv[]) {
 	struct stat fs[2];
 	u_char *content[2];
 	double result;
-	trie ngtrie;
+	trie_node ngtrie;
 
 	n		= 0;
 	result		= 0;
@@ -166,7 +184,6 @@ int main(int argc, char *argv[]) {
 	bytes_read	= 0;
 	content[0]	= NULL;
 	content[1]	= NULL;
-	ngtrie		= NULL;
 
 	if (argc < 4) {
 		fprintf(stdout, "Usage: %s n file1 file2\n", argv[0]);
@@ -174,7 +191,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	if ((n = atoi(argv[1])) == 0) n = 3;
-
 
 	/* mmap files */
 	for (i=0; i<2; i++) {
@@ -197,23 +213,20 @@ int main(int argc, char *argv[]) {
 		close(fd);
 	}
 
-
 	/* don't be shy, put in a trie */
-	if ((ngtrie = build_ngram_trie(n, content[0], content[1], fs[0].st_size, fs[1].st_size)) == NULL) {
+	memset(&ngtrie, 0, sizeof(trie_node));
+	if ((build_ngram_trie(&ngtrie, n, content[0], content[1], fs[0].st_size, fs[1].st_size)) == NULL) {
 		printf("No trie built.\n");
 		exit(EXIT_SUCCESS);
 	}
 
-
 	/* calculate vector lenghts and delete trie */ 
 	result = dotprod = sqrnorm1 = sqrnorm2 = 0;
-	calc_and_del_trie(ngtrie);
-
+	calc_and_del_trie(ngtrie.childlist, ngtrie.array_size, 0);
 
 	/* calculate similarity */
 	if (isnan(result = 100-(100*acos(dotprod/(sqrt(sqrnorm1)*sqrt(sqrnorm2)))/1.5707963))) result = 100;
 	fprintf(stdout, "Similarity: %.2f%%.\n", result);
-
 
 	if ((munmap(content[0], fs[0].st_size) != 0) || (munmap(content[1], fs[1].st_size) != 0)) {
 		fprintf(stderr, "Unmapping files failed: %s.\n", strerror(errno));
@@ -222,3 +235,4 @@ int main(int argc, char *argv[]) {
 	
 	return(EXIT_SUCCESS);
 }
+

@@ -48,13 +48,13 @@ int load_plugin(const char *dir, const char* plugname) {
 	}
 
 	if ((plugindir = opendir(dir)) == NULL) {
-		fprintf(stderr, "  Error - Unable to open plugin directory: %s.\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to open plugin directory: %m.\n");
 		exit(EXIT_FAILURE);
 	}
 	
 	DEBUG_FPRINTF(stdout, "  Looking for plugin %s in %s\n", plugname, dir);
 	if ((n = scandir(dir, &namelist, 0, alphasort)) < 0) {
-		fprintf(stderr, "  Error - Unable to scan plugin directory: %s\n", strerror(errno));
+		fprintf(stderr, "  Error - Unable to scan plugin directory: %m.\n");
 		return(-1);
 	} else while(n--) {
 		stat(namelist[n]->d_name, &statbuf);
@@ -81,7 +81,7 @@ int load_plugin(const char *dir, const char* plugname) {
 		free(namelist[n]);
 	}
 	if (ret != 0) {
-		fprintf(stderr, "  Error - Unable to load plugin %s: %s.\n", full_name, strerror(errno));
+		fprintf(stderr, "  Error - Unable to load plugin %s: %m.\n", full_name);
 		exit(EXIT_FAILURE);
 	}
 	free(namelist);
@@ -97,7 +97,7 @@ int init_plugin(char *plugin_name) {
 
 	/* allocate memory for new plugin and attach it to the plugin list */
 	if ((new_plugin = (Plugin *) malloc(sizeof(Plugin))) == NULL) {
-		fprintf(stderr, "    Error - Unable to allocate memory: %s\n", strerror(errno));
+		fprintf(stderr, "    Error - Unable to allocate memory: %m.\n");
 		return(-1);
 	} else {
 		new_plugin->handle = NULL;
@@ -112,7 +112,7 @@ int init_plugin(char *plugin_name) {
 		return(-1);
 	} else { 
 		if ((new_plugin->handle = (void *) malloc(sizeof(int))) == NULL) { 
-			fprintf(stderr, "  Error loading plugin - Unable to allocate memory: %s\n", strerror(errno));
+			fprintf(stderr, "  Error loading plugin - Unable to allocate memory: %m.\n");
 			free(new_plugin);
 			return(-1);
 		} else new_plugin->filename = (char *) strdup(plugin_name);
