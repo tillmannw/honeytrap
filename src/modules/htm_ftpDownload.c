@@ -259,7 +259,7 @@ int get_ftpcmd(char *attack_string, uint32_t string_size, struct in_addr lhost, 
 
 			/* Do FTP transaction */
 			return(get_ftp_resource(user, pass, (struct in_addr *) &lhost,
-						(struct in_addr *) host->h_addr_list[0], atoi(port), file, attack));
+				(struct in_addr *) host->h_addr_list[0], atoi(port), file, attack));
 		}
 	}
 	return(0);
@@ -360,6 +360,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		case ECONNREFUSED:
 		case ENETUNREACH:
 		case ETIMEDOUT:
+		case EHOSTUNREACH:
 			if (rhost != (struct in_addr *) &attack->a_conn.r_addr) {
 				rhost = (struct in_addr *) &attack->a_conn.r_addr;
 				control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));

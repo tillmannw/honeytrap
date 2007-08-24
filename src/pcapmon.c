@@ -92,6 +92,10 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 		return;
 	}
 
+	if (ip->ip_p == UDP) logmsg(LOG_NOISY, 1, "%s:%d requesting udp connection on %s:%d.\n",
+			inet_ntoa(ip->ip_src), sport, inet_ntoa(ip->ip_dst), dport);
+	else if (ip->ip_p == TCP) logmsg(LOG_NOISY, 1, "%s:%d requesting udp connection on %s:%d.\n",
+			inet_ntoa(ip->ip_dst), dport, inet_ntoa(ip->ip_src), sport);
 	switch (port_mode) {
 	case PORTCONF_NONE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n", sport, PROTO(ip->ip_p));
@@ -115,15 +119,9 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 		return;
 	}
 
-	if (ip->ip_p == UDP) {
-		logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
-			inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), dport, PROTO(ip->ip_p));
-		start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
-	} else if (ip->ip_p == TCP) {
-		logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
-			inet_ntoa(ip->ip_dst), dport, PROTO(ip->ip_p), sport, PROTO(ip->ip_p));
-		start_dynamic_server(ip->ip_dst, htons(dport), ip->ip_src, htons(sport), ip->ip_p);
-	}
+	if (ip->ip_p == UDP) start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
+	else if (ip->ip_p == TCP) start_dynamic_server(ip->ip_dst, htons(dport), ip->ip_src, htons(sport), ip->ip_p);
+
 	return;
 }
 

@@ -38,7 +38,7 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 	struct ip_header *ip;
 	struct udp_header *udp;
 	struct tcp_header *tcp;
-	char *payload;
+	char *payload, *srcip, *dstip;
 	uint16_t sport, dport;
 	u_int8_t port_mode;
 	struct nfqnl_msg_packet_hdr *ph;
@@ -83,6 +83,8 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		}
 	}
 
+	logmsg(LOG_NOISY, 1, "%s:%d requesting %s connection on %s:%d.\n",
+		inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), inet_ntoa(ip->ip_dst), dport);
 	switch (port_mode) {
 	case PORTCONF_NONE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n", dport, PROTO(ip->ip_p));
@@ -122,8 +124,14 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 		return(0);
 	}
 
-	logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
-		inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), dport, PROTO(ip->ip_p));
+	if ((srcip = strdup(inet_ntoa(ip->ip_src))) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+		exit(EXIT_FAILURE);
+	}
+	if ((dstip = strdup(inet_ntoa(ip->ip_dst))) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+		exit(EXIT_FAILURE);
+	}
 	start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 	
 	return(1);

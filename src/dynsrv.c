@@ -194,8 +194,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			default:
 				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
 				if (FD_ISSET(listen_fd, &rfds)) {
-					logmsg(LOG_NOISY, 1,
-					       "   %s  Connection request from %s.\n", portstr, inet_ntoa(ip_r));
+				logmsg(LOG_INFO, 1, "   %s  Handling %s connection request from %s:%d to %s:%d.\n",
+					portstr, PROTO(proto), inet_ntoa(ip_r), ntohs(port_r), inet_ntoa(ip_l), ntohs(port_l));
 
 					/* initialize attack record */
 					if ((attack = new_attack(ip_l, ip_r, ntohs(port_l), 0, proto)) == NULL) {

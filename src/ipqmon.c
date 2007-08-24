@@ -127,6 +127,8 @@ int start_ipq_mon(void) {
 					}
 
 					/* Got a connection request, start dynamic server and pass packet processing back to the kernel */
+					logmsg(LOG_NOISY, 1, "%s:%d requesting %s connection on %s:%d.\n",
+						inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), inet_ntoa(ip->ip_dst), dport);
 					switch (port_mode) {
 					case PORTCONF_NONE:
 						logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n",
@@ -168,8 +170,6 @@ int start_ipq_mon(void) {
 					
 					if (process == 0) break;
 
-					logmsg(LOG_NOISY, 1, "%s:%d/%s requesting connection on port %d/%s.\n",
-						inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), dport, PROTO(ip->ip_p));
 					start_dynamic_server(ip->ip_src, htons(sport), ip->ip_dst, htons(dport), ip->ip_p);
 					break;
 				default:

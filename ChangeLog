@@ -10,6 +10,7 @@ Version 1.0.0
 - Try to download from the attacking host in case of failed ftp connect()s
 - Improved connection request handling in the nfq stream monitor
 - Reconfiguration on SIGHUP fixed
+- Log addressed destination
 Version 0.7.0
 - Plugins can be prioritized
 - x86 CPU emulation module for generic shellcode analysis
