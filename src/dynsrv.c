@@ -116,9 +116,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 				port_mode = port_flags_udp[htons(port_l)]->mode;
 		}
 
-		ip_l_str = strdup(inet_ntoa(ip_l));
-		ip_r_str = strdup(inet_ntoa(ip_r));
-
 #ifndef USE_IPQ_MON
 #ifndef USE_NFQ_MON
 		/* don't need root privs any more */
@@ -194,8 +191,18 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			default:
 				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
 				if (FD_ISSET(listen_fd, &rfds)) {
-				logmsg(LOG_INFO, 1, "   %s  Handling %s connection request from %s:%d to %s:%d.\n",
-					portstr, PROTO(proto), inet_ntoa(ip_r), ntohs(port_r), inet_ntoa(ip_l), ntohs(port_l));
+					if ((ip_l_str = strdup(inet_ntoa(ip_l))) == NULL) {
+						logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+						exit(EXIT_FAILURE);
+					}
+					if ((ip_r_str = strdup(inet_ntoa(ip_r))) == NULL) {
+						logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+						exit(EXIT_FAILURE);
+					}
+					logmsg(LOG_INFO, 1, "   %s  Handling %s connection request from %s:%d to %s:%d.\n",
+						portstr, PROTO(proto), ip_r_str, ntohs(port_r), ip_l_str, ntohs(port_l));
+					free(ip_r_str);
+					free(ip_l_str);
 
 					/* initialize attack record */
 					if ((attack = new_attack(ip_l, ip_r, ntohs(port_l), 0, proto)) == NULL) {

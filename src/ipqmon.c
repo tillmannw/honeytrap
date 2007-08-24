@@ -41,6 +41,7 @@ int start_ipq_mon(void) {
 	uint16_t		sport, dport;
 	fd_set			rfds;
 	struct timeval		mainloop_timeout;
+	char			*srcip, *dstip;
 	unsigned char		buf[BUFSIZE];
 	struct ip_header	*ip;
 	struct tcp_header	*tcp;
@@ -127,8 +128,19 @@ int start_ipq_mon(void) {
 					}
 
 					/* Got a connection request, start dynamic server and pass packet processing back to the kernel */
+					if ((srcip = strdup(inet_ntoa(ip->ip_src))) == NULL) {
+						logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+						exit(EXIT_FAILURE);
+					}
+					if ((dstip = strdup(inet_ntoa(ip->ip_dst))) == NULL) {
+						logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+						exit(EXIT_FAILURE);
+					}
 					logmsg(LOG_NOISY, 1, "%s:%d requesting %s connection on %s:%d.\n",
-						inet_ntoa(ip->ip_src), sport, PROTO(ip->ip_p), inet_ntoa(ip->ip_dst), dport);
+						srcip, sport, PROTO(ip->ip_p), dstip, dport);
+					free(srcip);
+					free(dstip);
+
 					switch (port_mode) {
 					case PORTCONF_NONE:
 						logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n",

@@ -70,6 +70,7 @@ u_char *icmp_dissect(const struct ip_header *packet) {
 void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_char * packet) {
 	uint16_t	sport, dport;
 	u_int8_t	port_mode;
+	char		*srcip, *dstip;
 
 	sport		= 0;
 	dport		= 0;
@@ -92,10 +93,23 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 		return;
 	}
 
-	if (ip->ip_p == UDP) logmsg(LOG_NOISY, 1, "%s:%d requesting udp connection on %s:%d.\n",
-			inet_ntoa(ip->ip_src), sport, inet_ntoa(ip->ip_dst), dport);
-	else if (ip->ip_p == TCP) logmsg(LOG_NOISY, 1, "%s:%d requesting udp connection on %s:%d.\n",
-			inet_ntoa(ip->ip_dst), dport, inet_ntoa(ip->ip_src), sport);
+	if ((srcip = strdup(inet_ntoa(ip->ip_src))) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+		exit(EXIT_FAILURE);
+	}
+	if ((dstip = strdup(inet_ntoa(ip->ip_dst))) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (ip->ip_p == UDP)
+		logmsg(LOG_NOISY, 1, "%s:%d requesting udp connection on %s:%d.\n",
+		srcip, sport, dstip, dport);
+	else if (ip->ip_p == TCP)
+		logmsg(LOG_NOISY, 1, "%s:%d requesting tcp connection on %s:%d.\n",
+		dstip, dport, srcip, sport);
+	free(srcip);
+	free(dstip);
+
 	switch (port_mode) {
 	case PORTCONF_NONE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n", sport, PROTO(ip->ip_p));
