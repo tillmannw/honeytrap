@@ -106,6 +106,7 @@ void handle_sighup(int sig) {
 	}
 
 	/* reinstall original signal handler */
+	memset(&s_action, 0, sizeof(struct sigaction));
 	s_action.sa_handler	= get_signal;
 #ifdef SA_RESTART
 	s_action.sa_flags	|= SA_RESTART;
@@ -140,6 +141,7 @@ void handle_sigchld(int sig) {
 	}
 
 	/* reinstall original signal handler */
+	memset(&s_action, 0, sizeof(struct sigaction));
 	s_action.sa_handler	= get_signal;
 #ifdef SA_RESTART
 	s_action.sa_flags	|= SA_RESTART;
@@ -172,6 +174,7 @@ void install_signal_handlers(void) {
 	create_sigpipe();
 	
 	/* install signal handlers */
+	memset(&s_action, 0, sizeof(struct sigaction));
 	s_action.sa_handler	= get_signal;
 #ifdef SA_RESTART
 	s_action.sa_flags	|= SA_RESTART;
