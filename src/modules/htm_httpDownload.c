@@ -165,7 +165,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 	string_for_processing[attack->a_conn.payload.size] = 0;
 	
 	for (i=0; i<attack->a_conn.payload.size; i++) {
-		if ((attack->a_conn.payload.size-i >= 3)
+		if ((attack->a_conn.payload.size-i >= 7)
 			&& (memcmp(string_for_processing+i, "http://", 7) == 0)) {
 
 			start = string_for_processing+i;
@@ -173,6 +173,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 			/* 0-terminate URL */
 			for (end = start, i=0; i<strlen(start) && end[0]; end = &start[i++]) {
 				if (isspace(end[0])) end[0] = 0;
+				else if (!isprint(end[0])) end[0] = 0;
 			}
 			if (isspace(end[0])) end[0] = 0;
 

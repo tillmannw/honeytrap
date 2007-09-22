@@ -142,6 +142,7 @@ int nb_connect(int sock_fd, const struct sockaddr * sockaddr, socklen_t slen, in
 		case 0:
 			/* timeout */
 			close(sock_fd);
+			errno = ETIMEDOUT;
 			return(0);
 		default:
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) {

@@ -132,7 +132,7 @@ void handle_sigchld(int sig) {
 		if WIFSIGNALED(status)
 			logmsg(LOG_WARN, 1, "Warning - Process %d was terminated by signal %d.\n", pid, WTERMSIG(status));
 		else if (WIFEXITED(status) && (WEXITSTATUS(status) == EXIT_FAILURE))
-			logmsg(LOG_WARN, 1, "Warning - Process %d exited on failure.n", pid);
+			logmsg(LOG_WARN, 1, "Warning - Process %d exited on failure.\n", pid);
 		status = 0;
 	}
 	if (pid == -1 && errno != ECHILD) {

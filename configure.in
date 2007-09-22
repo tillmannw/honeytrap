@@ -13,6 +13,8 @@ AC_ARG_ENABLE(64bit-gcc,
 AM_MAINTAINER_MODE
 AM_PROG_CC_STDC
 AC_PROG_CC
+AM_PROG_LEX
+AC_PROG_YACC
 AC_PROG_LD(gnu-ld)
 AC_PROG_LIBTOOL
  if test -n "$GCC"; then
@@ -458,6 +460,17 @@ fi
 
 
 
+AC_ARG_WITH(cspm,
+	[  --with-cspm              Perform shellcode pattern matching])
+AM_CONDITIONAL(BUILD_CSPM_PLUGIN, test x$with_cspm = xyes)
+if test "$with_cspm" = "yes"; then
+	with_cspm="X"
+else
+	with_cspm=" "
+fi
+
+
+
 AC_ARG_WITH(postgres,
 	[  --with-postgres          Store attack data in PostgreSQL database])
 AM_CONDITIONAL(BUILD_POSTGRES_PLUGIN, test x$with_postgres = xyes)
@@ -570,9 +583,11 @@ AC_PROG_INSTALL
 AC_CONFIG_FILES([Makefile
 		doc/Makefile
 		src/Makefile
-		src/modules/Makefile]) 
+		src/modules/Makefile 
+		src/modules/htm_cspm/Makefile])
 
 AC_OUTPUT
+
 
 echo
 echo "--- honeytrap configuration ---"
@@ -592,4 +607,5 @@ echo -e "  ($with_clamav)  ClamAV"
 echo -e "  ($with_cpuemu)  cpuEmu"
 echo -e "  ($with_postgres)  PostgeSQL"
 echo -e "  ($with_spamsum)  SpamSum"
+echo -e "  ($with_cspm)  CSPM"
 echo -e "  ($with_submit_mwserv)  submitMwserv"

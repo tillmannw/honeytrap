@@ -1,10 +1,10 @@
 AUTOMAKE_OPTIONS = foreign no-dependencies
 
-AM_YFLAGS = -d
-
 AM_CFLAGS=-Wall -Werror
 
 INCLUDES = -I../
+
+SUBDIRS=
 
 libdir=$(DESTDIR)/$(sysconfdir)/honeytrap/plugins
 
@@ -77,6 +77,11 @@ endif
 if BUILD_SUBMIT_MWSERV_PLUGIN
 htm_submitMwserv_la = htm_submitMwserv.c htm_submitMwserv.h
 htm_submitMwserv_la_LDFLAGS = -module -no-undefined -avoid-version
+endif
+
+
+if BUILD_CSPM_PLUGIN
+SUBDIRS += htm_cspm
 endif
 
 install-exec-am:

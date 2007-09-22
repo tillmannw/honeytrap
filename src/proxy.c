@@ -73,7 +73,7 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 		return(-1);
 	}	
 	if (!(proxy_sock_fd = socket(AF_INET, sock_type, 0))) { 
-		logmsg(LOG_ERR, 1, "%s %s  Error - Unable to create client socket for %s connection.\n",
+		logmsg(LOG_ERR, 1, "%s %s  Error - Unable to create client socket for %s connection: %m.\n",
 			logpre, portstr, logact);
 		return(-1);
 	} else {
@@ -149,7 +149,7 @@ int copy_data(int to_fd, int from_fd, u_char **save_string, uint32_t offset, int
 		/* write read bytes to to_fd */
 		*bytes_sent = 0;
 		if ((*bytes_sent = write(to_fd, buffer, *bytes_read)) == -1) {
-			logmsg(LOG_ERR, 1, "Unable to tcpcopy() %u bytes to target connection.\n", *bytes_read);
+			logmsg(LOG_ERR, 1, "Error - Unable to tcpcopy() %u bytes to target connection: %m.\n", *bytes_read);
 			close(from_fd);
 			close(to_fd);
 			return(-1);

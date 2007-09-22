@@ -27,7 +27,7 @@ struct s_conn {
 	uint32_t		r_addr;		/* remote ip address */
 	uint16_t		l_port;		/* local (tcp/udp) port */
 	uint16_t		r_port;		/* remote (tcp/udp) port */
-	uint32_t		protocol;	/* protocol id (tcp/udp) */
+	u_char			protocol;	/* IP protocol id (tcp/udp) */
 	struct s_payload	payload;	/* payload read from fd */
 };
 
@@ -43,6 +43,7 @@ struct s_download {
 };
 
 typedef struct s_attack {
+	u_char			virtual;	/* flag for marking virtual attacks */
 	time_t			start_time;	/* time of attack start */
 	time_t			end_time;	/* time of attack end */
 	struct s_conn		a_conn;		/* attack connection */
@@ -53,6 +54,7 @@ typedef struct s_attack {
 } Attack;
 
 
+Attack *new_virtattack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto);
 Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto);
 int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_size, uint16_t port, Attack *a);
 int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, const uint16_t r_port, const char *user, const char *pass, const char *filename, const u_char *data, const u_int32_t size, Attack *a);

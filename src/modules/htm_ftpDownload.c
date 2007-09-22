@@ -613,7 +613,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	FD_ZERO(&rfds);
 	FD_SET(sigpipe[0], &rfds);
 	FD_SET(data_sock_listen_fd, &rfds);
-	switch (select_return = select(MAX(sigpipe[0], data_sock_fd) + 1, &rfds, NULL, NULL, &r_timeout)) {
+	switch (select_return = select(MAX(sigpipe[0], data_sock_listen_fd) + 1, &rfds, NULL, NULL, &r_timeout)) {
 	case -1:
 		if (errno != EINTR) {
 			logmsg(LOG_ERR, 1, "FTP download error - Select on FTP data channel failed: %s.\n", strerror(errno));

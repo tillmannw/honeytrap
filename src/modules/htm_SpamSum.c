@@ -169,6 +169,7 @@ int calc_spamsum(Attack *attack) {
 			logmsg(LOG_ERR, 1, "SpamSum error - Could not open MD5 hash file %s: %s.\n", md5sum_filename, strerror(errno));
 			return(0);
 		}
+		errno = 0;
 		if (fprintf(hashfile, "%s\n", attack->a_conn.payload.md5sum) != 33) {
 			logmsg(LOG_ERR, 1, "SpamSum error - Could not append MD5 hash to signature file: %s.\n", strerror(errno));
 			fclose(hashfile);

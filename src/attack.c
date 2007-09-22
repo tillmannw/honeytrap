@@ -34,6 +34,18 @@
 #include "plughook.h"
 #include "ipqmon.h"
 
+
+Attack *new_virtattack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto) {
+	Attack *a;
+
+	if ((a = new_attack(l_addr, r_addr, l_port, r_port, proto)) == NULL) return(NULL);
+
+	a->virtual = 1;
+
+	return(a);
+}
+
+
 Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto) {
 	Attack *a;
 
