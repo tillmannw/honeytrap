@@ -1,12 +1,26 @@
+/* connectback.c
+ * Copyright (C) 2007 Tillmann Werner <tillmann.werner@gmx.de>
+ *
+ * This file is free software; as a special exception the author gives
+ * unlimited permission to copy and/or distribute it, with or without
+ * modifications, as long as this notice is preserved.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
+ * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <netdb.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include <logging.h>
 
@@ -14,17 +28,18 @@
 #include "connectback.h"
 #include "honeytrap.h"
 #include "sc_action.h"
+#include "signals.h"
 #include "sock.h"
 #include "tcpip.h"
 
 
 int connectback(struct sc_action* sa, int haskey) {
-	int sockfd, t, bytes_read, total_bytes;
-	fd_set read_fds;
-	struct timeval st;
-	struct sockaddr_in sock;
-	u_char buffer[BUFSIZ], *attack_string;
-	Attack *a;
+	int			sockfd, t, bytes_read, total_bytes;
+	fd_set			rfds;
+	struct timeval		st;
+	struct sockaddr_in	sock;
+	u_char			buffer[BUFSIZ], *attack_string;
+	Attack			*a;
 
 	if ((a = new_virtattack(*(struct in_addr*) &sa->m_localhost, *(struct in_addr*) &sa->m_action.m_connectback.m_remotehost,
 				0, sa->m_action.m_connectback.m_remoteport, TCP)) == NULL) {
@@ -51,7 +66,7 @@ int connectback(struct sc_action* sa, int haskey) {
 		errno = 0;
 		return(0);
 	}
-	logmsg(LOG_INFO, 1, "CSPM - Connected back to %s:%d.\n",
+	logmsg(LOG_INFO, 1, "CSPM - Successfully connected back to %s:%d.\n",
 			inet_ntoa(*(struct in_addr *)&sa->m_action.m_connectback.m_remotehost),
 			sa->m_action.m_connectback.m_remoteport);
 
@@ -63,6 +78,7 @@ int connectback(struct sc_action* sa, int haskey) {
 
 	/* send key */
 	if (haskey) {
+logmsg(LOG_INFO, 1, "CSPM - Sending key.\n");
 		if (write(sockfd, &sa->m_action.m_connectback.m_key, sizeof(sa->m_action.m_connectback.m_key)) <
 			sizeof(sa->m_action.m_connectback.m_key)) { 
 			logmsg(LOG_ERR, 1, "CSPM Error - Unable to send connectback key: %s.\n", strerror(errno));
@@ -74,19 +90,24 @@ int connectback(struct sc_action* sa, int haskey) {
 
 	/* read data */
 	for(;;) {
-		FD_ZERO(&read_fds);
-		FD_SET(sockfd, &read_fds);
+		FD_ZERO(&rfds);
+		FD_SET(sockfd, &rfds);
 
 		st.tv_sec  = 10;
 		st.tv_usec = 0;
 
-		switch (t = select(FD_SETSIZE, &read_fds, NULL, NULL, &st)) {
-			case -1:
-				fprintf(stderr, "Error with select(): %s.\n", strerror(errno));
-				exit(1);
-			case  0:
-				break;
-			default:
+		switch (t = select(MAX(sigpipe[0], sockfd), &rfds, NULL, NULL, &st)) {
+		case -1:
+			fprintf(stderr, "Error with select(): %s.\n", strerror(errno));
+			exit(1);
+		case  0:
+			break;
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) {
+				logmsg(LOG_ERR, 1, "Error - Signal handling failed in dynamic server process.\n");
+				exit(EXIT_FAILURE);
+			}
+			if (FD_ISSET(sockfd, &rfds)) { 
 				if ((bytes_read = read(sockfd, buffer, BUFSIZ)) < 0) { 
 					logmsg(LOG_ERR, 1, "CSPM - Error while reading data from connectback socket: %s.\n",
 						strerror(errno));
@@ -123,6 +144,7 @@ int connectback(struct sc_action* sa, int haskey) {
 				close(sockfd);
 				// process data
 				return(process_data(attack_string, total_bytes, NULL, 0, a->a_conn.l_port, a));
+			}
 		}
 	}
 	close(sockfd);
