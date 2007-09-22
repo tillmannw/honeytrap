@@ -5,7 +5,7 @@ AM_CFLAGS=-Wall
 #AM_LDFLAGS = -lpcre -ly -lfl
 AM_LDFLAGS = -lpcre
 
-AM_YFLAGS = -d -p signature
+AM_YFLAGS = -d
 
 INCLUDES = -I../../
 
