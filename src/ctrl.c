@@ -166,7 +166,7 @@ int do_daemonize(void) {
 
 /* write master process id to pid file */
 int create_pid_file(void) {
-	char pid_str[5];
+	char pid_str[6];
 
 	if ((pidfile_fd = open(pidfile_name, O_EXCL | O_CREAT | O_NOCTTY | O_RDWR, 0640)) == -1) {
 		logmsg(LOG_ERR, 1, "Error - Unable to open pid file: %m.\n");
@@ -179,9 +179,9 @@ int create_pid_file(void) {
 
 	master_pid = getpid();
 
-	bzero(pid_str, 5);
-	snprintf(pid_str, 5,"%d\n", master_pid);
-	if (!(write(pidfile_fd, pid_str, strlen(pid_str)))) {
+	bzero(pid_str, 6);
+	snprintf(pid_str, 6,"%d", master_pid);
+	if (write(pidfile_fd, pid_str, strlen(pid_str)) != strlen(pid_str)) {
 		logmsg(LOG_ERR, 1, "Error - Unable to write pid file: %m.\n");
 		return(0);
 	}
