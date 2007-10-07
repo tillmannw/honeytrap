@@ -9,6 +9,7 @@ AM_INIT_AUTOMAKE(honeytrap,1.0.0)
 AC_ARG_ENABLE(64bit-gcc,
 [  --enable-64bit-gcc	   try to compile 64bit (only tested on Sparc Solaris 9).],
 		[ CFLAGS="-O0 -g" CC="gcc -m64"; export CFLAGS CC ],)
+
 # Disable annoying practice of recursively re-running the autotools
 AM_MAINTAINER_MODE
 AM_PROG_CC_STDC
@@ -17,9 +18,63 @@ AM_PROG_LEX
 AC_PROG_YACC
 AC_PROG_LD(gnu-ld)
 AC_PROG_LIBTOOL
- if test -n "$GCC"; then
+
+
+## prepare fancy console output, taken from GNU shtools
+# determine terminal bold sequence
+term_bold=''
+term_norm=''
+case $TERM in
+#   for the most important terminal types we directly know the sequences
+xterm|xterm*|vt220|vt220*)
+    term_bold=`awk 'BEGIN { printf("%c%c%c%c", 27, 91, 49, 109); }' </dev/null 2>/dev/null`
+    term_norm=`awk 'BEGIN { printf("%c%c%c", 27, 91, 109); }' </dev/null 2>/dev/null`
+    ;;
+vt100|vt100*|cygwin)
+    term_bold=`awk 'BEGIN { printf("%c%c%c%c%c%c", 27, 91, 49, 109, 0, 0); }' </dev/null 2>/dev/null`
+    term_norm=`awk 'BEGIN { printf("%c%c%c%c%c", 27, 91, 109, 0, 0); }' </dev/null 2>/dev/null`
+    ;;
+#   for all others, we try to use a possibly existing `tput' or `tcout' utility
+* )
+    paths=`echo $PATH | sed -e 's/:/ /g'`
+    for tool in tput tcout; do
+	for dir in $paths; do
+	    if [ -r "$dir/$tool" ]; then
+		for seq in bold md smso; do # 'smso' is last
+		    bold="`$dir/$tool $seq 2>/dev/null`"
+		    if [ ".$bold" != . ]; then
+			term_bold="$bold"
+			break
+		    fi
+		done
+		if [ ".$term_bold" != . ]; then
+		    for seq in sgr0 me rmso init reset; do # 'reset' is last
+			norm="`$dir/$tool $seq 2>/dev/null`"
+			if [ ".$norm" != . ]; then
+			    term_norm="$norm"
+			    break
+			fi
+		    done
+		fi
+		break
+	    fi
+	done
+	if [ ".$term_bold" != . ] && [ ".$term_norm" != . ]; then
+	    break;
+	fi
+    done
+    ;;
+esac
+
+bold () {
+	text=`echo $seo "$1" | sed -e "s/%B/${term_bold}/g" -e "s/%b/${term_norm}/g" 2>/dev/null`
+	echo $seo "$text"
+}
+
+
+if test -n "$GCC"; then
       CFLAGS="$CFLAGS -Wall"
- fi
+fi
 
 AC_ARG_ENABLE(debug,
 [  --enable-debug          enable debugging options (bugreports and developers only)],
@@ -204,136 +259,179 @@ sn_cv_have___func__=yes, sn_cv__have___func__=no)
    fi
 fi
 
+
 #----------------------- network stream monitors ---------------------------
+AC_ARG_WITH(stream_mon,
+	[  --with-stream-mon=TYPE          network stream monitor],
+	[with_stream_mon="$withval"], [with_stream_mon=""])
 
-AC_ARG_WITH(pcap-mon,
-	[  --with-pcap-mon          Use libpcap to catch connection requests])
-AM_CONDITIONAL(PCAP_MON, test x$with_pcap_mon = xyes)
-if test "$with_pcap_mon" = "yes"; then
-  with_pcap_mon="X"
-  AC_ARG_WITH(libpcap_includes,
-    [  --with-libpcap-includes=DIR  libpcap include directory],
-    [with_libpcap_includes="$withval"],[with_libpcap_includes=no])
+AM_CONDITIONAL(PCAP_MON, test x$with_stream_mon = xpcap)
+AM_CONDITIONAL(NFQ_MON, test x$with_stream_mon = xnfq)
+AM_CONDITIONAL(IPQ_MON, test x$with_stream_mon = xipq)
 
-  AC_ARG_WITH(libpcap_libraries,
-    [  --with-libpcap-libraries=DIR  libpcap library directory],
-    [with_libpcap_libraries="$withval"],[with_libpcap_libraries=no])
+pcap_mon=" "
+ipq_mon=" "
+nfq_mon=" "
+case "x$with_stream_mon" in
+	"xpcap")
+		with_pcap_mon="X"
+		AC_ARG_WITH(libpcap_includes,
+			[  --with-libpcap-includes=DIR     libpcap include directory],
+			[with_libpcap_includes="$withval"],[with_libpcap_includes=no])
 
-  if test "$with_libpcap_includes" != "no"; then
-     CPPFLAGS="${CPPFLAGS} -I${with_libpcap_includes}"
-  fi
-  AC_CHECK_HEADER(pcap.h,,[AC_ERROR(pcap.h not found.)])
+		AC_ARG_WITH(libpcap_libraries,
+			[  --with-libpcap-libraries=DIR    libpcap library directory],
+			[with_libpcap_libraries="$withval"],[with_libpcap_libraries=no])
 
-  if test "$with_libpcap_libraries" != "no"; then
-    LDFLAGS="${LDFLAGS}  -L${with_libpcap_libraries}"
-  fi
-  LPCAP=""
-  AC_CHECK_LIB(pcap, pcap_datalink,, LPCAP="no")
+		if test "$with_libpcap_includes" != "no"; then
+			CPPFLAGS="${CPPFLAGS} -I${with_libpcap_includes}"
+		fi
+		HPCAP=""
+		AC_CHECK_HEADER(pcap.h,, HPCAP="no")
+		if test "$HPCAP" = "no"; then
+			echo
+			bold "   %BError%b - libpcap headers not found. Install them or use the following options:"
+			echo
+			echo "   --with-libpcap-includes=location of libpcap header files"
+			echo
+			exit 1
+		fi
 
-  if test "$LPCAP" = "no"; then
-    echo
-    echo "   ERROR!  Libpcap library/headers not found, go get it from http://www.tcpdump.org"
-    echo "   or use the --with-libpcap-* options, if you have it installed in unusual place."
-    echo
-    exit 1
-  fi
+		if test "$with_libpcap_libraries" != "no"; then
+			LDFLAGS="${LDFLAGS}  -L${with_libpcap_libraries}"
+		fi
+		LPCAP=""
+		AC_CHECK_LIB(pcap, pcap_datalink,, LPCAP="no")
+		if test "$LPCAP" = "no"; then
+			echo
+			bold "   %BError%b - libpcap library not found. Install it or use the following options:"
+			echo
+			echo "   --with-libpcap-library=location of libpcap shared library files"
+			echo
+			exit 1
+		fi
 
-  AC_DEFINE([USE_PCAP_MON], [], [Define if pcap connection monitor is used])
-else with_pcap_mon=" "
-fi
+		AC_DEFINE([USE_PCAP_MON], [], [Define if pcap connection monitor is used])
+		;;
+	"xnfq")
+		with_nfq_mon="X"
+		AC_ARG_WITH(libnetfilter_queue_includes,
+			[  --with-libnfq-includes=DIR      libnetfilter_queue include directory],
+			[with_libnetfilter_queue_includes="$withval"],[with_libnetfilter_queue_includes=no])
 
-AC_ARG_WITH(ipq-mon,
-	[  --with-ipq-mon          Use libipq to catch connection requests])
-AM_CONDITIONAL(IPQ_MON, test x$with_ipq_mon = xyes)
-if test "$with_ipq_mon" = "yes"; then
-  with_ipq_mon="X"
-  AC_ARG_WITH(libipq_includes,
-    [  --with-libipq-includes=DIR  libipq include directory],
-    [with_libipq_includes="$withval"],[with_libipq_includes=no])
+		AC_ARG_WITH(libnetfilter_queue_libraries,
+			[  --with-libnfq-libraries=DIR     libnetfilter_queue library directory],
+			[with_libnetfilter_queue_libraries="$withval"],[with_libnetfilter_queue_libraries=no])
 
-  AC_ARG_WITH(libipq_libraries,
-    [  --with-libipq-libraries=DIR  libipq library directory],
-    [with_libipq_libraries="$withval"],[with_libipq_libraries=no])
+		if test "$with_libnetfilter_queue_includes" != "no"; then
+			CPPFLAGS="${CPPFLAGS} -I${with_libnetfilter_queue_includes}"
+		fi
+		HNFQ=""
+		AC_CHECK_HEADER(libnetfilter_queue/libnetfilter_queue.h,, HNFQ="no")
+		if test "$HNFQ" = "no"; then
+			echo
+			bold "   %BError%b - libnetfilter_queue headers not found. Install them or use the following options:"
+			echo
+			echo "   --with-libnfq-includes=location of libnetfilter_queue header files"
+			echo
+			exit
+		fi
 
-  if test "$with_libipq_includes" != "no"; then
-    CPPFLAGS="${CPPFLAGS} -I${with_libipq_includes}"
-  fi
-  AC_CHECK_HEADER(libipq.h,,[AC_ERROR(libipq.h not found.)])
+		if test "$with_libnetfilter_queue_libraries" != "no"; then
+			LDFLAGS="${LDFLAGS}  -L${with_libnetfilter_queue_libraries}"
+		fi
+		LNFQ=""
+		AC_CHECK_LIB(netfilter_queue, nfq_open,, LNFQ="no")
+		if test "$LNFQ" = "no"; then
+			echo
+			bold "   %BError%b - libnetfilter_queue library not found. Install it or use the following options:"
+			echo
+			echo "   --with-libnfq-library=location of libnetfilter_queue shared library files"
+			echo
+			exit
+		fi
 
-  if test "$with_libipq_libraries" != "no"; then
-    LDFLAGS="${LDFLAGS}  -L${with_libipq_libraries}"
-  fi
-  LIPQ=""
-  AC_CHECK_LIB(ipq, ipq_set_mode,, LIPQ="no")
+		AC_DEFINE([USE_NFQ_MON], [], [Define if netfilter_queue connection monitor is used])
+		;;
+	"xipq")
+		with_ipq_mon="X"
+		AC_ARG_WITH(libipq_includes,
+			[  --with-libipq-includes=DIR      libipq include directory],
+			[with_libipq_includes="$withval"],[with_libipq_includes=no])
 
-  if test "$LIPQ" = "no"; then
-    echo
-    echo "   ERROR!  Libipq library/headers not found, go get it from http://www.netfilter.org"
-    echo "   or use the --with-libipq-* options, if you have it installed in unusual place."
-    echo
-    exit
-  fi
+		AC_ARG_WITH(libipq_libraries,
+			[  --with-libipq-libraries=DIR     libipq library directory],
+			[with_libipq_libraries="$withval"],[with_libipq_libraries=no])
 
-  AC_DEFINE([USE_IPQ_MON], [], [Define if ip_queue connection monitor is used])
-else with_ipq_mon="no"
-fi
+		if test "$with_libipq_includes" != "no"; then
+			CPPFLAGS="${CPPFLAGS} -I${with_libipq_includes}"
+		fi
+		AC_CHECK_HEADER(libipq.h,, HIPQ="no")
+		if test "$HIPQ" = "no"; then
+			echo
+			bold "   %BError%b - libipq headers not found. Install them or use the following options:"
+			echo
+			echo "   --with-libipq-includes=location of libipq header files"
+			echo
+			exit
+		fi
 
-AC_ARG_WITH(nfq-mon,
-	[  --with-nfq-mon           Use nfqueue to catch connection requests])
-AM_CONDITIONAL(NFQ_MON, test x$with_nfq_mon = xyes)
-if test "$with_nfq_mon" = "yes"; then
-  with_nfq_mon="X"
-  AC_ARG_WITH(libnetfilter_queue_includes,
-    [  --with-libnetfilter_queue-includes=DIR  libnetfilter_queue include directory],
-    [with_libnetfilter_queue_includes="$withval"],[with_libnetfilter_queue_includes=no])
+		if test "$with_libipq_libraries" != "no"; then
+			LDFLAGS="${LDFLAGS}  -L${with_libipq_libraries}"
+		fi
+		LIPQ=""
+		AC_CHECK_LIB(ipq, ipq_set_mode,, LIPQ="no")
+		if test "$LIPQ" = "no"; then
+			echo
+			bold "   %BError%b - libipq library not found. Install it or use the following options:"
+			echo
+			echo "   --with-libipq-library=location of libipq shared library files"
+			echo
+			exit
+		fi
 
-  AC_ARG_WITH(libnetfilter_queue_libraries,
-    [  --with-libnetfilter_queue-libraries=DIR  libnetfilter_queue library directory],
-    [with_libnetfilter_queue_libraries="$withval"],[with_libnetfilter_queue_libraries=no])
+		AC_DEFINE([USE_IPQ_MON], [], [Define if ip_queue connection monitor is used])
+		;;
+	"xipfw")
+		echo
+		echo "The ipfw monitor is currently not implemented."
+		echo "Please choose a different stream monitor."
+		exit 1
+		;;
+	*)
+		echo
+		bold "   %BError%b - No connection monitor selected. Please reconfigure with one of the following:"
+		echo
+		echo "   --with-stream-mon=nfq    receive packets via netfilter's NFQUEUE target (Linux only, recommended)"
+		echo "   --with-stream-mon=ipq    receive packets via netfilter's QUEUE target (Linux only)"
+		echo "   --with-stream-mon=pcap   receive packets using a built-in pcap sniffer"
+		echo
+		exit 1
+esac
 
-  if test "$with_libnetfilter_queue_includes" != "no"; then
-    CPPFLAGS="${CPPFLAGS} -I${with_libnetfilter_queue_includes}"
-  fi
-  AC_CHECK_HEADER(libnetfilter_queue/libnetfilter_queue.h,,[AC_ERROR(libnetfilter_queue.h not found.)])
 
-  if test "$with_libnetfilter_queue_libraries" != "no"; then
-    LDFLAGS="${LDFLAGS}  -L${with_libnetfilter_queue_libraries}"
-  fi
-  LNFQ=""
-  AC_CHECK_LIB(netfilter_queue, nfq_open,, LNFQ="no")
-
-  if test "$LNFQ" = "no"; then
-    echo
-    echo "   ERROR!  Libnetfilter_queue library/headers not found, go get it from http://www.netfilter.org"
-    echo "   or use the --with-libnetfilter_queue-* options, if you have it installed in unusual place."
-    echo
-    exit
-  fi
-  AC_DEFINE([USE_NFQ_MON], [], [Define if netfilter_queue connection monitor is used])
-else with_nfq_mon="no"
-fi
-
-AC_ARG_WITH(ipfw-mon,
-	[  --with-ipfw-mon          Use ipfw to catch connection requests])
-AM_CONDITIONAL(IPFW_MON, test x$with_ipfw_mon = xyes)
-if test "$with_ipfw_mon" = "yes"; then
-  with_ipfw_mon="X"
-  echo "ipfw connection monitor is currently not supported."
-  exit 1
-  AC_DEFINE([USE_IPFW_MON], [], [Define if ipfw connection monitor is used])
-else with_ipfw_mon="no"
-fi
 
 
 #----------------------- optional plugins ---------------------------
 
+AC_ARG_WITH(spamsum,
+	[  --with-spamsum                  perform SpamSum similarity analysis for recorded attacks])
+AM_CONDITIONAL(BUILD_SPAMSUM_PLUGIN, test x$with_spamsum = xyes)
+if test "$with_spamsum" = "yes"; then
+	with_spamsum="X"
+else
+	with_spamsum=" "
+fi
+
+
 AC_ARG_WITH(clamav,
-	[  --with-clamav            Scan downloaded samples with ClamAV antivirus engine])
+	[  --with-clamav                   scan downloaded samples with ClamAV antivirus engine],
+	[with_clamav="$withval"], [with_clamav=""])
 AM_CONDITIONAL(BUILD_CLAMAV_PLUGIN, test x$with_clamav = xyes)
 if test "$with_clamav" = "yes"; then
   with_clamav="X"
   AC_ARG_WITH(libclamav_includes,
-    [  --with-libclamav-includes=DIR  libclamav include directory],
+    [  --with-libclamav-includes=DIR   libclamav include directory],
     [with_libclamav_includes="$withval"],[with_libclamav_includes=no])
 
   AC_ARG_WITH(libclamav_libraries,
@@ -343,18 +441,27 @@ if test "$with_clamav" = "yes"; then
   if test "$with_libclamav_includes" != "no"; then
     CPPFLAGS="${CPPFLAGS} -I${with_libclamav_includes}"
   fi
-  AC_CHECK_HEADER(clamav.h,,[AC_ERROR(clamav.h not found.)])
+  HCLAMAV="yes"
+  AC_CHECK_HEADER(clamav.h,, HCLAMAV="no")
+  if test "$HCLAMAV" = "no"; then
+    echo
+    bold "   %BError%b - libclamav headers not found. Install them or use the following options:"
+    echo
+    bold "   %B--with-libclamav-includes%b=location of libclamav header files"
+    echo
+    exit
+  fi
 
   if test "$with_libclamav_libraries" != "no"; then
     LDFLAGS="${LDFLAGS}  -L${with_libclamav_libraries}"
   fi
   LCLAMAV="yes"
   AC_CHECK_LIB(clamav, cl_load,, LCLAMAV="no")
-
   if test "$LCLAMAV" = "no"; then
     echo
-    echo "   ERROR!  Libclamav library/headers not found. Install it or use the"
-    echo "   --with-libclamav-* options, if you have it installed in unusual place."
+    bold "   %BError%b - libclamav library not found. Install it or use the following options:"
+    echo
+    bold "   %B--with-libclamav-library%b=location of libclamav shared library files"
     echo
     exit
   fi
@@ -364,33 +471,40 @@ fi
 
 
 AC_ARG_WITH(cpuemu,
-	[  --with-cpuemu            Perform shellcode analysis in x86 CPU emulation])
+	[  --with-cpuemu                   perform shellcode analysis in x86 CPU emulation])
 AM_CONDITIONAL(BUILD_CPUEMU_PLUGIN, test x$with_cpuemu = xyes)
 if test "$with_cpuemu" = "yes"; then
   with_cpuemu="X"
   AC_ARG_WITH(libemu_includes,
-    [  --with-libemu-includes=DIR  libemu include directory],
+    [  --with-libemu-includes=DIR      libemu include directory],
     [with_libemu_includes="$withval"],[with_libemu_includes=no])
 
   AC_ARG_WITH(libemu_libraries,
-    [  --with-libemu-libraries=DIR  libemu library directory],
+    [  --with-libemu-libraries=DIR     libemu library directory],
     [with_libemu_libraries="$withval"],[with_libemu_libraries=no])
 
   if test "$with_libemu_includes" != "no"; then
     CPPFLAGS="${CPPFLAGS} -I${with_libemu_includes}"
   fi
-  AC_CHECK_HEADER(emu/emu.h,,[AC_ERROR(emu.h not found.)])
+  HEMU="yes"
+  AC_CHECK_HEADER(emu/emu.h,, HEMU="no")
+  if test "$HEMU" = "no"; then
+    bold "   %BError%b - libemu headers not found. Install them or use the following options:"
+    echo
+    bold "   %B--with-libemu-includes%b=location of libemu header files"
+    echo
+    exit
+  fi
 
   if test "$with_libemu_libraries" != "no"; then
     LDFLAGS="${LDFLAGS}  -L${with_libemu_libraries}"
   fi
   LEMU="yes"
-#  AC_CHECK_LIB(emu, emu_getpc_check,, LEMU="no")
-
+  AC_CHECK_LIB(emu, emu_getpc_check,, LEMU="no")
   if test "$LEMU" = "no"; then
+    bold "   %BError%b - libemu library not found. Install it or use the following options:"
     echo
-    echo "   ERROR!  Libemu library/headers not found. Install it or use the"
-    echo "   --with-libemu-* options, if you have it installed in unusual place."
+    bold "   %B--with-libemu-library%b=location of libemu shared library files"
     echo
     exit
   fi
@@ -401,19 +515,8 @@ fi
 
 
 
-AC_ARG_WITH(spamsum,
-	[  --with-spamsum           Perform SpamSum similarity analysis for recorded attacks])
-AM_CONDITIONAL(BUILD_SPAMSUM_PLUGIN, test x$with_spamsum = xyes)
-if test "$with_spamsum" = "yes"; then
-	with_spamsum="X"
-else
-	with_spamsum=" "
-fi
-
-
-
 AC_ARG_WITH(submit-mwserv,
-	[  --with-submit-mwserv     Submit malware samples to a central server])
+	[  --with-submit-mwserv            submit malware samples to a central server])
 AM_CONDITIONAL(BUILD_SUBMIT_MWSERV_PLUGIN, test x$with_submit_mwserv = xyes)
 if test "$with_submit_mwserv" = "yes"; then
 	with_submit_mwserv="X"
@@ -422,31 +525,40 @@ if test "$with_submit_mwserv" = "yes"; then
 	AC_CHECK_FUNC(connect, , AC_CHECK_LIB(socket, connect))
 
 	AC_ARG_WITH(libcurl_includes,
-	[  --with-libcurl-includes=DIR  libcurl include directory],
+	[  --with-libcurl-includes=DIR     libcurl include directory],
 	[with_libcurl_includes="$withval"],[with_libcurl_includes=no])
 
 	AC_ARG_WITH(libcurl_libraries,
-	[  --with-libcurl-libraries=DIR  libcurl library directory],
+	[  --with-libcurl-libraries=DIR    libcurl library directory],
 	[with_libcurl_libraries="$withval"],[with_libcurl_libraries=no])
 
 	if test "$with_libcurl_includes" != "no"; then
 		CPPFLAGS="${CPPFLAGS} -I${with_libcurl_includes}"
 	fi
-	AC_CHECK_HEADER(curl.h,,[AC_ERROR(curl.h not found.)])
-
-	AC_CHECK_LIB(curl, curl_version, LCURL="yes", LCURL="no")
-	if test "$LCURL" = "no"; then
+	HCURL="yes"
+	AC_CHECK_HEADER(curl.h,, HCURL="no")
+	if test "$HCURL" = "no"; then
+		bold "   %BError%b - libcurl headers not found. Install them or use the following options:"
 		echo
-		echo "   ERROR!  Libcurl library/headers not found. Install it or use the"
-		echo "   --with-libcurl-* options, if you have it installed in unusual place."
+		bold "   %B--with-libcurl-includes%b=location of libcurl header files"
 		echo
 		exit
 	fi
+
+	LCURL="yes"
+	AC_CHECK_LIB(curl, curl_version, LCURL="yes", LCURL="no")
+	if test "$LCURL" = "no"; then
+		bold "   %BError%b - libcurl library not found. Install it or use the following options:"
+		echo
+		bold "   %B--with-libcurl-library%b=location of libcurl shared library files"
+		echo
+		exit
+	fi
+
 	if test "x$libcurl" = xno ; then
 		AC_MSG_CHECKING([checking for curl with SSL])
 		LIBS="$LIBS -lcurl -L/usr/local/ssl/lib -lssl -lcrypto"
-		AC_TRY_LINK([#include <curl/curl.h>], [curl_version();], libcurl=yes,
-		libcurl=no)
+		AC_TRY_LINK([#include <curl/curl.h>], [curl_version();], libcurl=yes, libcurl=no)
 		if test "x$libcurl" = xno ; then
 			AC_MSG_RESULT(no)
 			AC_MSG_ERROR([libcurl required. Go to http://curl.haxx.se/ to download and then install it first])
@@ -461,9 +573,44 @@ fi
 
 
 AC_ARG_WITH(cspm,
-	[  --with-cspm              Perform shellcode pattern matching])
+	[  --with-cspm                     perform shellcode pattern matching])
 AM_CONDITIONAL(BUILD_CSPM_PLUGIN, test x$with_cspm = xyes)
 if test "$with_cspm" = "yes"; then
+  AC_ARG_WITH(libpcre_includes,
+    [  --with-libpcre-includes=DIR     libpcre include directory],
+    [with_libpcre_includes="$withval"],[with_libpcre_includes=no])
+
+  AC_ARG_WITH(libpcre_libraries,
+    [  --with-libpcre-libraries=DIR    libpcre library directory],
+    [with_libpcre_libraries="$withval"],[with_libpcre_libraries=no])
+
+  if test "$with_libpcre_includes" != "no"; then
+    CPPFLAGS="${CPPFLAGS} -I${with_libpcre_includes}"
+  fi
+  HPCRE="yes"
+  AC_CHECK_HEADER(pcre.h,, HPCRE="no")
+  if test "$HPCRE" = "no"; then
+    echo
+    bold "   %BError%b - libpcre headers not found. Install them or use the following options:"
+    echo
+    bold "   %B--with-libpcre-includes%b=location of libpcre header files"
+    echo
+    exit
+  fi
+
+  if test "$with_libpcre_libraries" != "no"; then
+    LDFLAGS="${LDFLAGS}  -L${with_libpcre_libraries}"
+  fi
+  LPCRE=""
+  AC_CHECK_LIB(pcre, pcre_compile,, LPCRE="no")
+  if test "$LPCRE" = "no"; then
+    echo
+    bold "   %BError%b - libpcre library not found. Install it or use the following options:"
+    echo
+    bold "   %B--with-libpcre-library%b=location of libpcre shared library files"
+    echo
+    exit
+  fi
 	with_cspm="X"
 else
 	with_cspm=" "
@@ -472,33 +619,42 @@ fi
 
 
 AC_ARG_WITH(postgres,
-	[  --with-postgres          Store attack data in PostgreSQL database])
+	[  --with-postgres                 store attack data in PostgreSQL database])
 AM_CONDITIONAL(BUILD_POSTGRES_PLUGIN, test x$with_postgres = xyes)
 if test "$with_postgres" = "yes"; then
   with_postgres="X"
   AC_ARG_WITH(libpq_includes,
-    [  --with-libpq-includes=DIR  libpq include directory],
+    [  --with-libpq-includes=DIR       libpq include directory],
     [with_libpq_includes="$withval"],[with_libpq_includes=no])
 
   AC_ARG_WITH(libpq_libraries,
-    [  --with-libpq-libraries=DIR  libpq library directory],
+    [  --with-libpq-libraries=DIR      libpq library directory],
     [with_libpq_libraries="$withval"],[with_libpq_libraries=no])
 
   if test "$with_libpq_includes" != "no"; then
     CPPFLAGS="${CPPFLAGS} -I${with_libpq_includes}"
   fi
-  AC_CHECK_HEADER(libpq-fe.h,,[AC_ERROR(libpq-fe.h not found.)])
+  HPQ="yes"
+  AC_CHECK_HEADER(libpq-fe.h,, HPQ="no")
+  if test "$HPQ" = "no"; then
+    echo
+    bold "   %BError%b - libpq headers not found. Install them or use the following options:"
+    echo
+    bold "   %B--with-libpq-includes%b=location of libpq header files"
+    echo
+    exit
+  fi
 
   if test "$with_libpq_libraries" != "no"; then
     LDFLAGS="${LDFLAGS}  -L${with_libpq_libraries}"
   fi
-  LPQ=""
+  LPQ="yes"
   AC_CHECK_LIB(pq, PQconnectdb,, LPQ="no")
-
   if test "$LPQ" = "no"; then
     echo
-    echo "   ERROR!  Libpq library/headers not found. Install it or use the"
-    echo "   --with-libpq-* options, if you have it installed in unusual place."
+    bold "   %BError%b - libpq library not found. Install it or use the following options:"
+    echo
+    bold "   %B--with-libpq-library%b=location of libpq shared library files"
     echo
     exit
   fi
@@ -522,8 +678,8 @@ if test "$DLLIB" != "no"; then
 	AC_CHECK_LIB(c, dlsym,, DLCLIB="no")
 	if test "$DLCLIB" = "no"; then
 		echo
-		echo "   ERROR!  programmatic interface to dynamic link loader"
-		echo "   not found.  Cannot use dynamic plugin libraries."
+		bold "   %BError%b - Programmatic interface to dynamic link loader not found."
+		echo "          Cannot use dynamic plugin libraries."
 		echo
 		exit 1
 	fi
@@ -547,11 +703,19 @@ else
 fi
 
 # Check for electric fence malloc debugger
-AC_ARG_WITH(efence, [  --with-efence           link with electric fence ])
+AC_ARG_WITH(efence, [  --with-efence                   link with electric fence ])
 if test "$with_efence" = "yes"
 then
 	with_efence="X"
-	AC_CHECK_LIB(efence, EF_ALIGNMENT, LIBS="${LIBS} -lefence", AC_MSG_ERROR(libefence not found))
+	LEFENCE="yes"
+	AC_CHECK_LIB(efence, EF_ALIGNMENT, LIBS="${LIBS} -lefence", LEFENCE="no")
+	if test "$LEFENCE" = "no"; then
+		echo
+		bold "   %BError%b - Electric fence libraries not found."
+		bold "          Install them and re-run configure with %B--with-efence%b."
+		echo
+		exit 1
+	fi
 else
 	with_efence=" "
 fi
@@ -566,12 +730,6 @@ INCLUDES='-I$(top_srcdir) -I$(top_srcdir)/src'
 
 AC_SUBST(INCLUDES)
 
-if test $with_ipq_mon != "X" -a $with_nfq_mon != "X" -a $with_ipfw_mon != "X" -a $with_pcap_mon != "X"; then
-  echo
-  echo "   ERROR! No connection monitor selected. Please reconfigure with --with-pcap-mon, --with-nfq-mon  or --with-ipq-mon."
-  echo
-  exit 1
-fi
 
 if test "$with_ipq_mon" != "X"; then with_ipq_mon=" "; fi
 if test "$with_nfq_mon" != "X"; then with_nfq_mon=" "; fi
@@ -590,22 +748,23 @@ AC_OUTPUT
 
 
 echo
-echo "--- honeytrap configuration ---"
-echo "General options"
-echo -e "  ($enable_debug)  Debugging"
-echo -e "  ($enable_profile)  Profiling"
-echo -e "  ($with_efence)  Electric Fence"
+bold "  ----- %Bhoneytrap configuration%b -----"
 echo
-echo "Connection monitor"
-echo -e "  ($with_ipq_mon)  Linux ip_queue (ipq)"
-echo -e "  ($with_ipfw_mon)  FreeBSD ipfw (ipfw)"
-echo -e "  ($with_nfq_mon)  Linux libnetfilter_queue (nfq)"
-echo -e "  ($with_pcap_mon)  Libpcap (pcap)"
+echo "  General options"
+bold "    (%B$enable_debug%b)  Debugging"
+bold "    (%B$enable_profile%b)  Profiling"
+bold "    (%B$with_efence%b)  Electric Fence"
 echo
-echo "Optional plugins"
-echo -e "  ($with_clamav)  ClamAV"
-echo -e "  ($with_cpuemu)  cpuEmu"
-echo -e "  ($with_postgres)  PostgeSQL"
-echo -e "  ($with_spamsum)  SpamSum"
-echo -e "  ($with_cspm)  CSPM"
-echo -e "  ($with_submit_mwserv)  submitMwserv"
+echo "  Connection monitor"
+bold "    (%B$with_ipq_mon%b)  Linux ip_queue (ipq)"
+bold "    (%B$with_ipfw_mon%b)  FreeBSD ipfw (ipfw)"
+bold "    (%B$with_nfq_mon%b)  Linux libnetfilter_queue (nfq)"
+bold "    (%B$with_pcap_mon%b)  Libpcap (pcap)"
+echo
+echo "  Optional plugins"
+bold "    (%B$with_clamav%b)  ClamAV"
+bold "    (%B$with_cpuemu%b)  cpuEmu"
+bold "    (%B$with_postgres%b)  PostgeSQL"
+bold "    (%B$with_spamsum%b)  SpamSum"
+bold "    (%B$with_cspm%b)  CSPM"
+bold "    (%B$with_submit_mwserv%b)  submitMwserv"

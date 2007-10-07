@@ -324,7 +324,7 @@ sch_result eval_bindfiletransfer        (struct sc_shellcode *sc, void **data, u
 
 	if ( (matchCount = pcre_exec(sc->compiled_pattern, 0, (char *) shellcode, len, 0, 0, (int *)ovec, sizeof(ovec)/sizeof(int32_t))) > 0 ) {
 		if ( (matchCount = pcre_exec(sc->compiled_pattern, 0, (char *) shellcode, len, 0, 0, (int *)ovec, sizeof(ovec)/sizeof(int32_t))) > 0 ) {
-			logmsg(LOG_NOISY, 1, "CSPM -  Shellcode matches pattern '%s' (2).\n", sc->name);
+			logmsg(LOG_NOISY, 1, "CSPM - Shellcode matches pattern '%s' (2).\n", sc->name);
 			int32_t i;
 			for ( i=0; i < sc->map_items; i++ ) {
 				if (sc->map[i] == sc_none) continue;
