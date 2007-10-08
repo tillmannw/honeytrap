@@ -29,8 +29,8 @@ static const uint32_t priv_prefixes[] = {
 };
 
 
-int valid_ipaddr(uint32_t address);
-int private_ipaddr(uint32_t address);
+int valid_ipaddr(struct in_addr address);
+int private_ipaddr(struct in_addr address);
 int read_line(int socket, char *line, ssize_t len, int timeout);
 struct strtk extract_token(char *parse_string);
 char *get_next_line(FILE * file);

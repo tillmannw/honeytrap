@@ -28,17 +28,27 @@
 
 
 /* check if 'address' is an ip address with a reasonable value */
-int valid_ipaddr(uint32_t address) {
-	return(address > 0xffffff ? 1 : 0);
+int valid_ipaddr(struct in_addr address) {
+	u_char octet[4];
+
+	octet[0] = address.s_addr;
+	octet[1] = address.s_addr >> 8;
+	octet[2] = address.s_addr >> 16;
+	octet[3] = address.s_addr >> 24;
+
+	if (!octet[0] || !octet[3]) return(0);
+	if (address.s_addr == 0xffffffff) return(0);
+
+	return(1);
 }
 
 
 /* test if 'address' is a rfc1918 ip address */
-int private_ipaddr(uint32_t address) {
+int private_ipaddr(struct in_addr address) {
 	int i;
 
 	for (i=0; i<(sizeof(priv_prefixes)/4); i++)
-		if ((ntohl(address) & priv_prefixes[i]) == ntohl(address)) return(1);
+		if ((ntohl(address.s_addr) & priv_prefixes[i]) == ntohl(address.s_addr)) return(1);
 
 	return(0);
 }

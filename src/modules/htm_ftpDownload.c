@@ -159,9 +159,9 @@ int get_ftpcmd(char *attack_string, uint32_t string_size, struct in_addr lhost, 
 				return(-1);
 			}
 			logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s.\n", token.string,
-				inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
+				inet_ntoa(*(struct in_addr*)host->h_addr));
 
-			if (!replace_private_ips && !valid_ipaddr((uint32_t) *(host->h_addr_list[0]))) {
+			if (!replace_private_ips && !valid_ipaddr(*(struct in_addr*)host->h_addr)) {
 				logmsg(LOG_INFO, 1, "FTP download error - %s is not a valid ip address.\n",
 					inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 				return(-1);
@@ -336,7 +336,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 
 
 	/* replace private ip? */
-	if (replace_private_ips && (private_ipaddr(rhost->s_addr) || !(valid_ipaddr(rhost->s_addr)))) {
+	if (replace_private_ips && (private_ipaddr(*rhost) || !(valid_ipaddr(*rhost)))) {
 		logmsg(LOG_NOISY, 1, "FTP download - Replacing private/invalid server address with attacking IP address.\n");
 		rhost = (struct in_addr *) &attack->a_conn.r_addr;
 	}
@@ -499,7 +499,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		logmsg(LOG_DEBUG, 1, "FTP download - %s resolves to %s.\n", ftp_host,
 			inet_ntoa(*(struct in_addr*)data_host->h_addr_list[0]));
 
-		if (!valid_ipaddr((uint32_t) *(data_host->h_addr_list[0]))) {
+		if (!valid_ipaddr(*(struct in_addr*)data_host->h_addr)) {
 			logmsg(LOG_INFO, 1, "FTP download error - %s is not a valid ip address.\n",
 				inet_ntoa(*(struct in_addr*)data_host->h_addr_list[0]));
 			return(-1);

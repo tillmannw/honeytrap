@@ -112,7 +112,7 @@ int get_tftpcmd(char *attack_string, int string_size, Attack *attack) {
 			logmsg(LOG_DEBUG, 1, "TFTP download - %s resolves to %s.\n", token.string,
 				inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 
-			if (!replace_private_ips && !valid_ipaddr((uint32_t) *(host->h_addr_list[0]))) {
+			if (!replace_private_ips && !valid_ipaddr(*(struct in_addr*)host->h_addr)) {
 				logmsg(LOG_INFO, 1, "TFTP download error - %s is not a valid ip address.\n",
 					inet_ntoa(*(struct in_addr*)host->h_addr_list[0]));
 				return(-1);
@@ -173,7 +173,7 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 	
 
 	/* replace private ip? */
-	if (replace_private_ips && (private_ipaddr(host->s_addr) || !(valid_ipaddr(host->s_addr)))) {
+	if (replace_private_ips && (private_ipaddr(*host) || !(valid_ipaddr(*host)))) {
 		logmsg(LOG_NOISY, 1, "TFTP download - Replacing private/invalid server address with attacking IP address.\n");
 		host = (struct in_addr *) &attack->a_conn.r_addr;
 	}
