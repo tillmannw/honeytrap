@@ -1,4 +1,5 @@
 Version 1.0.0
+- Improved configure script
 - Basic http download wrapper plugin added
 - VNC plugin redesigned to generate virtual attacks
 - Safe signal delivery and handling using per-process pipes

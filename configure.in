@@ -39,18 +39,18 @@ vt100|vt100*|cygwin)
     paths=`echo $PATH | sed -e 's/:/ /g'`
     for tool in tput tcout; do
 	for dir in $paths; do
-	    if [ -r "$dir/$tool" ]; then
+	    if test -r "$dir/$tool" ; then
 		for seq in bold md smso; do # 'smso' is last
 		    bold="`$dir/$tool $seq 2>/dev/null`"
-		    if [ ".$bold" != . ]; then
+		    if test ".$bold" != . ; then
 			term_bold="$bold"
 			break
 		    fi
 		done
-		if [ ".$term_bold" != . ]; then
+		if test ".$term_bold" != . ; then
 		    for seq in sgr0 me rmso init reset; do # 'reset' is last
 			norm="`$dir/$tool $seq 2>/dev/null`"
-			if [ ".$norm" != . ]; then
+			if test ".$norm" != . ; then
 			    term_norm="$norm"
 			    break
 			fi
@@ -59,7 +59,7 @@ vt100|vt100*|cygwin)
 		break
 	    fi
 	done
-	if [ ".$term_bold" != . ] && [ ".$term_norm" != . ]; then
+	if test ".$term_bold" != . && test ".$term_norm" != . ; then
 	    break;
 	fi
     done
@@ -292,7 +292,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libpcap headers not found. Install them or use the following options:"
 			echo
-			echo "   --with-libpcap-includes=location of libpcap header files"
+			bold "   %B--with-libpcap-includes=%b[location of libpcap header files]"
 			echo
 			exit 1
 		fi
@@ -306,7 +306,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libpcap library not found. Install it or use the following options:"
 			echo
-			echo "   --with-libpcap-library=location of libpcap shared library files"
+			bold "   %B--with-libpcap-library=%b[location of libpcap shared library files]"
 			echo
 			exit 1
 		fi
@@ -332,7 +332,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libnetfilter_queue headers not found. Install them or use the following options:"
 			echo
-			echo "   --with-libnfq-includes=location of libnetfilter_queue header files"
+			bold "   %B--with-libnfq-includes=%b[location of libnetfilter_queue header files]"
 			echo
 			exit
 		fi
@@ -346,7 +346,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libnetfilter_queue library not found. Install it or use the following options:"
 			echo
-			echo "   --with-libnfq-library=location of libnetfilter_queue shared library files"
+			bold "   %B--with-libnfq-library=%b[location of libnetfilter_queue shared library files]"
 			echo
 			exit
 		fi
@@ -371,7 +371,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libipq headers not found. Install them or use the following options:"
 			echo
-			echo "   --with-libipq-includes=location of libipq header files"
+			bold "   %B--with-libipq-includes=%b[location of libipq header files]"
 			echo
 			exit
 		fi
@@ -385,7 +385,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libipq library not found. Install it or use the following options:"
 			echo
-			echo "   --with-libipq-library=location of libipq shared library files"
+			bold "   %B--with-libipq-library=%[blocation of libipq shared library files]"
 			echo
 			exit
 		fi
@@ -402,9 +402,9 @@ case "x$with_stream_mon" in
 		echo
 		bold "   %BError%b - No connection monitor selected. Please reconfigure with one of the following:"
 		echo
-		echo "   --with-stream-mon=nfq    receive packets via netfilter's NFQUEUE target (Linux only, recommended)"
-		echo "   --with-stream-mon=ipq    receive packets via netfilter's QUEUE target (Linux only)"
-		echo "   --with-stream-mon=pcap   receive packets using a built-in pcap sniffer"
+		bold "   %B--with-stream-mon=%bnfq    receive packets via netfilter's NFQUEUE target (Linux only, recommended)"
+		bold "   %B--with-stream-mon=%bipq    receive packets via netfilter's QUEUE target (Linux only)"
+		bold "   %B--with-stream-mon=%bpcap   receive packets using a built-in pcap sniffer"
 		echo
 		exit 1
 esac
@@ -447,7 +447,7 @@ if test "$with_clamav" = "yes"; then
     echo
     bold "   %BError%b - libclamav headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libclamav-includes%b=location of libclamav header files"
+    bold "   %B--with-libclamav-includes=%b[location of libclamav header files]"
     echo
     exit
   fi
@@ -461,7 +461,7 @@ if test "$with_clamav" = "yes"; then
     echo
     bold "   %BError%b - libclamav library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libclamav-library%b=location of libclamav shared library files"
+    bold "   %B--with-libclamav-library=%b[location of libclamav shared library files]"
     echo
     exit
   fi
@@ -491,7 +491,7 @@ if test "$with_cpuemu" = "yes"; then
   if test "$HEMU" = "no"; then
     bold "   %BError%b - libemu headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libemu-includes%b=location of libemu header files"
+    bold "   %B--with-libemu-includes=%b[location of libemu header files]"
     echo
     exit
   fi
@@ -504,7 +504,7 @@ if test "$with_cpuemu" = "yes"; then
   if test "$LEMU" = "no"; then
     bold "   %BError%b - libemu library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libemu-library%b=location of libemu shared library files"
+    bold "   %B--with-libemu-library=%b[location of libemu shared library files]"
     echo
     exit
   fi
@@ -540,7 +540,7 @@ if test "$with_submit_mwserv" = "yes"; then
 	if test "$HCURL" = "no"; then
 		bold "   %BError%b - libcurl headers not found. Install them or use the following options:"
 		echo
-		bold "   %B--with-libcurl-includes%b=location of libcurl header files"
+		bold "   %B--with-libcurl-includes=%b[location of libcurl header files]"
 		echo
 		exit
 	fi
@@ -550,7 +550,7 @@ if test "$with_submit_mwserv" = "yes"; then
 	if test "$LCURL" = "no"; then
 		bold "   %BError%b - libcurl library not found. Install it or use the following options:"
 		echo
-		bold "   %B--with-libcurl-library%b=location of libcurl shared library files"
+		bold "   %B--with-libcurl-library=%b[location of libcurl shared library files]"
 		echo
 		exit
 	fi
@@ -593,7 +593,7 @@ if test "$with_cspm" = "yes"; then
     echo
     bold "   %BError%b - libpcre headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libpcre-includes%b=location of libpcre header files"
+    bold "   %B--with-libpcre-includes=%b[location of libpcre header files]"
     echo
     exit
   fi
@@ -607,7 +607,7 @@ if test "$with_cspm" = "yes"; then
     echo
     bold "   %BError%b - libpcre library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libpcre-library%b=location of libpcre shared library files"
+    bold "   %B--with-libpcre-library=%b[location of libpcre shared library files]"
     echo
     exit
   fi
@@ -640,7 +640,7 @@ if test "$with_postgres" = "yes"; then
     echo
     bold "   %BError%b - libpq headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libpq-includes%b=location of libpq header files"
+    bold "   %B--with-libpq-includes=%b[location of libpq header files]"
     echo
     exit
   fi
@@ -654,7 +654,7 @@ if test "$with_postgres" = "yes"; then
     echo
     bold "   %BError%b - libpq library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libpq-library%b=location of libpq shared library files"
+    bold "   %B--with-libpq-library=%b[location of libpq shared library files]"
     echo
     exit
   fi
