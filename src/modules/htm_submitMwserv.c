@@ -59,13 +59,13 @@ void plugin_init(void) {
 }
 
 void plugin_unload(void) {
-	unhook(PPRIO_PREPROC, module_name, "submit_mwserv");
+	unhook(PPRIO_SAVEDATA, module_name, "submit_mwserv");
 	return;
 }
 
 void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
-	add_attack_func_to_list(PPRIO_PREPROC, module_name, "submit_mwserv", (void *) submit_mwserv);
+	add_attack_func_to_list(PPRIO_SAVEDATA, module_name, "submit_mwserv", (void *) submit_mwserv);
 
 	return;
 }
