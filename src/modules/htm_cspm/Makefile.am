@@ -25,11 +25,9 @@ htm_cspm_la_SOURCES += sc_buffer.c sc_buffer.h
 htm_cspm_la_SOURCES += connectback.c connectback.h
 htm_cspm_la_LDFLAGS = -module -no-undefined -avoid-version
 
+
 install-exec-am:
-	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/plugins
+	$(mkinstalldirs) $(libdir)
 	for module in `find .libs -name htm_*.so`; do \
-		[ -h $$module ] || $(INSTALL_DATA) "$$module" $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/ ; \
-	done
-	for module in `find . -name htm_*.*a`; do \
-		rm -f $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/`basename "$$module"` ; \
+		[ -h $$module ] || $(INSTALL_DATA) "$$module" $(libdir) ; \
 	done

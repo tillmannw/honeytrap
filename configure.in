@@ -67,8 +67,8 @@ vt100|vt100*|cygwin)
 esac
 
 bold () {
-	text=`echo $seo "$1" | sed -e "s/%B/${term_bold}/g" -e "s/%b/${term_norm}/g" 2>/dev/null`
-	echo $seo "$text"
+	text=`echo -e "$1" | sed -e "s/%B/${term_bold}/g" -e "s/%b/${term_norm}/g" 2>/dev/null`
+	echo "$text"
 }
 
 
@@ -95,6 +95,16 @@ AC_ARG_ENABLE(profile,
           fi
 	  enable_profile="X"
         ], enable_profile=" ")
+AC_ARG_ENABLE(devmodules,
+[  --enable-devmodules     enable unstable modules (not recommended for production setups)],
+                [ if test -n "$GCC"; then
+                    CFLAGS="-O0 -DDEBUG -g"
+                  else
+                    CFLAGS="$CFLAGS -DDEBUG"
+                  fi      
+		  enable_devmodules="X"
+                ], enable_devmodules=" ")
+
 
 #AC_CANONICAL_HOST
 linux=no
@@ -292,7 +302,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libpcap headers not found. Install them or use the following options:"
 			echo
-			bold "   %B--with-libpcap-includes=%b[location of libpcap header files]"
+			bold "   %B--with-libpcap-includes=%b\133location of libpcap header files\135"
 			echo
 			exit 1
 		fi
@@ -306,7 +316,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libpcap library not found. Install it or use the following options:"
 			echo
-			bold "   %B--with-libpcap-library=%b[location of libpcap shared library files]"
+			bold "   %B--with-libpcap-libraries=%b\133location of libpcap shared library files\135"
 			echo
 			exit 1
 		fi
@@ -332,7 +342,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libnetfilter_queue headers not found. Install them or use the following options:"
 			echo
-			bold "   %B--with-libnfq-includes=%b[location of libnetfilter_queue header files]"
+			bold "   %B--with-libnfq-includes=%b\133location of libnetfilter_queue header files\135"
 			echo
 			exit
 		fi
@@ -346,7 +356,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libnetfilter_queue library not found. Install it or use the following options:"
 			echo
-			bold "   %B--with-libnfq-library=%b[location of libnetfilter_queue shared library files]"
+			bold "   %B--with-libnfq-libraries=%b\133location of libnetfilter_queue shared library files\135"
 			echo
 			exit
 		fi
@@ -371,7 +381,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libipq headers not found. Install them or use the following options:"
 			echo
-			bold "   %B--with-libipq-includes=%b[location of libipq header files]"
+			bold "   %B--with-libipq-includes=%b\133location of libipq header files\135"
 			echo
 			exit
 		fi
@@ -385,7 +395,7 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libipq library not found. Install it or use the following options:"
 			echo
-			bold "   %B--with-libipq-library=%[blocation of libipq shared library files]"
+			bold "   %B--with-libipq-libraries=%b\133location of libipq shared library files\135"
 			echo
 			exit
 		fi
@@ -447,7 +457,7 @@ if test "$with_clamav" = "yes"; then
     echo
     bold "   %BError%b - libclamav headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libclamav-includes=%b[location of libclamav header files]"
+    bold "   %B--with-libclamav-includes=%b\133location of libclamav header filesi\135"
     echo
     exit
   fi
@@ -461,7 +471,7 @@ if test "$with_clamav" = "yes"; then
     echo
     bold "   %BError%b - libclamav library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libclamav-library=%b[location of libclamav shared library files]"
+    bold "   %B--with-libclamav-libraries=%b\133location of libclamav shared library files\135"
     echo
     exit
   fi
@@ -474,6 +484,14 @@ AC_ARG_WITH(cpuemu,
 	[  --with-cpuemu                   perform shellcode analysis in x86 CPU emulation])
 AM_CONDITIONAL(BUILD_CPUEMU_PLUGIN, test x$with_cpuemu = xyes)
 if test "$with_cpuemu" = "yes"; then
+  if test "$enable_devmodules" != "X"; then
+    echo
+    echo "   The cpuEmu plugin is still unstable and should not be used in production setups."
+    bold "   Use %B--enable-devmodules%b to build it anyway."
+    echo
+    exit
+  fi
+
   with_cpuemu="X"
   AC_ARG_WITH(libemu_includes,
     [  --with-libemu-includes=DIR      libemu include directory],
@@ -489,9 +507,10 @@ if test "$with_cpuemu" = "yes"; then
   HEMU="yes"
   AC_CHECK_HEADER(emu/emu.h,, HEMU="no")
   if test "$HEMU" = "no"; then
+    echo
     bold "   %BError%b - libemu headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libemu-includes=%b[location of libemu header files]"
+    bold "   %B--with-libemu-includes=%b\133location of libemu header files\135"
     echo
     exit
   fi
@@ -502,9 +521,10 @@ if test "$with_cpuemu" = "yes"; then
   LEMU="yes"
   AC_CHECK_LIB(emu, emu_getpc_check,, LEMU="no")
   if test "$LEMU" = "no"; then
+    echo
     bold "   %BError%b - libemu library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libemu-library=%b[location of libemu shared library files]"
+    bold "   %B--with-libemu-libraries=%b\133location of libemu shared library files\135"
     echo
     exit
   fi
@@ -519,6 +539,14 @@ AC_ARG_WITH(submit-mwserv,
 	[  --with-submit-mwserv            submit malware samples to a central server])
 AM_CONDITIONAL(BUILD_SUBMIT_MWSERV_PLUGIN, test x$with_submit_mwserv = xyes)
 if test "$with_submit_mwserv" = "yes"; then
+	if test "$enable_devmodules" != "X"; then
+		echo
+		echo "   The submitMWserv plugin is still unstable and should not be used in production setups."
+		bold "   Use %B--enable-devmodules%b to build it anyway."
+		echo
+		exit
+	fi
+
 	with_submit_mwserv="X"
 
 	AC_CHECK_FUNC(gethostbyname, , AC_CHECK_LIB(nsl, gethostbyname))
@@ -538,34 +566,27 @@ if test "$with_submit_mwserv" = "yes"; then
 	HCURL="yes"
 	AC_CHECK_HEADER(curl.h,, HCURL="no")
 	if test "$HCURL" = "no"; then
+		echo
 		bold "   %BError%b - libcurl headers not found. Install them or use the following options:"
 		echo
-		bold "   %B--with-libcurl-includes=%b[location of libcurl header files]"
+		bold "   %B--with-libcurl-includes=%b\133location of libcurl header files\135"
 		echo
 		exit
 	fi
 
+	if test "$with_libcurl_libraries" != "no"; then
+		LDFLAGS="${LDFLAGS}  -L${with_libcurl_libraries}"
+	fi
 	LCURL="yes"
 	AC_CHECK_LIB(curl, curl_version, LCURL="yes", LCURL="no")
 	if test "$LCURL" = "no"; then
+		echo
 		bold "   %BError%b - libcurl library not found. Install it or use the following options:"
 		echo
-		bold "   %B--with-libcurl-library=%b[location of libcurl shared library files]"
+		bold "   %B--with-libcurl-libraries=%b\133location of libcurl shared library files\135"
 		echo
 		exit
 	fi
-
-	if test "x$libcurl" = xno ; then
-		AC_MSG_CHECKING([checking for curl with SSL])
-		LIBS="$LIBS -lcurl -L/usr/local/ssl/lib -lssl -lcrypto"
-		AC_TRY_LINK([#include <curl/curl.h>], [curl_version();], libcurl=yes, libcurl=no)
-		if test "x$libcurl" = xno ; then
-			AC_MSG_RESULT(no)
-			AC_MSG_ERROR([libcurl required. Go to http://curl.haxx.se/ to download and then install it first])
-		else
-			AC_MSG_RESULT(yes)
-		fi
-	fi 
 else
 	with_submit_mwserv=" "
 fi
@@ -576,6 +597,16 @@ AC_ARG_WITH(cspm,
 	[  --with-cspm                     perform shellcode pattern matching])
 AM_CONDITIONAL(BUILD_CSPM_PLUGIN, test x$with_cspm = xyes)
 if test "$with_cspm" = "yes"; then
+  if test "$enable_devmodules" != "X"; then
+    echo
+    echo "   The CSPM plugin is still unstable and should not be used in production setups."
+    bold "   Use %B--enable-devmodules%b to build it anyway."
+    echo
+    exit
+  fi
+
+  with_cspm="X"
+
   AC_ARG_WITH(libpcre_includes,
     [  --with-libpcre-includes=DIR     libpcre include directory],
     [with_libpcre_includes="$withval"],[with_libpcre_includes=no])
@@ -593,7 +624,7 @@ if test "$with_cspm" = "yes"; then
     echo
     bold "   %BError%b - libpcre headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libpcre-includes=%b[location of libpcre header files]"
+    bold "   %B--with-libpcre-includes=%b\133location of libpcre header files\135"
     echo
     exit
   fi
@@ -607,11 +638,11 @@ if test "$with_cspm" = "yes"; then
     echo
     bold "   %BError%b - libpcre library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libpcre-library=%b[location of libpcre shared library files]"
+    bold "   %B--with-libpcre-libraries=%b\133location of libpcre shared library files\135"
     echo
     exit
   fi
-	with_cspm="X"
+
 else
 	with_cspm=" "
 fi
@@ -640,7 +671,7 @@ if test "$with_postgres" = "yes"; then
     echo
     bold "   %BError%b - libpq headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libpq-includes=%b[location of libpq header files]"
+    bold "   %B--with-libpq-includes=%b\133location of libpq header files\135"
     echo
     exit
   fi
@@ -654,7 +685,7 @@ if test "$with_postgres" = "yes"; then
     echo
     bold "   %BError%b - libpq library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libpq-library=%b[location of libpq shared library files]"
+    bold "   %B--with-libpq-libraries=%b\133location of libpq shared library files\135"
     echo
     exit
   fi
@@ -753,6 +784,7 @@ echo
 echo "  General options"
 bold "    (%B$enable_debug%b)  Debugging"
 bold "    (%B$enable_profile%b)  Profiling"
+bold "    (%B$enable_devmodules%b)  Unstable Modules"
 bold "    (%B$with_efence%b)  Electric Fence"
 echo
 echo "  Connection monitor"
@@ -764,7 +796,7 @@ echo
 echo "  Optional plugins"
 bold "    (%B$with_clamav%b)  ClamAV"
 bold "    (%B$with_cpuemu%b)  cpuEmu"
+bold "    (%B$with_cspm%b)  CSPM"
 bold "    (%B$with_postgres%b)  PostgeSQL"
 bold "    (%B$with_spamsum%b)  SpamSum"
-bold "    (%B$with_cspm%b)  CSPM"
 bold "    (%B$with_submit_mwserv%b)  submitMwserv"

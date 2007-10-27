@@ -1,6 +1,6 @@
 Version 1.0.0
 - Improved configure script
-- Basic http download wrapper plugin added
+- New plugin: Basic http download wrapper
 - VNC plugin redesigned to generate virtual attacks
 - Safe signal delivery and handling using per-process pipes
 - New configuration concept with hierarchically organized file format
@@ -15,7 +15,7 @@ Version 1.0.0
 Version 0.7.0
 - Plugins can be prioritized
 - x86 CPU emulation module for generic shellcode analysis
-  based on libemu by Markus and Paul
+  based on libemu by Markus and Paul (unstable)
 - PostgreSQL module for commits into mwcollect database
 - SHA512 hash support
 - Performance improvements

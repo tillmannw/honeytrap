@@ -2,7 +2,7 @@
  * honeytrap 1.0 port configuration file template
  * should be included in main configuration file
  * (c) Tillmann Werner <tillmann.werner@gmx.de>
-*/
+ */
 
 portconf = {
 	/* ignore these ports */

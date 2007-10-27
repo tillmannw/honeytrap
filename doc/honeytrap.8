@@ -27,7 +27,7 @@
 .TH HONEYTRAP 8 "5 August 2006" " " 
 .SH NAME
 .B honeytrap 
-\- trap attacks against tcp services
+\- trap attacks against network services
 .SH SYNOPSIS
 .B honeytrap
 [
@@ -70,11 +70,11 @@
 .br
 .SH DESCRIPTION
 .I honeytrap
-is a network security tool written to observe attacks against TCP services. As a low-interactive honeypot, it collects information regarding known or unknown network-based attacks. It starts server processes dynamically at the time of incoming connection requests. This generic behavior makes it possible to respond to most network-based attacks. Observed data can be processed with plugins for automatic analysis.
+is a network security tool written to observe attacks against network services. As a low-interactive honeypot, it collects information regarding known or unknown network-based attacks. It starts server processes dynamically at the time of incoming connection requests. This generic behavior makes it possible to respond to most network-based attacks. Observed data can be processed with plugins for automatic analysis.
 .LP
 Data capture is basically done by the core system. The master process uses a connection monitor to catch incoming requests. Currently, connection monitoring can be performed via a PCAP based sniffer or by hooking the ip_queue API, a userland interface to netfilter/iptables on Linux systems. The appropriate technique has to be built in during compile time.
 .LP
-Incoming connections are processed in one of the following modi: normal, ignore, proxy and mirror. The specific bevavior for a connection can be configured per TCP port. If no explicit configuration is given, the default mode applies. It is possible to setup
+Incoming connections are processed in one of the following modi: normal, ignore, proxy and mirror. The specific bevavior for a connection can be configured per tcp or udp port. If no explicit configuration is given, the default mode applies. It is possible to setup
 .I honeytrap
 as a meta-honeypot, forwarding some connections to different honeypot systems, handle some attacks with own routines or even route connections to different honeypots.
 .LP
@@ -176,7 +176,7 @@ Write process ID of master process to
 .IP "\fI expression\fP"
 To recognize rejected connections, 
 .I honeytrap
-uses a berkeley packet filter (bpf) to sniff TCP reset packets sent to a remote host. The filter can be restricted by adding a bpf
+uses a berkeley packet filter (bpf) to catch connection requests. The filter can be restricted by adding a bpf
 .I expression.
 This only has an effect when using the pcap connection monitor.
 
@@ -204,11 +204,12 @@ Set the log level to LOG_NOISY (
 .SH NOTES
 As a honeypot,
 .I honeytrap
-is exposed to attacks that might compromise the software itself. Running it into a hardened and secured environment is a good idea. Linking against a stack protection library might also improve security. The configure script supports the electric fence malloc debugger. Use it.
+is exposed to attacks that might compromise the software itself. Running it inside a hardened and secured environment is a good idea. Linking against a stack protection library might also improve security. The configure script supports the electric fence malloc debugger. Use it.
 .SH SEE ALSO
 .BR bpf (4),
 .BR iptables (8),
 .BR pcap (3),
+.BR udp(7).
 .BR tcp (7).
 .SH AUTHOR
 This version of

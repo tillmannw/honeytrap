@@ -84,11 +84,9 @@ if BUILD_CSPM_PLUGIN
 SUBDIRS += htm_cspm
 endif
 
+
 install-exec-am:
-	$(mkinstalldirs) $(DESTDIR)/$(sysconfdir)/honeytrap/plugins
+	$(mkinstalldirs) $(libdir)
 	for module in `find .libs -name htm_*.so`; do \
-		[ -h $$module ] || $(INSTALL_DATA) "$$module" $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/ ; \
-	done
-	for module in `find . -name htm_*.*a`; do \
-		rm -f $(DESTDIR)/$(sysconfdir)/honeytrap/plugins/`basename "$$module"` ; \
+		[ -h $$module ] || $(INSTALL_DATA) "$$module" $(libdir) ; \
 	done

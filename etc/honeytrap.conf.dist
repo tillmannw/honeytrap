@@ -13,9 +13,11 @@ pidfile		= "/var/run/honeytrap.pid"
  * these are sent for connections handled in "normal mode" */
 response_dir	= "/opt/honeytrap/etc/honeytrap/responses"
 
-/* run in mirror mode - mirror connections back to the initiator
- * use with caution! */
-//mirror = "on"
+/* replace rfc1918 ip addresses with attacking ip address */
+replace_private_ips = "no"
+
+/* default port mode -- valid values are "ignore", "normal" and "mirror"
+portconf_default = "normal"
 
 /* put network interface into promiscuous mode
  * (only availabel when compiled with --with-pcap-mon) */
@@ -47,11 +49,13 @@ plugin-tftpDownload = ""
 plugin-b64Decode = ""
 plugin-vncDownload = ""
 
+
 /* store attacks on disk */
 plugin-SaveFile = {
 	attacks_dir	= "/opt/honeytrap/attacks"
 	downloads_dir	= "/opt/honeytrap/downloads"
 }
+
 
 /* scan downloaded samples with ClamAV engine */
 plugin-ClamAV = {
@@ -59,11 +63,13 @@ plugin-ClamAV = {
 	clamdb_path	= "/var/lib/clamav"
 }
 
+
 /* calculate locality sensitive hashes */
 plugin-SpamSum = {
 	md5sum_sigfile	= "/opt/honeytrap/md5sum.sigs"
 	spamsum_sigfile	= "/opt/honeytrap/spamsum.sigs"
 }
+
 
 /* store attacks in PostgeSQL database */
 /*
@@ -75,6 +81,18 @@ plugin-SavePostgres = {
 //	db_port = "some_port"	// defaults to 5432/tcp if not set
 }
 */
+
+
+/* invoke wget to download files via http */
+/*
+plugin-httpDownload = {
+	http_program = "/usr/bin/wget"
+//      http_options = "-nv"
+	http_options = "-q"
+	download_dir = "/opt/honeytrap/downloads/"
+}
+*/
+
 
 
 /* ----- port mode configuration below ----- */

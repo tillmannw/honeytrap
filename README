@@ -23,8 +23,8 @@ README
 
 INSTALLATION
 
-  Installation of honeytrap should be pretty straight forward. Just
-  do  a  './configure  --with-<type>-mon  &&  make && make install'
+  Installation of honeytrap is  pretty straight forward.  Just do a
+  './configure  --with-stream-mon=<type> &&  make &&  make install'
   where '<type>' is the connection monitor  type  of  your  choice.
   Please  refer to the INSTALL file and to the output of './config-
   ure --help' for further information.
