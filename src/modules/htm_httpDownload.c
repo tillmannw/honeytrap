@@ -39,7 +39,7 @@
 #include "htm_httpDownload.h"
 
 const char module_name[]="httpDownload";
-const char module_version[]="0.0.1";
+const char module_version[]="0.0.2";
 
 static const char *config_keywords[] = {
 	"http_program",
@@ -64,13 +64,13 @@ void plugin_init(void) {
 
 
 void plugin_unload(void) {
-	unhook(PPRIO_ANALYZE, module_name, "cmd_parse_for_http_url");
+	unhook(PPRIO_POSTPROC, module_name, "cmd_parse_for_http_url");
 	return;
 }
 
 void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
-	add_attack_func_to_list(PPRIO_ANALYZE, module_name, "cmd_parse_for_http_url", (void *) cmd_parse_for_http_url);
+	add_attack_func_to_list(PPRIO_POSTPROC, module_name, "cmd_parse_for_http_url", (void *) cmd_parse_for_http_url);
 
 	return;
 }
@@ -143,7 +143,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 }
 
 int cmd_parse_for_http_url(Attack *attack) {
-	int i = 0;
+	int i = 0, j = 0;
 	FILE *f = NULL;
 	char *string_for_processing, *start, *end, *cmd;
 
@@ -171,7 +171,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 			start = string_for_processing+i;
 
 			/* 0-terminate URL */
-			for (end = start, i=0; i<strlen(start) && end[0]; end = &start[i++]) {
+			for (end = start, j=0; j<strlen(start) && end[0]; end = &start[j++]) {
 				if (isspace(end[0])) end[0] = 0;
 				else if (!isprint(end[0])) end[0] = 0;
 			}
