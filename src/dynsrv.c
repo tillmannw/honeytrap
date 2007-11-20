@@ -64,8 +64,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 #ifdef USE_IPQ_MON
 	int			status;
 #endif
-	socklen_t		client_addr_len;
-	struct sockaddr_in	client_addr, server_addr;
+	socklen_t		cliaddr_len, srvaddr_len;
+	struct sockaddr_in	cliaddr, srvaddr;
 	struct timeval		c_timeout;
 	struct hostent		*proxy_addr;
 	struct in_addr		*p_addr;
@@ -104,13 +104,13 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
 		if (proto == TCP) {
 			logmsg(LOG_DEBUG, 1, "Requesting tcp socket.\n");
-			if ((listen_fd = get_boundsock(&server_addr, port_l, SOCK_STREAM)) == -1)
+			if ((listen_fd = get_boundsock(&srvaddr, port_l, SOCK_STREAM)) == -1)
 				exit(EXIT_SUCCESS);
 			if (port_flags_tcp[htons(port_l)])
 				port_mode = port_flags_tcp[htons(port_l)]->mode;
 		} else if (proto == UDP) {
 			logmsg(LOG_DEBUG, 1, "Requesting udp socket.\n");
-			if ((listen_fd = get_boundsock(&server_addr, port_l, SOCK_DGRAM)) == -1)
+			if ((listen_fd = get_boundsock(&srvaddr, port_l, SOCK_DGRAM)) == -1)
 				exit(EXIT_SUCCESS);
 			if (port_flags_udp[htons(port_l)])
 				port_mode = port_flags_udp[htons(port_l)]->mode;
@@ -191,37 +191,18 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			default:
 				if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
 				if (FD_ISSET(listen_fd, &rfds)) {
-					if ((ip_l_str = strdup(inet_ntoa(ip_l))) == NULL) {
-						logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
-						exit(EXIT_FAILURE);
-					}
-					if ((ip_r_str = strdup(inet_ntoa(ip_r))) == NULL) {
-						logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
-						exit(EXIT_FAILURE);
-					}
-					logmsg(LOG_INFO, 1, "   %s  Handling %s connection request from %s:%d to %s:%d.\n",
-						portstr, PROTO(proto), ip_r_str, ntohs(port_r), ip_l_str, ntohs(port_l));
-					free(ip_r_str);
-					free(ip_l_str);
-
-					/* initialize attack record */
-					if ((attack = new_attack(ip_l, ip_r, ntohs(port_l), 0, proto)) == NULL) {
-						logmsg(LOG_ERR, 1, "Error - Could not initialize attack record.\n");
-						free(attack);
-						exit(EXIT_FAILURE);
-					}
 
 
 					/* accept connection depending on protocol */
-					bzero(&client_addr, sizeof(client_addr));
-					client_addr_len = sizeof(client_addr);
+					bzero(&cliaddr, sizeof(cliaddr));
+					cliaddr_len = sizeof(cliaddr);
 					established = 0;
 
 					switch ((uint16_t) proto) {
 					case TCP:
 						/* accept tcp connection request */
 						if ((connection_fd = accept(listen_fd, (struct sockaddr *)
-									    &client_addr, &client_addr_len)) < 0) {
+									    &cliaddr, &cliaddr_len)) < 0) {
 							if (errno == EINTR)
 								break;
 							else {
@@ -237,14 +218,14 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 						break;
 					case UDP:
 						connection_fd = dup(listen_fd);
-						client_addr.sin_family = AF_INET;
-						client_addr.sin_addr = ip_r;
-						client_addr.sin_port = port_r;
+						cliaddr.sin_family = AF_INET;
+						cliaddr.sin_addr = ip_r;
+						cliaddr.sin_port = port_r;
 
 						/* connecting our udp socket enables us to use read() and write() */
 						if (connect
-						    (connection_fd, (struct sockaddr *) &client_addr,
-						     client_addr_len) < 0) {
+						    (connection_fd, (struct sockaddr *) &cliaddr,
+						     cliaddr_len) < 0) {
 							if (errno == EINTR)
 								break;
 							else {
@@ -259,8 +240,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
 						/* update remote endpoint information for attack structure */
 						if (getpeername
-						    (connection_fd, (struct sockaddr *) &client_addr,
-						     &client_addr_len) < 0) {
+						    (connection_fd, (struct sockaddr *) &cliaddr,
+						     &cliaddr_len) < 0) {
 							if (errno == EINTR)
 								break;
 							else {
@@ -281,11 +262,44 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					if (!established) continue;
 					
 
-					/* incoming connection accepted, select port mode */
-					logmsg(LOG_NOTICE, 1, "   %s  Connection from %s:%u accepted.\n",
-					       portstr, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-					attack->a_conn.r_port = ntohs(client_addr.sin_port);
+					/* get remote socket endpoint info */
+					cliaddr_len = sizeof(cliaddr);
+					if (getpeername(connection_fd, (struct sockaddr *) &cliaddr, (socklen_t *) &cliaddr_len) != 0) {
+						logmsg(LOG_ERR, 1, "Error - Could not get client info from socket: %s.\n", strerror(errno));
+						exit(1);
+					}
+					if ((ip_r_str = strdup(inet_ntoa(cliaddr.sin_addr))) == NULL) {
+						logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+						exit(EXIT_FAILURE);
+					}
 
+					/* get local socket endpoint info */
+					srvaddr_len = sizeof(srvaddr);
+					if (getsockname(connection_fd, (struct sockaddr *) &srvaddr, (socklen_t *) &srvaddr_len) != 0) {
+						logmsg(LOG_ERR, 1, "Error - Could not get client info from socket: %s.\n", strerror(errno));
+						exit(1);
+					}
+					srvaddr.sin_addr = ip_l;
+					if ((ip_l_str = strdup(inet_ntoa(srvaddr.sin_addr))) == NULL) {
+						logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+						exit(EXIT_FAILURE);
+					}
+
+					logmsg(LOG_NOTICE, 1, "   %s  Handling %s connection request from %s:%d to %s:%d.\n",
+						portstr, PROTO(proto), ip_r_str, ntohs(cliaddr.sin_port), ip_l_str, ntohs(srvaddr.sin_port));
+					free(ip_r_str);
+					free(ip_l_str);
+
+					/* initialize attack record */
+					if ((attack = new_attack(cliaddr.sin_addr, srvaddr.sin_addr, ntohs(srvaddr.sin_port), 0, proto)) == NULL) {
+						logmsg(LOG_ERR, 1, "Error - Could not initialize attack record.\n");
+						free(attack);
+						exit(EXIT_FAILURE);
+					}
+					attack->a_conn.r_port = ntohs(cliaddr.sin_port);
+
+
+					/* incoming connection accepted, select port mode */
 					if (port_mode & PORTCONF_NORMAL) {
 						/* handle connection in normal mode if this port configured to be handled 'normal' */
 						logmsg(LOG_DEBUG, 1,
@@ -371,14 +385,14 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							logmsg(LOG_DEBUG, 1,
 							       "   %s  Handling connection from %s:%u in proxy mode.\n",
 							       portstr,
-							       inet_ntoa(client_addr.sin_addr),
-							       ntohs(client_addr.sin_port));
+							       inet_ntoa(cliaddr.sin_addr),
+							       ntohs(cliaddr.sin_port));
 							handle_connection_proxied(connection_fd,
 										  PORTCONF_PROXY,
 										  proxy_sock_fd, (uint16_t)
 										  ntohs(port_l),
-										  client_addr.sin_port,
-										  client_addr.sin_addr,
+										  cliaddr.sin_port,
+										  cliaddr.sin_addr,
 										  proto,
 										  m_read_timeout,
 										  read_timeout, attack);
@@ -386,14 +400,14 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							logmsg(LOG_DEBUG, 1,
 							       "   %s  Handling connection from %s:%u in mirror mode.\n",
 							       portstr,
-							       inet_ntoa(client_addr.sin_addr),
-							       ntohs(client_addr.sin_port));
+							       inet_ntoa(cliaddr.sin_addr),
+							       ntohs(cliaddr.sin_port));
 							handle_connection_proxied(connection_fd,
 										  PORTCONF_MIRROR,
 										  mirror_sock_fd, (uint16_t)
 										  ntohs(port_l),
-										  client_addr.sin_port,
-										  client_addr.sin_addr,
+										  cliaddr.sin_port,
+										  cliaddr.sin_addr,
 										  proto,
 										  m_read_timeout,
 										  read_timeout, attack);
@@ -401,8 +415,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							logmsg(LOG_DEBUG, 1,
 							       "   %s  Handling connection from %s:%u in normal mode.\n",
 							       portstr,
-							       inet_ntoa(client_addr.sin_addr),
-							       ntohs(client_addr.sin_port));
+							       inet_ntoa(cliaddr.sin_addr),
+							       ntohs(cliaddr.sin_port));
 							handle_connection_normal(connection_fd, (uint16_t)
 										 ntohs(port_l), proto,
 										 read_timeout, attack);

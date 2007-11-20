@@ -1,3 +1,5 @@
+Version 1.0.1
+- Fix: Improper logging of IP address pairs
 Version 1.0.0
 - Improved configure script
 - New plugin: Basic http download wrapper
