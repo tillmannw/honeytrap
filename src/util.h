@@ -21,6 +21,11 @@ struct strtk {
 	int offset;
 };
 
+typedef struct {
+	u_int32_t len;
+	u_char *data;
+} bstr;
+
 /* rfc1918 prefixes */
 static const uint32_t priv_prefixes[] = {
 	0x0affffff,	// 10.x.x.x

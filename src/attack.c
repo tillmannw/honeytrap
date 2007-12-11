@@ -159,6 +159,8 @@ int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, co
 	a->download[a->dl_count].dl_payload.size	= size;
 	a->download[a->dl_count].r_addr			= r_addr;
 	a->download[a->dl_count].r_port			= r_port;
+	a->download[a->dl_count].l_addr			= a->a_conn.l_addr;
+	a->download[a->dl_count].l_port			= a->a_conn.l_port;
 	a->dl_count++;
 
 	logmsg(LOG_DEBUG, 1, "%d. malware download added to attack record.\n", a->dl_count);

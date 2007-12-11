@@ -103,7 +103,7 @@ u_int32_t edit_dist(struct bstr str1, struct bstr str2) {
 		p = q;
 		q = r;
 	}
-	return(p[str2.len-1]);
+	return(p[str2.len]);
 }
 
 

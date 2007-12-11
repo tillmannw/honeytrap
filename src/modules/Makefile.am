@@ -33,7 +33,7 @@ lib_LTLIBRARIES += htm_ClamAV.la
 endif
 
 if BUILD_SUBMIT_MWSERV_PLUGIN
-lib_LTLIBRARIES += htm_submitMwserv.la
+lib_LTLIBRARIES += htm_submitMWserv.la
 endif
 
 htm_SaveFile_la_SOURCES = htm_SaveFile.c htm_SaveFile.h
@@ -75,8 +75,8 @@ htm_ClamAV_la_LDFLAGS = -module -no-undefined -avoid-version
 endif
 
 if BUILD_SUBMIT_MWSERV_PLUGIN
-htm_submitMwserv_la = htm_submitMwserv.c htm_submitMwserv.h
-htm_submitMwserv_la_LDFLAGS = -module -no-undefined -avoid-version
+htm_submitMWserv_la = htm_submitMWserv.c htm_submitMWserv.h
+htm_submitMWserv_la_LDFLAGS = -module -no-undefined -avoid-version -lcurl
 endif
 
 

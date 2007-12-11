@@ -59,7 +59,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 	server_addr->sin_family		= AF_INET;
 	server_addr->sin_addr.s_addr	= htonl(INADDR_ANY);
 	server_addr->sin_port		= port;
-	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) < 0) {
+	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) != 0) {
 	    /* we already got one server process */
 	    logmsg(LOG_DEBUG, 1, "Unable to bind to port %u/tcp: %m.\n", port);
 #ifdef USE_IPQ_MON

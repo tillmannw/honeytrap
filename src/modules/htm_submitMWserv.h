@@ -1,4 +1,4 @@
-/* htm_submitMwserv.h
+/* htm_submitMWserv.h
  * Copyright (C) 2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives

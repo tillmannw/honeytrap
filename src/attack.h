@@ -34,7 +34,9 @@ struct s_conn {
 struct s_download {
 	char			*dl_type;	/* (FTP, TFTP, VNC, ...) */
 	uint32_t		r_addr;		/* remote IP address */
+	uint32_t		l_addr;		/* local IP address */
 	uint16_t		r_port;		/* remote port */
+	uint16_t		l_port;		/* local port */
 	uint16_t		protocol;	/* protocol as in IP header */
 	char			*user;		/* username for download connection */
 	char			*pass;		/* user's password */
