@@ -239,8 +239,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 						}
 
 						/* update remote endpoint information for attack structure */
-						if (getpeername
-						    (connection_fd, (struct sockaddr *) &cliaddr,
+						if (getpeername(connection_fd, (struct sockaddr *) &cliaddr,
 						     &cliaddr_len) < 0) {
 							if (errno == EINTR)
 								break;
