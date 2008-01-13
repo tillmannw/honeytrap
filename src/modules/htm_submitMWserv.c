@@ -11,7 +11,7 @@
  *
  *
  * Description:
- *   submit sampels to a central repository
+ *   still to come...
  */
 
 #define _GNU_SOURCE 1
@@ -32,7 +32,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <curl.h>
+#include <curl/curl.h>
 
 #include <conftree.h>
 #include <honeytrap.h>
@@ -50,7 +50,6 @@
 #define TSS_UNKNOWN	1
 #define TSS_OK		2
 #define TSS_HEARTBEAT	3
-#define TSS_INCOMPLETE	4
 
 #define ST_SUBMIT	1
 #define ST_HASHTEST	2
@@ -61,13 +60,13 @@ const char module_name[]="submitMwserv";
 const char module_version[]="0.1.0";
 
 static const char *config_keywords[] = {
-	"mwserv-url",
+	"mwserv_url",
 	"guid",
 	"maintainer",
 	"secret"
 };
 
-char	*mwserv_url;
+const char	*mwserv_url;
 
 const char	*guid;
 const char	*maintainer;
@@ -113,7 +112,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 
 		node->val = node->val->next;
 
-		if OPT_IS("mwserv-url") {
+		if OPT_IS("mwserv_url") {
 			mwserv_url = value;
 		} else if OPT_IS("guid") {
 			guid = value;
@@ -139,6 +138,7 @@ int build_uri(char **uri, struct s_download download) {
 	// build a generic malware URI of format 'type://user:pass@path/to/file:port/protocol'
 
 	logmsg(LOG_DEBUG, 1, "SavePostgres - Building generic malware resource URI.\n");
+
 	return(asprintf(uri, "%s://%s:%s@%s:%d/%s:%s",
 		download.dl_type,
 		download.user,
@@ -165,16 +165,36 @@ size_t get_response(void *buffer, size_t s, size_t n, void *response) {
 
 
 int response_code(const bstr *response) {
-	if (response->len >= 9 && memcmp(response->data, "UNKNOWN", 7) == 0) return(TSS_UNKNOWN);
-	if (response->len >= 4 && memcmp(response->data, "OK", 2) == 0) return(TSS_OK);
-//	if (response->len >= 7 && memcmp(response->data, "ERROR: ", 7) == 0) return(TSS_ERROR);
-//	if (response->len >= 11 && memcmp(response->data, "HEARTBEAT: ", 4) == 0) return(TSS_HEARTBEAT);
-	return(TSS_ERROR);
+	if (response->len >= 7 && memcmp(response->data, "ERROR: ", 7) == 0) return(TSS_ERROR);
+	if (response->len >= 9 && memcmp(response->data, "UNKNOWN: ", 9) == 0) return(TSS_UNKNOWN);
+	if (response->len >= 4 && memcmp(response->data, "OK: ", 4) == 0) return(TSS_OK);
+	if (response->len >= 11 && memcmp(response->data, "HEARTBEAT: ", 4) == 0) return(TSS_HEARTBEAT);
+	return(-1);
 }
 
 
+int check_response(const bstr *response) {
+	switch(response_code(response)) {
+	case TSS_OK:
+		logmsg(LOG_NOISY, 1, "SubmitMWServ - Server returned transfer status OK.\n");
+		return(TSS_OK);
+	case TSS_HEARTBEAT:
+		logmsg(LOG_NOISY, 1, "SubmitMWServ - Server returned transfer status HEARTBEAT.\n");
+		return(TSS_HEARTBEAT);
+	case TSS_ERROR:
+		logmsg(LOG_ERR, 1, "SubmitMWServ - Server returned transfer status ERROR.\n");
+		return(TSS_ERROR);
+	case TSS_UNKNOWN:
+		logmsg(LOG_ERR, 1, "SubmitMWServ - Server returned status UNKNOWN.\n");
+		return(TSS_UNKNOWN);
+	default:
+		return(0);
+	}
+
+}
+
 int transfer_data(CURLM *mhandle, const bstr *response) {
-	int		max_fd, rv, handles;
+	int		max_fd, rv, handles, resp;
 	fd_set		rfds, wfds, efds;
 	struct timeval	select_timeout;
 	CURLMcode	error;
@@ -207,19 +227,8 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 			break;
 		case 0:
 			logmsg(LOG_WARN, 1, "SubmitMWServ Warning - Select timed out.\n");
-
-			switch(response_code(response)) {
-			case TSS_ERROR:
-				return(TSS_ERROR);
-			case TSS_UNKNOWN:
-				return(TSS_UNKNOWN);
-			case TSS_OK:
-				return(TSS_OK);
-			case TSS_INCOMPLETE:
-			default:
-				return(TSS_ERROR);
-			}
-
+			if ((resp = check_response(response)) == -1) return(-1);
+			else if (resp == 1) return(1);
 			break;
 		default:
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
@@ -228,39 +237,23 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 			logmsg(LOG_DEBUG, 1, "SubmitMWServ - Data to process.\n");
 			while(curl_multi_perform(mhandle, &handles) == CURLM_CALL_MULTI_PERFORM && handles);
 
-			switch(response_code(response)) {
-			case TSS_ERROR:
-				return(TSS_ERROR);
-			case TSS_UNKNOWN:
-				return(TSS_UNKNOWN);
-			case TSS_OK:
-				return(TSS_OK);
-			case TSS_INCOMPLETE:
-			default:
-				continue;
-			}
-			break;
+			if ((resp = check_response(response)) == -1) return(-1);
+			else if (resp == 1) return(1);
 		}
 	}
 	return(0);
 }
 
 
-struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle, const Attack *a, const int dlnum,
+struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
+		const u_char *data, const u_int32_t len,
 		const char* uri, const bstr *response, const u_char type) {
 
 	int			handles;
 	struct curl_httppost	*pinfo;
 	struct curl_httppost	*pinfo_last;
-	char 			*saddr_str, *daddr_str;
 
-	pinfo = pinfo_last	= NULL;
-
-	if (((daddr_str = strdup(inet_ntoa(*(struct in_addr *)&(a->download[dlnum].l_addr)))) == NULL) || 
-	    ((saddr_str = strdup(inet_ntoa(*(struct in_addr *)&(a->download[dlnum].r_addr)))) == NULL)) {
-		logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to allocate memory: %m.\n");
-		return(NULL);
-	}
+	pinfo = pinfo_last = NULL;
 
 	logmsg(LOG_DEBUG, 1, "SubmitMWServ - Creating easy handle.\n");
 	if (!(*curlhandle = curl_easy_init()) || !(*multihandle = curl_multi_init())) {
@@ -277,33 +270,13 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle, const 
 
 	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "uri",
 		CURLFORM_PTRCONTENTS, uri, CURLFORM_CONTENTSLENGTH, strlen(uri), CURLFORM_END);
-	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "sha512",
-		CURLFORM_PTRCONTENTS, a->download[dlnum].dl_payload.sha512sum, CURLFORM_END);
-	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "saddr",
-		CURLFORM_COPYCONTENTS, saddr_str, CURLFORM_END);
-	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "daddr",
-		CURLFORM_COPYCONTENTS, daddr_str, CURLFORM_END);
-
-	free(saddr_str);
-	free(daddr_str);
-
-	switch(type) {
-	case ST_HASHTEST:
-		break;
-
-	case ST_SUBMIT:
-		
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "data",
-			CURLFORM_PTRCONTENTS, a->download[dlnum].dl_payload.data,
-			CURLFORM_CONTENTSLENGTH, a->download[dlnum].dl_payload.size, CURLFORM_END);
-
-		// attack: cli:port->srv:port, mode
-		break;
 	
-	default:
-		logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unknown message tyoe: %d.\n", type);
-		return(NULL);
-	}
+	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "data",
+		CURLFORM_PTRCONTENTS, data,
+		CURLFORM_CONTENTSLENGTH, len,
+		CURLFORM_END);
+
+	// attack: cli:port->srv:port, mode
 
 	curl_easy_setopt(*curlhandle, CURLOPT_HTTPPOST, pinfo);
 	curl_easy_setopt(*curlhandle, CURLOPT_FORBID_REUSE, 1);
@@ -337,6 +310,7 @@ int submit_mwserv(Attack *attack) {
 	char			*uri;
 	bstr			response;
 
+
 	/* no data - nothing todo */
 	if (!attack->download) {
 		logmsg(LOG_DEBUG, 1, "SubmitMWserv - No samples attached to attack record, nothing to submit.\n");
@@ -347,56 +321,39 @@ int submit_mwserv(Attack *attack) {
 
 	/* save malware */
 	for (i=0; i<attack->dl_count; i++) {
-		if (build_uri(&uri, attack->download[i]) == -1) {
-			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to create URI: %m.\n");
-			return(0);
-		}
-		logmsg(LOG_DEBUG, 1, "SubmitMWServ - Sampel URI is '%s'\n", uri);
-
-
 		// test hash
 		logmsg(LOG_INFO, 1, "SubmitMWServ - Checking SHA512 hash at %s.\n", mwserv_url);
 		memset(&response, 0, sizeof(bstr));
 		
-		if ((pinfo = init_handle(&multihandle, &curlhandle, attack, i, uri, &response, ST_HASHTEST)) == NULL) {
+		if ((pinfo = init_handle(&multihandle, &curlhandle,
+				attack->download[i].dl_payload.data, attack->download[i].dl_payload.size,
+				uri, &response, ST_HASHTEST)) == NULL) {
 			free(response.data);
 			return(0);
 		}
 
-
-		// check transfer status
-		switch(transfer_data(multihandle, &response)) {
-		case TSS_OK:
-			logmsg(LOG_NOTICE, 1, "SubmitMWServ - Sample is already present, skipping submission.\n");
-			return(1);
-		case TSS_UNKNOWN:
-			logmsg(LOG_NOTICE, 1, "SubmitMWServ - Sample is unknown, preparing submission.\n");
-			break;
-		case TSS_ERROR:
+		if (transfer_data(multihandle, &response) == TSS_OK)
+			logmsg(LOG_NOTICE, 1, "SubmitMWServ - Sample is already present at %s, skipping submission.\n", mwserv_url);
+		elseif (
+		else
 			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Hash test failed.\n");
-			return(0);
-		default:
-			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unknown server response.\n");
-			return(0);
-		}
 
-
-		// prepare sample submission form
 		free(response.data);
-		if (multihandle) {
-			curl_multi_remove_handle(multihandle, curlhandle);
-			curl_multi_cleanup(multihandle);
-			multihandle = NULL;
-		}
-		if (pinfo) curl_formfree(pinfo);
-		if (curlhandle) curl_easy_cleanup(curlhandle);
 
 
 		// submit sample
 		logmsg(LOG_INFO, 1, "SubmitMWServ - Submitting sample to %s.\n", mwserv_url);
-		memset(&response, 0, sizeof(bstr));
 
-		if ((pinfo = init_handle(&multihandle, &curlhandle, attack, i, uri, &response, ST_SUBMIT)) == NULL) {
+		if (build_uri(&uri, attack->download[i]) == -1) {
+			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to create URI: %m.\n");
+			return(0);
+		}
+
+		memset(&response, 0, sizeof(bstr));
+		
+		if ((pinfo = init_handle(&multihandle, &curlhandle,
+				attack->download[i].dl_payload.data, attack->download[i].dl_payload.size,
+				uri, &response, ST_SUBMIT)) == NULL) {
 			free(uri);
 			free(response.data);
 			return(0);

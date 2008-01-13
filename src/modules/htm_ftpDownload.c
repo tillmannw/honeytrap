@@ -15,6 +15,8 @@
  *   It performs the downloads with an own ftp implementation.
  */
 
+#define _GNU_SOURCE 1
+
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
@@ -392,13 +394,11 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		if (read_ftp_line(control_sock_fd, rline, MAX_LINE, timeout) <= 0) return(0);
 
 	logmsg(LOG_NOISY, 1, "FTP download - Sending 'USER %s'.\n", user);
-	if ((ftp_command = (char *) realloc(ftp_command, 5 + strlen(user) + 3)) == NULL) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s.\n", strerror(errno));
-		shutdown(control_sock_fd, 1);
+	if (asprintf(&ftp_command, "USER %s\r\n", user) == -1) {
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to create USER command: %m.\n");
 		return(-1);
 	}
 
-	snprintf(ftp_command, 5 + strlen(user) + 3, "USER %s\r\n", user);
 	if (write(control_sock_fd, ftp_command, strlen(ftp_command))) {
 		logmsg(LOG_DEBUG, 1, "FTP download - USER sent.\n");
 	} else {
@@ -413,13 +413,11 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	
 	/* send PASS */
 	while ((strstr(rline, "331") == rline) && (strstr(rline, "230") != rline)) {
-		logmsg(LOG_NOISY, 1, "FTP download - Sending 'PASS %s'.\n", pass);
-		if ((ftp_command = (char *) realloc(ftp_command, 5 + strlen(pass) + 3)) == NULL) {
-			logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s.\n", strerror(errno));
-			shutdown(control_sock_fd, 1);
+		free(ftp_command);
+		if (asprintf(&ftp_command, "PASS %s\r\n", pass) == -1) {
+			logmsg(LOG_ERR, 1, "FTP download error - Unable to create PASS command: %m.\n");
 			return(-1);
 		}
-		snprintf(ftp_command, 5 + strlen(pass) + 3, "PASS %s\r\n", pass);
 		if (write(control_sock_fd, ftp_command, strlen(ftp_command))) {
 			logmsg(LOG_DEBUG, 1, "FTP download - PASS sent.\n");
 		} else {
@@ -555,14 +553,12 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	logmsg(LOG_NOISY, 1, "FTP download - Sending 'PORT %u,%u,%u,%u,%u,%u.\n",
 		ip_octet[0], ip_octet[1], ip_octet[2], ip_octet[3],
 		ftp_port.first_half, ftp_port.second_half);
-	if ((ftp_command = (char *) realloc(ftp_command, 30)) == NULL) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s\n.", strerror(errno));
-		close(data_sock_listen_fd);
-		shutdown(control_sock_fd, 1);
+	free(ftp_command);
+	if (asprintf(&ftp_command, "PORT %u,%u,%u,%u,%u,%u\r\n", ip_octet[0], ip_octet[1],
+		ip_octet[2], ip_octet[3], ftp_port.first_half, ftp_port.second_half) == -1) {
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to create PORT command: %m.\n");
 		return(-1);
 	}
-	snprintf(ftp_command, 30, "PORT %u,%u,%u,%u,%u,%u\r\n", ip_octet[0], ip_octet[1],
-		ip_octet[2], ip_octet[3], ftp_port.first_half, ftp_port.second_half);
 	if (write(control_sock_fd, ftp_command, strlen(ftp_command)) == strlen(ftp_command)) {
 		logmsg(LOG_DEBUG, 1, "FTP download - PORT sent.\n");
 	} else {
@@ -579,17 +575,17 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 
 	/* send RETR to retrieve file */
 	logmsg(LOG_NOISY, 1, "FTP download - Sending 'RETR %s'.\n", save_file);
-	if ((ftp_command = (char *) realloc(ftp_command, 5 + strlen(save_file) + 3)) == NULL) {
-		logmsg(LOG_ERR, 1, "FTP download error - Unable to allocate memory: %s.\n", strerror(errno));
-		close(data_sock_listen_fd);
-		shutdown(control_sock_fd, 1);
+	free(ftp_command);
+	if (asprintf(&ftp_command, "RETR %s\r\n", save_file) == -1) {
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to create RETR command: %m.\n");
 		return(-1);
 	}
-	snprintf(ftp_command, 5 + strlen(save_file) + 3, "RETR %s\r\n", save_file);
 	if (write(control_sock_fd, ftp_command, strlen(ftp_command))) {
 		logmsg(LOG_DEBUG, 1, "FTP download - RETR sent.\n");
+		free(ftp_command);
 	} else {
 		logmsg(LOG_ERR, 1, "FTP download error - Unable to write to control socket: %s.\n", strerror(errno));
+		free(ftp_command);
 		close(data_sock_fd);
 		shutdown(control_sock_fd, 1);
 		return(-1);

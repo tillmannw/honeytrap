@@ -17,6 +17,8 @@
  *   are dumped into a download directory.
  */
 
+#define _GNU_SOURCE 1
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,20 +127,20 @@ int save_to_file(Attack *attack) {
 		return(-1);
 	}
 
-	if ((filename = (char *) malloc(strlen(attacks_dir) + strlen(proto_str) + 34)) == NULL) {
-		logmsg(LOG_ERR, 1, "SaveFile error - Unable to allocate memory: %s\n", strerror(errno));
-		return(-1);
-	}
-	bzero(filename, strlen(attacks_dir)+34);
-
 	/* assemble filename */
 	loc_time = time(NULL);
 	if((file_time = localtime(&loc_time)) == NULL) {
 		logmsg(LOG_WARN, 1, "SaveFile warning - Unable to get local time for filename.\n");
-		sprintf(filename, "%s/from_port_%u-%s_%u", attacks_dir, attack->a_conn.l_port, proto_str, getpid());
+		if (asprintf(&filename, "%s/from_port_%u-%s_%u", attacks_dir, attack->a_conn.l_port, proto_str, getpid()) == -1) {
+			logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %m.\n");
+			return(-1);
+		}
 	} else {
-		sprintf(filename, "%s/from_port_%u-%s_%u_%04d-%02d-%02d", attacks_dir, attack->a_conn.l_port, proto_str,
-			getpid(), file_time->tm_year+1900, file_time->tm_mon+1, file_time->tm_mday);
+		if (asprintf(&filename, "%s/from_port_%u-%s_%u_%04d-%02d-%02d", attacks_dir, attack->a_conn.l_port, proto_str,
+			getpid(), file_time->tm_year+1900, file_time->tm_mon+1, file_time->tm_mday) == -1) {
+			logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %m.\n");
+			return(-1);
+		}
 	}
 
 	/* open file and set access rights */
@@ -163,11 +165,11 @@ int save_to_file(Attack *attack) {
 	for (i=0; i<attack->dl_count; i++) {
 		/* save file */
 		/* we need the length of directory + "/" + filename plus md5 checksum */
-		mwfilename = (char *) malloc(strlen(downloads_dir)+strlen(attack->download[i].filename)+35);
-		snprintf(mwfilename, strlen(downloads_dir)+strlen(attack->download[i].filename)+35, "%s/%s-%s",
-			downloads_dir,
-			mem_md5sum(attack->download[i].dl_payload.data, attack->download[i].dl_payload.size),
-			attack->download[i].filename);
+		if (asprintf(&mwfilename, "%s/%s-%s", downloads_dir, mem_md5sum(attack->download[i].dl_payload.data,
+			attack->download[i].dl_payload.size), attack->download[i].filename) == -1) {
+			logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %m.\n");
+			return(-1);
+		}
 		logmsg(LOG_DEBUG, 1, "SaveFile - Malware sample dumpfile name is %s\n", mwfilename);
 		if (((dumpfile_fd = open(mwfilename, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
 		    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {

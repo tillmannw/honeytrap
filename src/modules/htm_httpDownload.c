@@ -15,6 +15,8 @@
  *   Matches are passed to an external program, i.e. wget.
  */
 
+#define _GNU_SOURCE 1
+
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
@@ -186,13 +188,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 			}
 
 			/* assemble wget download command and execute it */
-			if ((cmd = malloc(strlen(http_program)+strlen(http_options)+strlen(start)+3)) == NULL) {
-				logmsg(LOG_ERR, 1, "HTTP download error - Unable to allocate memory: %m.\n");
-				return(0);
-			}
-			snprintf(cmd,
-				strlen(http_program)+strlen(http_options)+strlen(start)+3,
-				"%s %s %s", http_program, http_options, start);
+			asprintf(&cmd, "%s %s %s", http_program, http_options, start);
 			logmsg(LOG_DEBUG, 1, "HTTP download - Calling '%s'.\n", cmd);
 			if ((f = popen(cmd, "r")) == NULL) {
 				logmsg(LOG_ERR, 1, "HTTP download error - Cannot call download command: %m.\n");

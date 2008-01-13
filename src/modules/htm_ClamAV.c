@@ -141,7 +141,7 @@ int clamscan(Attack *attack) {
 	int			num_scanned, ret, tmpfd;
 	unsigned long int	size;
 	struct s_download	*sample;
-	char			tmpfile[256];
+	char			*tmpfile;
 	const char		*virusname;
 
 	num_scanned	= 0;
@@ -164,13 +164,8 @@ int clamscan(Attack *attack) {
 		logmsg(LOG_NOISY, 1, "ClamAV - Scanning sample %u.\n", num_scanned+1);
 
 		/* libclamav can only scan files, so dump data to a secure temp file */
-		memset(tmpfile, 0, 256);
-		if ((size = snprintf(tmpfile, 256, "%s/honeytrap-clamav-XXXXXX", temp_dir)) > 255) {
-			logmsg(LOG_ERR, 1, "ClamAV error - Unable to create temporary file: filename too long.\n");
-			return(-1);
-		}
-		if (!size) {
-			logmsg(LOG_ERR, 1, "ClamAV error - Unable to create temporary file: %s.\n", strerror(errno));
+		if (asprintf(&tmpfile, "%s/honeytrap-clamav-XXXXXX", temp_dir) == -1) {
+			logmsg(LOG_ERR, 1, "ClamAV error - Unable to create temporary file: %m.\n");
 			return(-1);
 		}
 		if ((tmpfd = mkstemp(tmpfile)) < 0) {
@@ -191,7 +186,6 @@ int clamscan(Attack *attack) {
 			logmsg(LOG_NOISY, 1, "ClamAV - Sample %u considered to be clean.\n", num_scanned+1);
 			break;
 		case CL_VIRUS:
-//			snprintf(outstring, sizeof(outstring), "%s %s", CLAMAV_VIRUSFOUND_STR, virusname);
 			logmsg(LOG_INFO, 1, "ClamAV - Sample %u is infected with '%s'.\n", num_scanned+1, virusname);
 			break;
 		default:

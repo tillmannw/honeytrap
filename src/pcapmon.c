@@ -1,4 +1,4 @@
-/* pcapmon.c
+* pcapmon.c
  * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
@@ -318,8 +318,10 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 
 	/* determine ip address of device */
 	if (dev == NULL) {
-		dev = (char *) malloc(4);
-		dev = "any";
+		if ((dev = strdup("any")) == NULL) {
+			fprintf(stderr, "Error - Unable to allocate memory: %m.\n");
+			exit(EXIT_FAILURE);
+		}
 	} else if ((strcmp(dev, "any") != 0)) {
 		/* lookup net address and netmask for interface */
 		pcap_lookupnet((char *) dev, &net, &mask, errbuf);
@@ -350,12 +352,18 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 				newstrsize = strlen(inet_ntoa(*(struct in_addr*)
 					&(((struct sockaddr_in *)curaddr->addr)->sin_addr)));
 				if (!bpf_ip_filter) {
-					bpf_ip_filter = (char *) malloc(newstrsize+1);
-					snprintf(bpf_ip_filter, newstrsize+1, "%s%c",
+					if ((bpf_ip_filter = (char *) malloc(newstrsize+1)) == NULL) {
+						fprintf(stderr, "Error - Unable to allocate memory: %m.\n");
+						exit(EXIT_FAILURE);
+					}
+					snprintf(bpf_ip_filter, "%s%c",
 						inet_ntoa(*(struct in_addr*)
 						&(((struct sockaddr_in *)curaddr->addr)->sin_addr)), 0);
 				} else {
-					bpf_ip_filter = (char *) realloc(bpf_ip_filter, oldstrsize+21);
+					if ((bpf_ip_filter = (char *) realloc(bpf_ip_filter, oldstrsize+21)) == NULL) {
+						fprintf(stderr, "Error - Unable to allocate memory: %m.\n");
+						exit(EXIT_FAILURE);
+					}
 					snprintf(bpf_ip_filter+oldstrsize, 21, " or %s%c",
 						inet_ntoa(*(struct in_addr*)
 						&(((struct sockaddr_in *)curaddr->addr)->sin_addr)), 0);
@@ -376,21 +384,27 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 	
 	if (ip_cmd_opt) {
 		/* add ip address from -a command line option to filter string */
-		bpf_filter_string = (char *) realloc(bpf_filter_string, strlen(bpf_filter_string)+37);
+		if ((bpf_filter_string = (char *) realloc(bpf_filter_string, strlen(bpf_filter_string)+37)) == NULL) {
+			fprintf(stderr, "Error - Unable to allocate memory: %m.\n");
+			exit(EXIT_FAILURE);
+		}
 		snprintf(bpf_filter_string+strlen(bpf_filter_string), 
 			strlen((char *) inet_ntoa(*(struct in_addr*)ip_cmd_opt->h_addr_list[0]))+17,
 			" and (src host %s)%c", (char*) inet_ntoa(*(struct in_addr*)ip_cmd_opt->h_addr_list[0]), 0);
 	} else if (bpf_ip_filter) {
 		/* add addresses guessed from interfaces to bpf string */
-		bpf_filter_string = (char *) realloc(bpf_filter_string, strlen(bpf_filter_string)+strlen(bpf_ip_filter)+19);
+		if ((bpf_filter_string = (char *) realloc(bpf_filter_string, strlen(bpf_filter_string)+strlen(bpf_ip_filter)+19)) == NULL) {
+			fprintf(stderr, "Error - Unable to allocate memory: %m.\n");
+			exit(EXIT_FAILURE);
+		}
 		snprintf(bpf_filter_string + strlen(bpf_filter_string), strlen(bpf_ip_filter)+19, 
 			" and (src host (%s))%c", bpf_ip_filter, 0);
 	}
 
 	/* add bpf expression from command line */
 	if (bpf_cmd_ext) {
-		if (!(bpf_filter_string = (char *)realloc(bpf_filter_string,
-			strlen(bpf_filter_string)+strlen(bpf_cmd_ext)+8))) {
+		if ((bpf_filter_string = (char *)realloc(bpf_filter_string,
+			strlen(bpf_filter_string)+strlen(bpf_cmd_ext)+8)) == NULL) {
 			fprintf(stderr, "  Error - Unable to allocate memory: %m.\n");
 			exit(EXIT_FAILURE);
 		}	
