@@ -35,10 +35,10 @@
 #include "ipqmon.h"
 
 
-Attack *new_virtattack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto) {
+Attack *new_virtattack(struct in_addr r_addr, struct in_addr l_addr, uint16_t r_port, uint16_t l_port, uint16_t proto) {
 	Attack *a;
 
-	if ((a = new_attack(l_addr, r_addr, l_port, r_port, proto)) == NULL) return(NULL);
+	if ((a = new_attack(r_addr, l_addr, r_port, l_port, proto)) == NULL) return(NULL);
 
 	a->virtual = 1;
 
@@ -46,7 +46,7 @@ Attack *new_virtattack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_
 }
 
 
-Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto) {
+Attack *new_attack(struct in_addr r_addr, struct in_addr l_addr, uint16_t r_port, uint16_t l_port, uint16_t proto) {
 	Attack *a;
 
 	/* mem for attack record */
@@ -101,12 +101,12 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 
 
 	if (!a_size) {
-		addr = (struct in_addr *) &(a->a_conn.l_addr);
+		addr = (struct in_addr *) &(a->a_conn.r_addr);
 		logmsg(LOG_NOTICE, 1, " * %u/%s\t  No bytes received from %s:%u.\n",
 			(uint16_t) a->a_conn.l_port, PROTO(a->a_conn.protocol),
 			inet_ntoa(*addr), a->a_conn.r_port);
 	} else {
-		addr = (struct in_addr *) &(a->a_conn.l_addr);
+		addr = (struct in_addr *) &(a->a_conn.r_addr);
 		logmsg(LOG_NOTICE, 1, " * %u/%s\t  %d bytes attack string from %s:%u.\n",
 			(uint16_t) a->a_conn.l_port, PROTO(a->a_conn.protocol), a_size,
 			inet_ntoa(*addr), a->a_conn.r_port);

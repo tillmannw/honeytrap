@@ -290,7 +290,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					free(ip_l_str);
 
 					/* initialize attack record */
-					if ((attack = new_attack(cliaddr.sin_addr, srvaddr.sin_addr, ntohs(srvaddr.sin_port), 0, proto)) == NULL) {
+					if ((attack = new_attack(cliaddr.sin_addr, srvaddr.sin_addr, 0, ntohs(srvaddr.sin_port), proto)) == NULL) {
 						logmsg(LOG_ERR, 1, "Error - Could not initialize attack record.\n");
 						free(attack);
 						exit(EXIT_FAILURE);
