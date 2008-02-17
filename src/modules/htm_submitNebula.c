@@ -37,6 +37,7 @@
 #include <readconf.h>
 #include <sock.h>
 #include <tcpip.h>
+#include <util.h>
 
 #include "htm_submitNebula.h"
 
@@ -112,7 +113,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 
 int submit_nebula(Attack *attack) {
 	struct hostent		*host;
-	u_char			*cbuf;
+	u_char			*cbuf, response[8];
 	u_int32_t		cbuf_len;
 	struct sockaddr_in	sock;
 	int			sock_fd;
@@ -194,6 +195,32 @@ int submit_nebula(Attack *attack) {
 		return(-1);
 	}
 
+	// send md5 hash
+	if (write(sock_fd, attack->a_conn.payload.md5sum, 32) == -1) {
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
+		close(sock_fd);
+		return(-1);
+	}
+
+
+	if (!read_line(sock_fd, (char *) response, 8, 10)) {
+		logmsg(LOG_WARN, 1, "SubmitNebula Warning - Nebula server did not respond within 10 seconds, skipping submission.\n");
+		close(sock_fd);
+		return(0);
+	}
+	if (strncmp((char *) response, "KNOWN", 5) == 0) {
+		logmsg(LOG_WARN, 1, "SubmitNebula - Attack hash is already known, skipping submission.\n");
+		close(sock_fd);
+		return(0);
+	}
+	else if (strncmp((char *) response, "UNKNOWN", 5) != 0) {
+		logmsg(LOG_WARN, 1, "SubmitNebula - Nebula server returned an invalid response, skipping submission.\n");
+		close(sock_fd);
+		return(0);
+	}
+	logmsg(LOG_NOISY, 1, "SubmitNebula - Nebula server requested unknown attack, starting submission.\n");
+
+
 	// send protocol 
 	if (write(sock_fd, &(attack->a_conn.protocol), 1) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
@@ -208,13 +235,6 @@ int submit_nebula(Attack *attack) {
 		return(-1);
 	}
 
-	// send md5 hash
-	if (write(sock_fd, attack->a_conn.payload.md5sum, 32) == -1) {
-		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
-		close(sock_fd);
-		return(-1);
-	}
-
 	// send length of uncompressed attack
 	if (write(sock_fd, &(attack->a_conn.payload.size), 4) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
@@ -223,7 +243,6 @@ int submit_nebula(Attack *attack) {
 	}
 
 	// send length of compressed attack
-printf("--> compressed length: %u\n", cbuf_len);
 	if (write(sock_fd, &cbuf_len, 4) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
