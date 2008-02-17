@@ -103,6 +103,10 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 			nebula_port = strtoull(value, NULL, 10);
 		} else if OPT_IS("secret") {
 			nebula_secret = value;
+			if (strlen(nebula_secret) > 255) {
+				logmsg(LOG_ERR, 1, "SubmitNebula Error - Secret must not be longer than 255 characters.\n");
+				exit(EXIT_FAILURE);
+			}
 		} else {
 			fprintf(stderr, "  Error - Invalid configuration option for plugin %s: %s\n", module_name, node->keyword);
 			exit(EXIT_FAILURE);
@@ -113,11 +117,11 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 
 int submit_nebula(Attack *attack) {
 	struct hostent		*host;
-	u_char			*cbuf, response[8];
+	u_char			*cbuf, response[9];
 	u_int32_t		cbuf_len;
 	struct sockaddr_in	sock;
 	int			sock_fd;
-	u_int16_t		secret_len;
+	u_char			secret_len;
 
 	cbuf_len	= 0;
 	cbuf		= NULL;
@@ -136,29 +140,6 @@ int submit_nebula(Attack *attack) {
 	}
 	logmsg(LOG_NOISY, 1, "SubmitNebula - Submitting attack data to %s:%u.\n",
 		inet_ntoa(*(struct in_addr*)host->h_addr), nebula_port);
-
-
-
-	logmsg(LOG_DEBUG, 1, "SubmitNebula - Compressing attack data.\n");
-	cbuf_len = attack->a_conn.payload.size + (attack->a_conn.payload.size * 0.0001) + 12;
-	if ((cbuf = calloc(1, cbuf_len)) == NULL) {
-		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
-		return(-1);
-	}
-	switch (compress(cbuf, (unsigned long *)&cbuf_len, attack->a_conn.payload.data, attack->a_conn.payload.size)) {
-	case Z_OK:
-		break;
-	case Z_MEM_ERROR:
-		logmsg(LOG_ERR, 1, "SubmitNebula Error - Cannot compress attack data: Out of memory.\n");
-		return(-1);
-	case Z_BUF_ERROR:
-		logmsg(LOG_ERR, 1, "SubmitNebula Error - Cannot compress attack data: Output buffer too small.\n");
-		return(-1);
-	default:
-		logmsg(LOG_ERR, 1, "SubmitNebula Error - Cannot compress attack data: Unknown error.\n");
-		return(-1);
-	}
-	logmsg(LOG_DEBUG, 1, "SubmitNebula - Compressed data has %u bytes.\n", cbuf_len);
 
 
 	/* create socket and connect to nebula server */
@@ -182,7 +163,7 @@ int submit_nebula(Attack *attack) {
 
 	// send secret length
 	secret_len = strlen(nebula_secret);
-	if (write(sock_fd, &secret_len, 2) == -1) {
+	if (write(sock_fd, &secret_len, 1) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
 		return(-1);
@@ -203,7 +184,7 @@ int submit_nebula(Attack *attack) {
 	}
 
 
-	if (!read_line(sock_fd, (char *) response, 8, 10)) {
+	if (!read_line(sock_fd, (char *) response, 9, 10)) {
 		logmsg(LOG_WARN, 1, "SubmitNebula Warning - Nebula server did not respond within 10 seconds, skipping submission.\n");
 		close(sock_fd);
 		return(0);
@@ -242,6 +223,28 @@ int submit_nebula(Attack *attack) {
 		return(-1);
 	}
 
+	// compress attack
+	logmsg(LOG_DEBUG, 1, "SubmitNebula - Compressing attack data.\n");
+	cbuf_len = attack->a_conn.payload.size + (attack->a_conn.payload.size * 0.002) + 12;
+	if ((cbuf = calloc(1, cbuf_len)) == NULL) {
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
+		return(-1);
+	}
+	switch (compress(cbuf, (unsigned long *)&cbuf_len, attack->a_conn.payload.data, attack->a_conn.payload.size)) {
+	case Z_OK:
+		break;
+	case Z_MEM_ERROR:
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Cannot compress attack data: Out of memory.\n");
+		return(-1);
+	case Z_BUF_ERROR:
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Cannot compress attack data: Output buffer too small.\n");
+		return(-1);
+	default:
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Cannot compress attack data: Unknown error.\n");
+		return(-1);
+	}
+	logmsg(LOG_DEBUG, 1, "SubmitNebula - Compressed data has %u bytes.\n", cbuf_len);
+
 	// send length of compressed attack
 	if (write(sock_fd, &cbuf_len, 4) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
@@ -256,10 +259,17 @@ int submit_nebula(Attack *attack) {
 		return(-1);
 	}
 
+	// wait for OK
+	logmsg(LOG_DEBUG, 1, "SubmitNebula - Attack sent, waiting for OK.\n");
+	if (!read_line(sock_fd, (char *) response, 8, 10)) {
+		logmsg(LOG_WARN, 1, "SubmitNebula Warning - Nebula server did not respond within 10 seconds.\n");
+	} else if (strlen((char *) response) != 2 || strncmp((char *) response, "OK", 2) != 0)
+		logmsg(LOG_WARN, 1, "SubmitNebula - Invalid response from Nebula server.\n");
+
 	close(sock_fd);
 	free(cbuf);
 
-	logmsg(LOG_DEBUG, 1, "SubmitNebula - Done.\n");
+	logmsg(LOG_NOISY, 1, "SubmitNebula - Submission complete.\n");
 
 	return(0);
 }
