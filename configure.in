@@ -67,8 +67,8 @@ vt100|vt100*|cygwin)
 esac
 
 bold () {
-	text=`echo -e "$1" | sed -e "s/%B/${term_bold}/g" -e "s/%b/${term_norm}/g" 2>/dev/null`
-	echo "$text"
+	text=`echo -ne "$1" | sed -e "s/%B/${term_bold}/g" -e "s/%b/${term_norm}/g" 2>/dev/null`
+	echo -n "$text"
 }
 
 
@@ -302,7 +302,9 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libpcap headers not found. Install them or use the following options:"
 			echo
-			bold "   %B--with-libpcap-includes=%b\133location of libpcap header files\135"
+			echo
+			bold "   %B--with-libpcap-includes=%b"
+			echo -e "\x5blocation of libpcap header files\x5d"
 			echo
 			exit 1
 		fi
@@ -316,7 +318,9 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libpcap library not found. Install it or use the following options:"
 			echo
-			bold "   %B--with-libpcap-libraries=%b\133location of libpcap shared library files\135"
+			echo
+			bold "   %B--with-libpcap-libraries=%b"
+			echo -e "\5blocation of libpcap shared library files\x5d"
 			echo
 			exit 1
 		fi
@@ -342,7 +346,9 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libnetfilter_queue headers not found. Install them or use the following options:"
 			echo
-			bold "   %B--with-libnfq-includes=%b\133location of libnetfilter_queue header files\135"
+			echo
+			bold "   %B--with-libnfq-includes=%b"
+			echo -e "\x5blocation of libnetfilter_queue header files\x5d"
 			echo
 			exit
 		fi
@@ -356,7 +362,9 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libnetfilter_queue library not found. Install it or use the following options:"
 			echo
-			bold "   %B--with-libnfq-libraries=%b\133location of libnetfilter_queue shared library files\135"
+			echo
+			bold "   %B--with-libnfq-libraries=%b"
+			echo -e "\x5blocation of libnetfilter_queue shared library files\x5d"
 			echo
 			exit
 		fi
@@ -381,7 +389,9 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libipq headers not found. Install them or use the following options:"
 			echo
-			bold "   %B--with-libipq-includes=%b\133location of libipq header files\135"
+			echo
+			bold "   %B--with-libipq-includes=%b"
+			echo -e "\x5blocation of libipq header files\x5d"
 			echo
 			exit
 		fi
@@ -395,7 +405,9 @@ case "x$with_stream_mon" in
 			echo
 			bold "   %BError%b - libipq library not found. Install it or use the following options:"
 			echo
-			bold "   %B--with-libipq-libraries=%b\133location of libipq shared library files\135"
+			echo
+			bold "   %B--with-libipq-libraries=%b"
+			echo -e "\x5blocation of libipq shared library files\x5d"
 			echo
 			exit
 		fi
@@ -412,9 +424,13 @@ case "x$with_stream_mon" in
 		echo
 		bold "   %BError%b - No connection monitor selected. Please reconfigure with one of the following:"
 		echo
+		echo
 		bold "   %B--with-stream-mon=%bnfq    receive packets via netfilter's NFQUEUE target (Linux only, recommended)"
+		echo
 		bold "   %B--with-stream-mon=%bipq    receive packets via netfilter's QUEUE target (Linux only)"
+		echo
 		bold "   %B--with-stream-mon=%bpcap   receive packets using a built-in pcap sniffer"
+		echo
 		echo
 		exit 1
 esac
@@ -457,7 +473,9 @@ if test "$with_clamav" = "yes"; then
     echo
     bold "   %BError%b - libclamav headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libclamav-includes=%b\133location of libclamav header filesi\135"
+    echo
+    bold "   %B--with-libclamav-includes=%b"
+    echo -e "\x5blocation of libclamav header files\x5d"
     echo
     exit
   fi
@@ -471,7 +489,9 @@ if test "$with_clamav" = "yes"; then
     echo
     bold "   %BError%b - libclamav library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libclamav-libraries=%b\133location of libclamav shared library files\135"
+    echo
+    bold "   %B--with-libclamav-libraries=%b"
+    echo -e "\x5blocation of libclamav shared library files\x5d"
     echo
     exit
   fi
@@ -488,6 +508,7 @@ if test "$with_cpuemu" = "yes"; then
     echo
     echo "   The cpuEmu plugin is still unstable and should not be used in production setups."
     bold "   Use %B--enable-devmodules%b to build it anyway."
+    echo
     echo
     exit
   fi
@@ -510,7 +531,9 @@ if test "$with_cpuemu" = "yes"; then
     echo
     bold "   %BError%b - libemu headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libemu-includes=%b\133location of libemu header files\135"
+    echo
+    bold "   %B--with-libemu-includes=%b"
+    echo -e "\x5blocation of libemu header files\x5d"
     echo
     exit
   fi
@@ -524,7 +547,9 @@ if test "$with_cpuemu" = "yes"; then
     echo
     bold "   %BError%b - libemu library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libemu-libraries=%b\133location of libemu shared library files\135"
+    echo
+    bold "   %B--with-libemu-libraries=%b"
+    echo -e "\x5blocation of libemu shared library files\x5d"
     echo
     exit
   fi
@@ -543,6 +568,7 @@ if test "$with_submit_mwserv" = "yes"; then
 		echo
 		echo "   The submitMWserv plugin is still unstable and should not be used in production setups."
 		bold "   Use %B--enable-devmodules%b to build it anyway."
+		echo
 		echo
 		exit
 	fi
@@ -569,7 +595,9 @@ if test "$with_submit_mwserv" = "yes"; then
 		echo
 		bold "   %BError%b - libcurl headers not found. Install them or use the following options:"
 		echo
-		bold "   %B--with-libcurl-includes=%b\133location of libcurl header files\135"
+		echo
+		bold "   %B--with-libcurl-includes=%b"
+		echo -e "\x5blocation of libcurl header files\x5d"
 		echo
 		exit
 	fi
@@ -583,12 +611,76 @@ if test "$with_submit_mwserv" = "yes"; then
 		echo
 		bold "   %BError%b - libcurl library not found. Install it or use the following options:"
 		echo
-		bold "   %B--with-libcurl-libraries=%b\133location of libcurl shared library files\135"
+		echo
+		bold "   %B--with-libcurl-libraries=%b"
+		echo -e "\x5blocation of libcurl shared library files\x5d"
 		echo
 		exit
 	fi
 else
 	with_submit_mwserv=" "
+fi
+
+
+
+AC_ARG_WITH(submit-nebula,
+	[  --with-submit-nebula            submit attacks to a nebula server])
+AM_CONDITIONAL(BUILD_SUBMIT_NEBULA_PLUGIN, test x$with_submit_nebula = xyes)
+if test "$with_submit_nebula" = "yes"; then
+	if test "$enable_devmodules" != "X"; then
+		echo
+		echo "   The submitNebula plugin is still unstable and should not be used in production setups."
+		bold "   Use %B--enable-devmodules%b to build it anyway."
+		echo
+		echo
+		exit
+	fi
+
+	with_submit_nebula="X"
+
+	AC_CHECK_FUNC(gethostbyname, , AC_CHECK_LIB(nsl, gethostbyname))
+
+	AC_ARG_WITH(zlib_includes,
+	[  --with-zlib-includes=DIR        zlib include directory],
+	[with_zlib_includes="$withval"],[with_zlib_includes=no])
+
+	AC_ARG_WITH(zlib_libraries,
+	[  --with-zlib-libraries=DIR       zlib library directory],
+	[with_zlib_libraries="$withval"],[with_zlib_libraries=no])
+
+	if test "$with_zlib_includes" != "no"; then
+		CFLAGS="${CFLAGS} -I${with_zlib_includes}"
+	fi
+	HZ="yes"
+	AC_CHECK_HEADER(zlib.h,, HZ="no")
+	if test "$HZ" = "no"; then
+		echo
+		bold "   %BError%b - zlib headers not found. Install them or use the following options:"
+		echo
+		echo
+		bold "   %B--with-zlib-includes=%b"
+		echo -e "\x5blocation of zlib header files\x5d"
+		echo
+		exit
+	fi
+
+	if test "$with_zlib_libraries" != "no"; then
+		LDFLAGS="${LDFLAGS}  -L${with_zlib_libraries}"
+	fi
+	LZ="yes"
+	AC_CHECK_LIB(z, compress, LZ="yes", LZ="no")
+	if test "$LZ" = "no"; then
+		echo
+		bold "   %BError%b - zlib library not found. Install it or use the following options:"
+		echo
+		echo
+		bold "   %B--with-zlib-libraries=%b"
+		echo -e "\x5blocation of zlib shared library files\x5d"
+		echo
+		exit
+	fi
+else
+	with_submit_nebula=" "
 fi
 
 
@@ -781,22 +873,39 @@ AC_OUTPUT
 echo
 bold "  ----- %Bhoneytrap configuration%b -----"
 echo
+echo
 echo "  General options"
 bold "    (%B$enable_debug%b)  Debugging"
+echo
 bold "    (%B$enable_profile%b)  Profiling"
+echo
 bold "    (%B$enable_devmodules%b)  Unstable Modules"
+echo
 bold "    (%B$with_efence%b)  Electric Fence"
+echo
 echo
 echo "  Connection monitor"
 bold "    (%B$with_ipq_mon%b)  Linux ip_queue (ipq)"
+echo
 bold "    (%B$with_ipfw_mon%b)  FreeBSD ipfw (ipfw)"
+echo
 bold "    (%B$with_nfq_mon%b)  Linux libnetfilter_queue (nfq)"
+echo
 bold "    (%B$with_pcap_mon%b)  Libpcap (pcap)"
+echo
 echo
 echo "  Optional plugins"
 bold "    (%B$with_clamav%b)  ClamAV"
+echo
 bold "    (%B$with_cpuemu%b)  cpuEmu"
+echo
 bold "    (%B$with_cspm%b)  CSPM"
+echo
 bold "    (%B$with_postgres%b)  PostgeSQL"
+echo
 bold "    (%B$with_spamsum%b)  SpamSum"
+echo
 bold "    (%B$with_submit_mwserv%b)  submitMwserv"
+echo
+bold "    (%B$with_submit_nebula%b)  submitNebula"
+echo

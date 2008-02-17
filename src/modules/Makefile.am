@@ -36,6 +36,10 @@ if BUILD_SUBMIT_MWSERV_PLUGIN
 lib_LTLIBRARIES += htm_submitMWserv.la
 endif
 
+if BUILD_SUBMIT_NEBULA_PLUGIN
+lib_LTLIBRARIES += htm_submitNebula.la
+endif
+
 htm_SaveFile_la_SOURCES = htm_SaveFile.c htm_SaveFile.h
 htm_SaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
 
@@ -77,6 +81,11 @@ endif
 if BUILD_SUBMIT_MWSERV_PLUGIN
 htm_submitMWserv_la = htm_submitMWserv.c htm_submitMWserv.h
 htm_submitMWserv_la_LDFLAGS = -module -no-undefined -avoid-version -lcurl
+endif
+
+if BUILD_SUBMIT_NEBULA_PLUGIN
+htm_submitNebula_la = htm_submitNebula.c htm_submitNebula.h
+htm_submitNebula_la_LDFLAGS = -module -no-undefined -avoid-version -lz
 endif
 
 

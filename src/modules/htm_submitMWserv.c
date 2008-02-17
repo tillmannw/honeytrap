@@ -174,6 +174,7 @@ int response_code(const bstr *response) {
 
 
 int check_response(const bstr *response) {
+printf("--> response is '%s'\n", response->data);
 	switch(response_code(response)) {
 	case TSS_OK:
 		logmsg(LOG_NOISY, 1, "SubmitMWServ - Server returned transfer status OK.\n");
@@ -185,10 +186,9 @@ int check_response(const bstr *response) {
 		logmsg(LOG_ERR, 1, "SubmitMWServ - Server returned transfer status ERROR.\n");
 		return(TSS_ERROR);
 	case TSS_UNKNOWN:
+	default:
 		logmsg(LOG_ERR, 1, "SubmitMWServ - Server returned status UNKNOWN.\n");
 		return(TSS_UNKNOWN);
-	default:
-		return(0);
 	}
 
 }
@@ -204,6 +204,7 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 		FD_ZERO(&rfds);
 		FD_ZERO(&wfds);
 		FD_ZERO(&efds);
+printf("--> selecting...\n");
 		
 		max_fd = 0;
 		if ((error = curl_multi_fdset(mhandle, &rfds, &wfds, &efds, &max_fd))) {
@@ -231,14 +232,26 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 			else if (resp == 1) return(1);
 			break;
 		default:
-			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
+printf("--> got data.\n");
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) {
+				fprintf(stderr, "SubmitMWServ Error - Select failed.\n");
+				exit(EXIT_FAILURE);
+			}
 
 			handles = 0;
 			logmsg(LOG_DEBUG, 1, "SubmitMWServ - Data to process.\n");
 			while(curl_multi_perform(mhandle, &handles) == CURLM_CALL_MULTI_PERFORM && handles);
 
-			if ((resp = check_response(response)) == -1) return(-1);
-			else if (resp == 1) return(1);
+printf("--> checking response.\n");
+			switch (resp = check_response(response)) {
+	printf("response is %u\n", resp);
+			case TSS_UNKNOWN:
+				break;
+			case TSS_OK:
+				return(1);
+			default:
+				return(-1);
+			}
 		}
 	}
 	return(0);
@@ -264,13 +277,20 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 	
 	logmsg(LOG_NOISY, 1, "SubmitMWServ - Constructing HTTP form for request type %d.\n", type);
 	
+printf("--> adding guid\n");
 	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "guid", CURLFORM_PTRCONTENTS, guid, CURLFORM_END);
+printf("--> adding maintainer\n");
 	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "maintainer", CURLFORM_PTRCONTENTS, maintainer, CURLFORM_END);
+printf("--> adding secret\n");
 	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "secret", CURLFORM_PTRCONTENTS, secret, CURLFORM_END); 
 
+	if (uri) {
+printf("--> adding uri\n");
 	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "uri",
 		CURLFORM_PTRCONTENTS, uri, CURLFORM_CONTENTSLENGTH, strlen(uri), CURLFORM_END);
+	}
 	
+printf("--> adding data\n");
 	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "data",
 		CURLFORM_PTRCONTENTS, data,
 		CURLFORM_CONTENTSLENGTH, len,
@@ -325,16 +345,17 @@ int submit_mwserv(Attack *attack) {
 		logmsg(LOG_INFO, 1, "SubmitMWServ - Checking SHA512 hash at %s.\n", mwserv_url);
 		memset(&response, 0, sizeof(bstr));
 		
+printf("--> uri is %s\n", uri);
 		if ((pinfo = init_handle(&multihandle, &curlhandle,
 				attack->download[i].dl_payload.data, attack->download[i].dl_payload.size,
 				uri, &response, ST_HASHTEST)) == NULL) {
 			free(response.data);
 			return(0);
 		}
+printf("--> handle initialized\n");
 
 		if (transfer_data(multihandle, &response) == TSS_OK)
 			logmsg(LOG_NOTICE, 1, "SubmitMWServ - Sample is already present at %s, skipping submission.\n", mwserv_url);
-		elseif (
 		else
 			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Hash test failed.\n");
 

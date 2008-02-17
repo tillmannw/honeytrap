@@ -61,7 +61,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 	server_addr->sin_port		= port;
 	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) != 0) {
 	    /* we already got one server process */
-	    logmsg(LOG_DEBUG, 1, "Unable to bind to port %u/tcp: %m.\n", port);
+	    logmsg(LOG_DEBUG, 1, "Unable to bind to port %u/tcp: %m.\n", ntohs(port));
 #ifdef USE_IPQ_MON
 	    /* hand packet processing back to the kernel */
 	    if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
@@ -90,7 +90,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 #else
 	    /* if bind() did not fail for 'port already in use' but for some other reason,
 	     *  we're in troubles and want a verbose error message */
-	    if (errno != 98) logmsg(LOG_NOISY, 1, "Warning - Could not bind to port %u/tcp: %m.\n", port);
+	    if (errno != 98) logmsg(LOG_NOISY, 1, "Warning - Could not bind to port %u/tcp: %m.\n", ntohs(port));
 	    exit(EXIT_FAILURE);
 #endif
 #endif

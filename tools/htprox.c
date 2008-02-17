@@ -17,18 +17,16 @@
  * option, responses are written to stdout.
  */
 
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <netdb.h>
-#include <signal.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
 #include <unistd.h>
-
-extern int h_errno;
-extern int errno;
 
 
 void handle_signal(int sig) {
