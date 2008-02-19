@@ -35,14 +35,16 @@
 #include <md5.h>
 #include <plughook.h>
 #include <readconf.h>
+#include <sha512.h>
 #include <sock.h>
 #include <tcpip.h>
 #include <util.h>
 
 #include "htm_submitNebula.h"
 
+
 const char module_name[]="submitNebula";
-const char module_version[]="0.1.0";
+const char module_version[]="0.1.1";
 
 static const char *config_keywords[] = {
 	"host",
@@ -118,10 +120,10 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 int submit_nebula(Attack *attack) {
 	struct hostent		*host;
 	u_char			*cbuf, response[9];
-	u_int32_t		cbuf_len;
+	u_int32_t		cbuf_len, rand_no;
 	struct sockaddr_in	sock;
 	int			sock_fd;
-	u_char			secret_len;
+	char			*sha512sum;
 
 	cbuf_len	= 0;
 	cbuf		= NULL;
@@ -161,16 +163,35 @@ int submit_nebula(Attack *attack) {
 	logmsg(LOG_DEBUG, 1, "SubmitNebula - Connection to %s:%d established.\n",
 		inet_ntoa(*(struct in_addr*)host->h_addr), nebula_port);
 
-	// send secret length
-	secret_len = strlen(nebula_secret);
-	if (write(sock_fd, &secret_len, 1) == -1) {
+
+
+	// get random number
+	srand(time(0));
+	rand_no = (u_int32_t) (RAND_MAX * (rand() / (RAND_MAX + 1.0)));
+
+	// hash secret with random number
+	if ((cbuf = malloc(strlen(nebula_secret)+4)) == NULL) {
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
+		close(sock_fd);
+		return(-1);
+	}
+	memcpy(cbuf, nebula_secret, strlen(nebula_secret));
+	memcpy(cbuf+strlen(nebula_secret), &rand_no, 4);
+	if ((sha512sum = mem_sha512sum(cbuf, strlen(nebula_secret)+4)) == NULL) {
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to hash secret.\n");
+		close(sock_fd);
+		return(-1);
+	}
+
+	// send random number
+	if (write(sock_fd, &rand_no, 4) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
 		return(-1);
 	}
 
-	// send secret
-	if (write(sock_fd, nebula_secret, secret_len) == -1) {
+	// send hashed secret
+	if (write(sock_fd, sha512sum, 128) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
 		return(-1);
@@ -184,7 +205,7 @@ int submit_nebula(Attack *attack) {
 	}
 
 
-	if (!read_line(sock_fd, (char *) response, 9, 10)) {
+	if (!read_line(sock_fd, (char *) &response, 9, 10)) {
 		logmsg(LOG_WARN, 1, "SubmitNebula Warning - Nebula server did not respond within 10 seconds, skipping submission.\n");
 		close(sock_fd);
 		return(0);
@@ -194,7 +215,7 @@ int submit_nebula(Attack *attack) {
 		close(sock_fd);
 		return(0);
 	}
-	else if (strncmp((char *) response, "UNKNOWN", 5) != 0) {
+	if (strncmp((char *) response, "UNKNOWN", 7)) {
 		logmsg(LOG_WARN, 1, "SubmitNebula - Nebula server returned an invalid response, skipping submission.\n");
 		close(sock_fd);
 		return(0);
