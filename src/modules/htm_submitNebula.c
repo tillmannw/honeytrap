@@ -148,20 +148,20 @@ char *hmac(u_char **msg, ssize_t len) {
 
 	// append inner padding to message
 	if ((*msg = realloc(*msg, len+HMAC_BLOCK_SIZE)) == NULL) {
-		fprintf(stderr, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
 		return(NULL);
 	}
 	memcpy(*msg+len, k_ipad, HMAC_BLOCK_SIZE);
 
 	// compute inner hash
 	if ((inner = (u_char *) mem_sha512sum(*msg, len+HMAC_BLOCK_SIZE)) == NULL) {
-		fprintf(stderr, "Error - Unable to compute inner HMAC SHA512 hash.\n");
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to compute inner HMAC SHA512 hash.\n");
 		return(NULL);
 	}
 
 	// append outer padding to iner hash
 	if ((inner = realloc(inner, HMAC_HASH_SIZE+HMAC_BLOCK_SIZE)) == NULL) {
-		fprintf(stderr, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
 		free(inner);
 		return(NULL);
 	}
@@ -169,7 +169,7 @@ char *hmac(u_char **msg, ssize_t len) {
 
 	// compute outer hash
 	if ((outer = (u_char *) mem_sha512sum(inner, HMAC_HASH_SIZE+HMAC_BLOCK_SIZE)) == NULL)
-		fprintf(stderr, "Error - Unable to compute outer HMAC SHA512 hash.\n");
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to compute outer HMAC SHA512 hash.\n");
 
 	free(inner);
 	return((char *) outer);
@@ -384,7 +384,11 @@ int submit_nebula(Attack *attack) {
 	memcpy(cbuf+cbuf_len, &attack->a_conn.protocol, 1);
 	memcpy(cbuf+cbuf_len+1, &attack->a_conn.l_port, 2);
 
-	sha512sum = hmac(&cbuf, cbuf_len+3);
+	if ((sha512sum = hmac(&cbuf, cbuf_len+3)) == NULL) {
+		free(cbuf);
+		close(sock_fd);
+		return(-1);
+	}
 	free(cbuf);
 
 	// send length of HMAC
