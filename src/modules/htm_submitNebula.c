@@ -36,6 +36,7 @@
 #include <plughook.h>
 #include <readconf.h>
 #include <sha512.h>
+#include <signals.h>
 #include <sock.h>
 #include <tcpip.h>
 #include <util.h>
@@ -57,13 +58,36 @@ const char	*nebula_host;
 u_int16_t	nebula_port;
 
 
+// hmac stuff 
+#define HMAC_HASH_SIZE	128	// for sha512
+#define HMAC_BLOCK_SIZE	256	// for sha512
+#define IPAD_VAL	0x36
+#define OPAD_VAL	0x5C    
+
+u_char		k[HMAC_BLOCK_SIZE];
+u_char		k_ipad[HMAC_BLOCK_SIZE];
+u_char		k_opad[HMAC_BLOCK_SIZE];
+
+
+
 void plugin_init(void) {
+	int i;
+
 	plugin_register_hooks();
 	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
 	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
 		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
 		exit(EXIT_FAILURE);
 	}
+
+	// initialize HMAC pads
+	memset(k_ipad, IPAD_VAL, HMAC_BLOCK_SIZE);
+	memset(k_opad, OPAD_VAL, HMAC_BLOCK_SIZE);
+	if (nebula_secret) for (i=0; i<strlen(nebula_secret); i++) {
+		k_ipad[i] ^= nebula_secret[i];
+		k_opad[i] ^= nebula_secret[i];
+	}
+
 	return;
 }
 
@@ -117,17 +141,57 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 	return(node);
 }
 
+
+// calculate HMAC
+char *hmac(u_char **msg, ssize_t len) {
+	u_char	*inner, *outer;
+
+	// append inner padding to message
+	if ((*msg = realloc(*msg, len+HMAC_BLOCK_SIZE)) == NULL) {
+		fprintf(stderr, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		return(NULL);
+	}
+	memcpy(*msg+len, k_ipad, HMAC_BLOCK_SIZE);
+
+	// compute inner hash
+	if ((inner = (u_char *) mem_sha512sum(*msg, len+HMAC_BLOCK_SIZE)) == NULL) {
+		fprintf(stderr, "Error - Unable to compute inner HMAC SHA512 hash.\n");
+		return(NULL);
+	}
+
+	// append outer padding to iner hash
+	if ((inner = realloc(inner, HMAC_HASH_SIZE+HMAC_BLOCK_SIZE)) == NULL) {
+		fprintf(stderr, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		free(inner);
+		return(NULL);
+	}
+	memcpy(&inner[HMAC_HASH_SIZE], k_opad, HMAC_BLOCK_SIZE);
+
+	// compute outer hash
+	if ((outer = (u_char *) mem_sha512sum(inner, HMAC_HASH_SIZE+HMAC_BLOCK_SIZE)) == NULL)
+		fprintf(stderr, "Error - Unable to compute outer HMAC SHA512 hash.\n");
+
+	free(inner);
+	return((char *) outer);
+}
+
+
+// submit attack to a Nebula server
 int submit_nebula(Attack *attack) {
 	struct hostent		*host;
 	u_char			*cbuf, response[9];
-	u_int32_t		cbuf_len, rand_no;
+	u_int32_t		cbuf_len, nonce;
+	u_int16_t		hmac_len;
 	struct sockaddr_in	sock;
-	int			sock_fd;
+	int			sock_fd, bytes_read, total_bytes;
 	char			*sha512sum;
 
-	cbuf_len	= 0;
-	cbuf		= NULL;
-	host		= NULL;
+	struct timeval		r_timeout;
+	fd_set			rfds;
+
+	cbuf_len		= 0;
+	cbuf			= NULL;
+	host			= NULL;
 
 	/* no data - nothing todo */
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
@@ -165,27 +229,58 @@ int submit_nebula(Attack *attack) {
 
 
 
-	// get random number
-	srand(time(0));
-	rand_no = (u_int32_t) (RAND_MAX * (rand() / (RAND_MAX + 1.0)));
+	// get nonce from server
+	FD_ZERO(&rfds);
+	FD_SET(sigpipe[0], &rfds);
+	FD_SET(sock_fd, &rfds);
 
-	// hash secret with random number
+	r_timeout.tv_sec = 10;
+	r_timeout.tv_usec = 0;
+
+	/* wait for incoming data, close connection on timeout */
+	logmsg(LOG_DEBUG, 1, "SubmitNebula - Waiting for nonce, timeout is %d seconds.\n",
+		(u_int16_t) r_timeout.tv_sec);
+
+	switch (select(MAX(sigpipe[0], sock_fd) + 1, &rfds, NULL, NULL, &r_timeout)) {
+	case -1:
+		if (errno == EINTR) {
+			if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+			break;
+		}
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Select failed: %m.\n");
+		close(sock_fd);
+		return(-1);
+	case 0:
+		logmsg(LOG_ERR, 1, "SubmitNebula Warning - Did not receive nonce within %u seconds.\n", (unsigned int) r_timeout.tv_sec);
+		close(sock_fd);
+		return(-1);
+	default:
+		if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
+		if (FD_ISSET(sock_fd, &rfds)) {
+			logmsg(LOG_DEBUG, 1, "SubmitNebula - Reading nonce.\n");
+			for (bytes_read = 1, total_bytes = 0; bytes_read && total_bytes < 4; total_bytes += bytes_read)
+				bytes_read = read(sock_fd, &nonce+total_bytes, 4);
+
+			if (bytes_read < 0) {
+				logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to read from socket: %m.\n");
+				close(sock_fd);
+				return(-1);
+			}
+			logmsg(LOG_DEBUG, 1, "SubmitNebula - Nonce received.\n");
+		}
+	}
+
+
+	// hash secret with nonce
 	if ((cbuf = malloc(strlen(nebula_secret)+4)) == NULL) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
 		close(sock_fd);
 		return(-1);
 	}
 	memcpy(cbuf, nebula_secret, strlen(nebula_secret));
-	memcpy(cbuf+strlen(nebula_secret), &rand_no, 4);
+	memcpy(cbuf+strlen(nebula_secret), &nonce, 4);
 	if ((sha512sum = mem_sha512sum(cbuf, strlen(nebula_secret)+4)) == NULL) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to hash secret.\n");
-		close(sock_fd);
-		return(-1);
-	}
-
-	// send random number
-	if (write(sock_fd, &rand_no, 4) == -1) {
-		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
 		return(-1);
 	}
@@ -211,7 +306,7 @@ int submit_nebula(Attack *attack) {
 		return(0);
 	}
 	if (strncmp((char *) response, "KNOWN", 5) == 0) {
-		logmsg(LOG_WARN, 1, "SubmitNebula - Attack hash is already known, skipping submission.\n");
+		logmsg(LOG_WARN, 1, "SubmitNebula - Attack hash is already known to the server, skipping submission.\n");
 		close(sock_fd);
 		return(0);
 	}
@@ -280,15 +375,42 @@ int submit_nebula(Attack *attack) {
 		return(-1);
 	}
 
+	// append protocol and port to cattack for HMAC calculation
+	if ((cbuf = realloc(cbuf, cbuf_len+3)) == NULL) {
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
+		close(sock_fd);
+		return(-1);
+	}
+	memcpy(cbuf+cbuf_len, &attack->a_conn.protocol, 1);
+	memcpy(cbuf+cbuf_len+1, &attack->a_conn.l_port, 2);
+
+	sha512sum = hmac(&cbuf, cbuf_len+3);
+	free(cbuf);
+
+	// send length of HMAC
+	hmac_len = strlen(sha512sum);
+	if (write(sock_fd, &hmac_len, sizeof(hmac_len)) == -1) {
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
+		close(sock_fd);
+		return(-1);
+	}
+
+	// send HMAC
+	if (write(sock_fd, sha512sum, strlen(sha512sum)) == -1) {
+		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
+		close(sock_fd);
+		return(-1);
+	}
+	free(sha512sum);
+
 	// wait for OK
 	logmsg(LOG_DEBUG, 1, "SubmitNebula - Attack sent, waiting for OK.\n");
-	if (!read_line(sock_fd, (char *) response, 8, 10)) {
+	if (!read_line(sock_fd, (char *) response, 9, 10)) {
 		logmsg(LOG_WARN, 1, "SubmitNebula Warning - Nebula server did not respond within 10 seconds.\n");
 	} else if (strlen((char *) response) != 2 || strncmp((char *) response, "OK", 2) != 0)
 		logmsg(LOG_WARN, 1, "SubmitNebula - Invalid response from Nebula server.\n");
 
 	close(sock_fd);
-	free(cbuf);
 
 	logmsg(LOG_NOISY, 1, "SubmitNebula - Submission complete.\n");
 
