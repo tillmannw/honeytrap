@@ -2,6 +2,7 @@ Version 1.0.1
 - Code cleanup: asprintf()
 - Error handling for failed malloc()'s where it was missing
 - Fix: Improper logging of IP address pairs
+- Nebula submission plugin
 Version 1.0.0
 - Improved configure script
 - New plugin: Basic http download wrapper

@@ -179,8 +179,9 @@ char *hmac(u_char **msg, ssize_t len) {
 // submit attack to a Nebula server
 int submit_nebula(Attack *attack) {
 	struct hostent		*host;
+	unsigned long		cbuf_len;
 	u_char			*cbuf, response[9];
-	u_int32_t		cbuf_len, nonce;
+	u_int32_t		nonce;
 	u_int16_t		hmac_len;
 	struct sockaddr_in	sock;
 	int			sock_fd, bytes_read, total_bytes;
@@ -341,12 +342,12 @@ int submit_nebula(Attack *attack) {
 
 	// compress attack
 	logmsg(LOG_DEBUG, 1, "SubmitNebula - Compressing attack data.\n");
-	cbuf_len = attack->a_conn.payload.size + (attack->a_conn.payload.size * 0.002) + 12;
+	cbuf_len = (attack->a_conn.payload.size * 1.1) + 12;
 	if ((cbuf = calloc(1, cbuf_len)) == NULL) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
 		return(-1);
 	}
-	switch (compress(cbuf, (unsigned long *)&cbuf_len, attack->a_conn.payload.data, attack->a_conn.payload.size)) {
+	switch (compress(cbuf, &cbuf_len, attack->a_conn.payload.data, attack->a_conn.payload.size)) {
 	case Z_OK:
 		break;
 	case Z_MEM_ERROR:
@@ -359,7 +360,7 @@ int submit_nebula(Attack *attack) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Cannot compress attack data: Unknown error.\n");
 		return(-1);
 	}
-	logmsg(LOG_DEBUG, 1, "SubmitNebula - Compressed data has %u bytes.\n", cbuf_len);
+	logmsg(LOG_DEBUG, 1, "SubmitNebula - Compressed data has %lu bytes.\n", cbuf_len);
 
 	// send length of compressed attack
 	if (write(sock_fd, &cbuf_len, 4) == -1) {
