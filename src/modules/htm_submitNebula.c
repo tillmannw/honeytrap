@@ -181,8 +181,8 @@ int submit_nebula(Attack *attack) {
 	struct hostent		*host;
 	unsigned long		cbuf_len;
 	u_char			*cbuf, response[9];
-	u_int32_t		nonce;
-	u_int16_t		hmac_len;
+	u_int32_t		nonce, len;
+	u_int16_t		hmac_len, hmac_port;
 	struct sockaddr_in	sock;
 	int			sock_fd, bytes_read, total_bytes;
 	char			*sha512sum;
@@ -267,6 +267,7 @@ int submit_nebula(Attack *attack) {
 				close(sock_fd);
 				return(-1);
 			}
+			nonce = ntohl(nonce);
 			logmsg(LOG_DEBUG, 1, "SubmitNebula - Nonce received.\n");
 		}
 	}
@@ -285,6 +286,7 @@ int submit_nebula(Attack *attack) {
 		close(sock_fd);
 		return(-1);
 	}
+	free(cbuf);
 
 	// send hashed secret
 	if (write(sock_fd, sha512sum, 128) == -1) {
@@ -326,15 +328,17 @@ int submit_nebula(Attack *attack) {
 		return(-1);
 	}
 
-	// send port (in host byte order)
-	if (write(sock_fd, &(attack->a_conn.l_port), 2) == -1) {
+	// send port
+	hmac_port = htons(attack->a_conn.l_port);
+	if (write(sock_fd, &(hmac_port), 2) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
 		return(-1);
 	}
 
 	// send length of uncompressed attack
-	if (write(sock_fd, &(attack->a_conn.payload.size), 4) == -1) {
+	len = htonl(attack->a_conn.payload.size);
+	if (write(sock_fd, &(len), 4) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
 		return(-1);
@@ -363,7 +367,8 @@ int submit_nebula(Attack *attack) {
 	logmsg(LOG_DEBUG, 1, "SubmitNebula - Compressed data has %lu bytes.\n", cbuf_len);
 
 	// send length of compressed attack
-	if (write(sock_fd, &cbuf_len, 4) == -1) {
+	len = htonl(cbuf_len);
+	if (write(sock_fd, &len, 4) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
 		return(-1);
@@ -383,7 +388,7 @@ int submit_nebula(Attack *attack) {
 		return(-1);
 	}
 	memcpy(cbuf+cbuf_len, &attack->a_conn.protocol, 1);
-	memcpy(cbuf+cbuf_len+1, &attack->a_conn.l_port, 2);
+	memcpy(cbuf+cbuf_len+1, &hmac_port, 2);
 
 	if ((sha512sum = hmac(&cbuf, cbuf_len+3)) == NULL) {
 		free(cbuf);
@@ -393,7 +398,7 @@ int submit_nebula(Attack *attack) {
 	free(cbuf);
 
 	// send length of HMAC
-	hmac_len = strlen(sha512sum);
+	hmac_len = ntohs(strlen(sha512sum));
 	if (write(sock_fd, &hmac_len, sizeof(hmac_len)) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Writing to socket failed: %m.\n");
 		close(sock_fd);
