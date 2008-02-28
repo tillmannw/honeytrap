@@ -14,8 +14,6 @@
  *   still to come...
  */
  
-#define C(); { printf("%s:%u\n", __PRETTY_FUNCTION__, __LINE__); fflush(stdout); }
- 
 
 #define _GNU_SOURCE 1
 
@@ -42,6 +40,7 @@
 #include <logging.h>
 #include <plughook.h>
 #include <readconf.h>
+#include <sha512.h>
 #include <signals.h>
 #include <tcpip.h>
 #include <util.h>
@@ -144,15 +143,25 @@ int build_uri(char **uri, struct s_download download) {
 
 	logmsg(LOG_DEBUG, 1, "SavePostgres - Building generic malware resource URI.\n");
 
-printf("user: %s\n", download.user);
-	return(asprintf(uri, "%s://%s:%s@%s:%d/%s:%s",
-		download.dl_type,
-		download.user,
-		download.pass,
-		inet_ntoa(*(struct in_addr*)&download.r_addr),
-		download.r_port,
-		PROTO(download.protocol),
-		download.filename));
+	if (strlen(download.dl_type) == 3 && !strcmp(download.dl_type, "ftp"))
+		return(asprintf(uri, "%s://%s:%s@%s:%d/%s:%s",
+			download.dl_type,
+			download.user,
+			download.pass,
+			inet_ntoa(*(struct in_addr*)&download.r_addr),
+			download.r_port,
+			PROTO(download.protocol),
+			download.filename));
+
+	if (strlen(download.dl_type) == 4 && !strcmp(download.dl_type, "tftp"))
+		return(asprintf(uri, "%s://%s:%d/%s:%s",
+			download.dl_type,
+			inet_ntoa(*(struct in_addr*)&download.r_addr),
+			download.r_port,
+			PROTO(download.protocol),
+			download.filename));
+
+	return(-1);
 }
 
 
@@ -180,11 +189,9 @@ int response_code(const bstr *response) {
 int check_response(const bstr *response) {
 	switch(response_code(response)) {
 	case TSS_OK:
-		C();
 		logmsg(LOG_NOISY, 1, "SubmitMWServ - Server returned transfer status OK.\n");
 		return(TSS_OK);
 	case TSS_UNKNOWN:
-		C();
 		logmsg(LOG_WARN, 1, "SubmitMWServ - Server returned status UNKNOWN.\n");
 		return(TSS_UNKNOWN);
 	default:
@@ -257,7 +264,7 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 					{
 						if(message->data.result)
 						{
-							logmsg(LOG_ERR, 1, "SubmitMWServ Error - %s\n", curl_easy_strerror(message->data.result));
+							logmsg(LOG_ERR, 1, "SubmitMWServ Error - HTTP failure: %s\n", curl_easy_strerror(message->data.result));
 							return TSS_ERROR;
 						}
 						else
@@ -272,14 +279,23 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 
 
 struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
-		const u_char *data, const u_int32_t len,
+		const Attack *attack, const struct s_download *download,
 		const char* uri, const bstr *response, const u_char type) {
 
-	int			handles;
+	int			handles, rv;
 	struct curl_httppost	*pinfo;
 	struct curl_httppost	*pinfo_last;
+	char			saddr[16], daddr[16], sport[6], dport[6];
+
+
+	if (type != ST_HASHTEST && type != ST_SUBMIT) return(NULL);
+	if (!download) return(NULL);
 
 	pinfo = pinfo_last = NULL;
+	memset(saddr, 0, 16);
+	memset(daddr, 0, 16);
+	memset(sport, 0, 6);
+	memset(dport, 0, 6);
 
 	logmsg(LOG_DEBUG, 1, "SubmitMWServ - Creating easy handle.\n");
 	if (!(*curlhandle = curl_easy_init()) || !(*multihandle = curl_multi_init())) {
@@ -290,19 +306,44 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 		
 	logmsg(LOG_NOISY, 1, "SubmitMWServ - Constructing HTTP form for request type %d.\n", type);
 	
-	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "guid", CURLFORM_PTRCONTENTS, guid, CURLFORM_END);
-	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "maintainer", CURLFORM_PTRCONTENTS, maintainer, CURLFORM_END);
-	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "secret", CURLFORM_PTRCONTENTS, secret, CURLFORM_END); 
-
+	if (guid)
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "guid", CURLFORM_PTRCONTENTS, guid, CURLFORM_END);
+	if (maintainer)
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "maintainer", CURLFORM_PTRCONTENTS, maintainer, CURLFORM_END);
+	if (secret)
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "secret", CURLFORM_PTRCONTENTS, secret, CURLFORM_END); 
+	if (download->dl_payload.sha512sum)
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "sha512", CURLFORM_PTRCONTENTS, download->dl_payload.sha512sum, CURLFORM_END); 
+	if (attack->a_conn.r_addr) {
+		rv = snprintf(saddr, 16, "%s", inet_ntoa(*(struct in_addr *)&attack->a_conn.r_addr));
+		if (rv == -1 || rv > 16) return(NULL);
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "saddr", CURLFORM_COPYCONTENTS, saddr, CURLFORM_END); 
+	}
+	if (attack->a_conn.l_addr) {
+		rv = snprintf(daddr, 16, "%s", inet_ntoa(*(struct in_addr *)&attack->a_conn.l_addr));
+		if (rv == -1 || rv > 16) return(NULL);
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "daddr", CURLFORM_COPYCONTENTS, daddr, CURLFORM_END); 
+	}
+	if (attack->a_conn.r_port) {
+		rv = snprintf(sport, 6, "%d", attack->a_conn.r_port);
+		if (rv == -1 || rv > 16) return(NULL);
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "sport", CURLFORM_COPYCONTENTS, sport, CURLFORM_END); 
+	}
+	if (attack->a_conn.l_port) {
+		rv = snprintf(dport, 6, "%d", attack->a_conn.l_port);
+		if (rv == -1 || rv > 16) return(NULL);
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "dport", CURLFORM_COPYCONTENTS, dport, CURLFORM_END); 
+	}
 	if (uri) {
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "uri",
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "url",
 			CURLFORM_PTRCONTENTS, uri, CURLFORM_CONTENTSLENGTH, strlen(uri), CURLFORM_END);
 	}
 	
-	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "data",
-		CURLFORM_PTRCONTENTS, data,
-		CURLFORM_CONTENTSLENGTH, len,
-		CURLFORM_END);
+	if (type == ST_SUBMIT)
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "data",
+			CURLFORM_PTRCONTENTS, download->dl_payload.data,
+			CURLFORM_CONTENTSLENGTH, download->dl_payload.size,
+			CURLFORM_END);
 
 	// attack: cli:port->srv:port, mode
 
@@ -350,18 +391,19 @@ int submit_mwserv(Attack *attack) {
 
 	/* save malware */
 	for (i=0; i<attack->dl_count; i++) {
+		if (!attack->download[i].dl_payload.sha512sum) continue;
+
 		// test hash
 		logmsg(LOG_INFO, 1, "SubmitMWServ - Checking SHA512 hash at %s.\n", mwserv_url);
 		memset(&response, 0, sizeof(bstr));
-		
+
 		if (build_uri(&uri, attack->download[i]) == -1) {
 			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to create URI: %m.\n");
 			return(0);
 		}
 		
-		if ((pinfo = init_handle(&multihandle, &curlhandle,
-				attack->download[i].dl_payload.data, attack->download[i].dl_payload.size,
-				uri, &response, ST_HASHTEST)) == NULL) {
+		if ((pinfo = init_handle(&multihandle, &curlhandle, attack,
+				&attack->download[i], uri, &response, ST_HASHTEST)) == NULL) {
 			free(response.data);
 			return(0);
 		}
@@ -389,9 +431,8 @@ int submit_mwserv(Attack *attack) {
 
 		memset(&response, 0, sizeof(bstr));
 		
-		if ((pinfo = init_handle(&multihandle, &curlhandle,
-				attack->download[i].dl_payload.data, attack->download[i].dl_payload.size,
-				uri, &response, ST_SUBMIT)) == NULL) {
+		if ((pinfo = init_handle(&multihandle, &curlhandle, attack,
+				&attack->download[i], uri, &response, ST_SUBMIT)) == NULL) {
 			free(uri);
 			free(response.data);
 			return(0);

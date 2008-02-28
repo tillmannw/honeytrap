@@ -41,7 +41,7 @@ s_log_level log_level;
 u_char log_level;
 */
 
-#define LOGLINE_SIZE	256	/* truncates longer lines */
+#define LOGLINE_SIZE	4069	/* truncates longer lines */
 
 #define DEBUG_FPRINTF	if (log_level == LOG_DEBUG) fprintf
 
