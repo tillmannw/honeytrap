@@ -13,6 +13,9 @@
  * Description:
  *   still to come...
  */
+ 
+#define C(); { printf("%s:%u\n", __PRETTY_FUNCTION__, __LINE__); fflush(stdout); }
+ 
 
 #define _GNU_SOURCE 1
 
@@ -49,7 +52,6 @@
 #define	TSS_ERROR	0
 #define TSS_UNKNOWN	1
 #define TSS_OK		2
-#define TSS_HEARTBEAT	3
 
 #define ST_SUBMIT	1
 #define ST_HASHTEST	2
@@ -67,6 +69,7 @@ static const char *config_keywords[] = {
 };
 
 const char	*mwserv_url;
+char * submit_url;
 
 const char	*guid;
 const char	*maintainer;
@@ -86,6 +89,7 @@ void plugin_init(void) {
 
 void plugin_unload(void) {
 	unhook(PPRIO_SAVEDATA, module_name, "submit_mwserv");
+	free(submit_url);
 	return;
 }
 
@@ -114,6 +118,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 
 		if OPT_IS("mwserv_url") {
 			mwserv_url = value;
+			asprintf(&submit_url, "%shoneytrap/submit-binary", mwserv_url);
 		} else if OPT_IS("guid") {
 			guid = value;
 		} else if OPT_IS("maintainer") {
@@ -166,41 +171,43 @@ size_t get_response(void *buffer, size_t s, size_t n, void *response) {
 
 
 int response_code(const bstr *response) {
-	if (response->len >= 7 && memcmp(response->data, "ERROR: ", 7) == 0) return(TSS_ERROR);
-	if (response->len >= 9 && memcmp(response->data, "UNKNOWN: ", 9) == 0) return(TSS_UNKNOWN);
-	if (response->len >= 4 && memcmp(response->data, "OK: ", 4) == 0) return(TSS_OK);
-	if (response->len >= 11 && memcmp(response->data, "HEARTBEAT: ", 4) == 0) return(TSS_HEARTBEAT);
-	return(-1);
+	if (response->len >= 7 && memcmp(response->data, "UNKNOWN", 7) == 0) return(TSS_UNKNOWN);
+	if (response->len >= 2 && memcmp(response->data, "OK", 2) == 0) return(TSS_OK);	
+	return(TSS_ERROR);
 }
 
 
 int check_response(const bstr *response) {
 	switch(response_code(response)) {
 	case TSS_OK:
+		C();
 		logmsg(LOG_NOISY, 1, "SubmitMWServ - Server returned transfer status OK.\n");
 		return(TSS_OK);
-	case TSS_HEARTBEAT:
-		logmsg(LOG_NOISY, 1, "SubmitMWServ - Server returned transfer status HEARTBEAT.\n");
-		return(TSS_HEARTBEAT);
-	case TSS_ERROR:
-		logmsg(LOG_ERR, 1, "SubmitMWServ - Server returned transfer status ERROR.\n");
-		return(TSS_ERROR);
 	case TSS_UNKNOWN:
-	default:
-		logmsg(LOG_ERR, 1, "SubmitMWServ - Server returned status UNKNOWN.\n");
+		C();
+		logmsg(LOG_WARN, 1, "SubmitMWServ - Server returned status UNKNOWN.\n");
 		return(TSS_UNKNOWN);
+	default:
+		{
+			char buf[response->len + 1];
+	
+			memcpy(buf, response->data, response->len);
+			buf[response->len] = 0;
+			
+			logmsg(LOG_ERR, 1, "SubmitMWServ - Server returned unexpected response \"%s\".\n", buf);
+			return TSS_ERROR;
+		}
 	}
-
 }
 
 int transfer_data(CURLM *mhandle, const bstr *response) {
-	int		max_fd, rv, handles, resp;
+	int		max_fd, rv, handles;
 	fd_set		rfds, wfds, efds;
 	struct timeval	select_timeout;
 	CURLMcode	error;
 
 	rv	= 1;
-	while(rv) {
+	while(rv >= 0) {
 		FD_ZERO(&rfds);
 		FD_ZERO(&wfds);
 		FD_ZERO(&efds);
@@ -213,7 +220,7 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 		FD_SET(sigpipe[0], &rfds);
 		max_fd = MAX(max_fd, sigpipe[0]);
 
-		select_timeout.tv_sec	= timeout;
+		select_timeout.tv_sec	= 1;
 		select_timeout.tv_usec	= 0;
 		
 		logmsg(LOG_DEBUG, 1, "SubmitMWServ - Submitting data to %s.\n", mwserv_url);
@@ -225,12 +232,8 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 				return(-1);
 			}
 			break;
-		case 0:
-			logmsg(LOG_WARN, 1, "SubmitMWServ Warning - Select timed out.\n");
-			if ((resp = check_response(response)) == -1) return(-1);
-			else if (resp == 1) return(1);
-			break;
 		default:
+		
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) {
 				fprintf(stderr, "SubmitMWServ Error - Select failed.\n");
 				exit(EXIT_FAILURE);
@@ -238,18 +241,30 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 
 			handles = 0;
 			logmsg(LOG_DEBUG, 1, "SubmitMWServ - Data to process.\n");
+			
+			
 			while(curl_multi_perform(mhandle, &handles) == CURLM_CALL_MULTI_PERFORM && handles);
-
-			switch (resp = check_response(response)) {
-	printf("response is %u\n", resp);
-			case TSS_UNKNOWN:
-				break;
-			case TSS_OK:
-				return(1);
-			default:
-				return(-1);
+			
+			
+			
+			{
+				CURLMsg * message;
+				int messagesRemaining;
+				
+				while((message = curl_multi_info_read(mhandle, &messagesRemaining)))
+				{
+					if(message->msg == CURLMSG_DONE)
+					{
+						if(message->data.result)
+						{
+							logmsg(LOG_ERR, 1, "SubmitMWServ Error - %s\n", curl_easy_strerror(message->data.result));
+							return TSS_ERROR;
+						}
+						else
+							return check_response(response);
+					}
+				}
 			}
-			break;
 		}
 	}
 	return(0);
@@ -271,8 +286,8 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 		logmsg(LOG_ERR, 1, "SubmitMWserv - Unable to create easy hanlde.\n");
 		return(NULL);
 	}
-
 	
+		
 	logmsg(LOG_NOISY, 1, "SubmitMWServ - Constructing HTTP form for request type %d.\n", type);
 	
 	curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "guid", CURLFORM_PTRCONTENTS, guid, CURLFORM_END);
@@ -295,10 +310,11 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 	curl_easy_setopt(*curlhandle, CURLOPT_FORBID_REUSE, 1);
 	curl_easy_setopt(*curlhandle, CURLOPT_SSL_VERIFYHOST, 0);
 	curl_easy_setopt(*curlhandle, CURLOPT_SSL_VERIFYPEER, 0);
-	curl_easy_setopt(*curlhandle, CURLOPT_URL, mwserv_url);
+	curl_easy_setopt(*curlhandle, CURLOPT_URL, submit_url);
 	curl_easy_setopt(*curlhandle, CURLOPT_USERAGENT, "honeytrap " VERSION " (" MY_OS ", " MY_ARCH ", " MY_COMPILER ")");
 	curl_easy_setopt(*curlhandle, CURLOPT_WRITEDATA, response);
 	curl_easy_setopt(*curlhandle, CURLOPT_WRITEFUNCTION, get_response);
+	curl_easy_setopt(*curlhandle, CURLOPT_TIMEOUT, timeout);
 
 	logmsg(LOG_DEBUG, 1, "SubmitMWServ - Creating multi handle.\n");
 	CURLMcode error;
@@ -338,6 +354,11 @@ int submit_mwserv(Attack *attack) {
 		logmsg(LOG_INFO, 1, "SubmitMWServ - Checking SHA512 hash at %s.\n", mwserv_url);
 		memset(&response, 0, sizeof(bstr));
 		
+		if (build_uri(&uri, attack->download[i]) == -1) {
+			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to create URI: %m.\n");
+			return(0);
+		}
+		
 		if ((pinfo = init_handle(&multihandle, &curlhandle,
 				attack->download[i].dl_payload.data, attack->download[i].dl_payload.size,
 				uri, &response, ST_HASHTEST)) == NULL) {
@@ -345,21 +366,26 @@ int submit_mwserv(Attack *attack) {
 			return(0);
 		}
 
-		if (transfer_data(multihandle, &response) == TSS_OK)
+		switch (transfer_data(multihandle, &response))
+		{
+		case TSS_OK:
 			logmsg(LOG_NOTICE, 1, "SubmitMWServ - Sample is already present at %s, skipping submission.\n", mwserv_url);
-		else
+			free(response.data);
+			
+			continue;
+		
+		case TSS_ERROR:
 			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Hash test failed.\n");
+			free(response.data);
+			
+			continue;
+		}
 
 		free(response.data);
 
 
 		// submit sample
 		logmsg(LOG_INFO, 1, "SubmitMWServ - Submitting sample to %s.\n", mwserv_url);
-
-		if (build_uri(&uri, attack->download[i]) == -1) {
-			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to create URI: %m.\n");
-			return(0);
-		}
 
 		memset(&response, 0, sizeof(bstr));
 		
