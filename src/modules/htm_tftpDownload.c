@@ -155,7 +155,7 @@ int tftp_quit(int data_sock_fd) {
 
 int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attack) {
 	struct sockaddr_in data_socket, from;
-	int data_sock_fd, fromlen, bytes_sent,
+	int data_sock_fd, fromlen, bytes_sent, data_arrived, sv,
 	    tftp_command_size, socklen, retransmissions, received_last_packet, last_ack_packet;
 	uint8_t *binary_stream;
 	uint16_t tftp_opcode, tftp_errcode, tftp_blockcode, max_blockcode;
@@ -213,6 +213,7 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 	strncpy(tftp_command+3+strlen(save_file), "octet", 5);
 			
 	bytes_sent = 0;
+	data_arrived = 0;
 	retransmissions = 0;
 	received_last_packet = 0;
 
@@ -220,7 +221,7 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 	FD_SET(sigpipe[0], &rfds);
 	FD_SET(data_sock_fd, &rfds);
 
-	while (retransmissions++ < MAX_TRANSMISSION_TRIES) {
+	while (!data_arrived && retransmissions++ < MAX_TRANSMISSION_TRIES) {
 		/* send read request */
 		if ((bytes_sent = sendto(data_sock_fd, tftp_command, tftp_command_size, 0,
 				(struct sockaddr *) &data_socket, socklen)) != tftp_command_size) {
@@ -253,7 +254,10 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 			return(-1);
 		default:
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
-			if (FD_ISSET(data_sock_fd, &rfds)) break;
+			if (FD_ISSET(data_sock_fd, &rfds)) {
+				data_arrived = 1;
+				break;
+			}
 		}
 	}
 	if (retransmissions >= MAX_TRANSMISSION_TRIES) {
@@ -276,10 +280,11 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 		}
 		if (data_socket.sin_port != from.sin_port) {
 			data_socket.sin_port = from.sin_port;
-			logmsg(LOG_NOISY, 1, "TFTP download - Remote host uses port %d/udp.\n", data_socket.sin_port);
+			logmsg(LOG_NOISY, 1, "TFTP download - Remote host uses port %d/udp.\n", ntohs(data_socket.sin_port));
 		}
 		
 		memcpy(&tftp_opcode, rbuf, 2);
+		sv = ntohs(tftp_opcode);
 
 		switch(ntohs(tftp_opcode)) {
 		case 3:
@@ -325,9 +330,10 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 					ntohs(tftp_blockcode));
 			} else {
 				retransmissions = 0;
+				data_arrived = 0;
 				bytes_sent = 0;
 
-				while (retransmissions++ < MAX_TRANSMISSION_TRIES) {
+				while (!data_arrived && retransmissions++ < MAX_TRANSMISSION_TRIES) {
 					/* send read request */
 					logmsg(LOG_DEBUG, 1, "TFTP download - Sending \"ACK %u\" (%u. try)\n",
 						ntohs(tftp_blockcode), retransmissions);
@@ -361,7 +367,10 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 						return(-1);
 					default:
 						if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
-						if (FD_ISSET(data_sock_fd, &rfds)) break;
+						if (FD_ISSET(data_sock_fd, &rfds)) {
+							data_arrived = 1;
+							break;
+						}
 					}
 				}
 				if (retransmissions >= MAX_TRANSMISSION_TRIES) {
