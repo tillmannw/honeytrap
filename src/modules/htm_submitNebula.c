@@ -159,7 +159,7 @@ char *hmac(u_char **msg, ssize_t len) {
 		return(NULL);
 	}
 
-	// append outer padding to iner hash
+	// append outer padding to inner hash
 	if ((inner = realloc(inner, HMAC_HASH_SIZE+HMAC_BLOCK_SIZE)) == NULL) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Unable to allocate memory: %m.\n");
 		free(inner);

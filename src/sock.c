@@ -110,12 +110,15 @@ int nb_connect(int sock_fd, const struct sockaddr * sockaddr, socklen_t slen, in
 	fd_set		rfds, wfds;
 	socklen_t	len;
 
+	flags		 = 0;
+
 	/* safe fd flags and set socket to non-blocking */
 	if ((flags = fcntl(sock_fd, F_GETFL, 0) < 0)) return(-1);
 	if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) < 0) return(-1);
 	
 	/* try an immediate connect */
-	errno = 0;
+	errno	= 0;
+	error	= 0;
 	if ((rv = connect(sock_fd, sockaddr, slen)) < 0) 
 		if (errno != EINPROGRESS) return(-1);
 	
@@ -150,7 +153,7 @@ int nb_connect(int sock_fd, const struct sockaddr * sockaddr, socklen_t slen, in
 				exit(EXIT_FAILURE);
 			}
 			if (FD_ISSET(sock_fd, &rfds) || FD_ISSET(sock_fd, &wfds)) {
-				len = sizeof(error);
+				len	= sizeof(error);
 				if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) return(-1);
 				if (error) {
 					errno = error;

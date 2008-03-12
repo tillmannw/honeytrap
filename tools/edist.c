@@ -111,18 +111,30 @@ u_int32_t edit_dist(struct bstr str1, struct bstr str2) {
 int main(int argc, char *argv[]) {
 	struct bstr bstr1, bstr2;
 	u_int32_t dist;
-	float eq;
+	double eq, ed;
 
 	if (argc < 3) printf("usage: %s file1 file2\n", argv[0]);
 	else {
 		bstr1	= file2string(argv[1]);
 		bstr2	= file2string(argv[2]);
 
+		// special cases: at least one input is empty
+		if (!bstr1.len && !bstr2.len) { 
+			printf("Similarity: 100%% (edit distance: 0).\n");
+			return(EXIT_SUCCESS);
+		}
+		if (!bstr1.len || !bstr2.len) { 
+			printf("Similarity: 0%% (edit distance: %u).\n", abs(bstr1.len-bstr2.len));
+			return(EXIT_SUCCESS);
+		}
+
 		dist	= edit_dist(bstr1, bstr2);
-		eq	= dist*100;
-		eq	= 100-eq/max(bstr1.len, bstr2.len);
+
+		ed	= edit_dist(bstr1, bstr2) - abs(bstr1.len-bstr2.len);
+		eq	= bstr1.len + bstr2.len - abs(bstr1.len-bstr2.len);
+		eq	= 1 - (ed / eq);
 
 		printf("Similarity: %.2f%% (edit distance: %u).\n", eq, dist);
 	}
-	return(0);
+	return(EXIT_SUCCESS);
 }

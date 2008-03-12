@@ -169,7 +169,7 @@ size_t get_response(void *buffer, size_t s, size_t n, void *response) {
 	// assemble server response
 	
 	if ((((bstr *)response)->data = realloc(((bstr *)response)->data, ((((bstr *)response)->len + n) * s))) == NULL) {
-		logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to allocate memory: %m.\n");
+		logmsg(LOG_ERR, 1, "SubmitMWserv Error - Unable to allocate memory: %m.\n");
 		return(0);
 	}
 
@@ -189,10 +189,10 @@ int response_code(const bstr *response) {
 int check_response(const bstr *response) {
 	switch(response_code(response)) {
 	case TSS_OK:
-		logmsg(LOG_NOISY, 1, "SubmitMWServ - Server returned transfer status OK.\n");
+		logmsg(LOG_NOISY, 1, "SubmitMWserv - Server returned transfer status OK.\n");
 		return(TSS_OK);
 	case TSS_UNKNOWN:
-		logmsg(LOG_WARN, 1, "SubmitMWServ - Server returned status UNKNOWN.\n");
+		logmsg(LOG_WARN, 1, "SubmitMWserv - Server returned status UNKNOWN.\n");
 		return(TSS_UNKNOWN);
 	default:
 		{
@@ -201,7 +201,7 @@ int check_response(const bstr *response) {
 			memcpy(buf, response->data, response->len);
 			buf[response->len] = 0;
 			
-			logmsg(LOG_ERR, 1, "SubmitMWServ - Server returned unexpected response \"%s\".\n", buf);
+			logmsg(LOG_ERR, 1, "SubmitMWserv - Server returned unexpected response \"%s\".\n", buf);
 			return TSS_ERROR;
 		}
 	}
@@ -221,7 +221,7 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 		
 		max_fd = 0;
 		if ((error = curl_multi_fdset(mhandle, &rfds, &wfds, &efds, &max_fd))) {
-			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to get descriptor set: %s.\n", curl_multi_strerror(error));
+			logmsg(LOG_ERR, 1, "SubmitMWserv Error - Unable to get descriptor set: %s.\n", curl_multi_strerror(error));
 			return(0);
 		}
 		FD_SET(sigpipe[0], &rfds);
@@ -230,24 +230,24 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 		select_timeout.tv_sec	= 1;
 		select_timeout.tv_usec	= 0;
 		
-		logmsg(LOG_DEBUG, 1, "SubmitMWServ - Submitting data to %s.\n", mwserv_url);
+		logmsg(LOG_DEBUG, 1, "SubmitMWserv - Submitting data to %s.\n", mwserv_url);
 
 		switch (rv = select(max_fd+1, &rfds, &wfds, &efds, &select_timeout)) {
 		case -1:
 			if (errno != EINTR) {
-				logmsg(LOG_ERR, 1, "SubmitMWServ Error - Select failed: %s.\n", strerror(errno));
+				logmsg(LOG_ERR, 1, "SubmitMWserv Error - Select failed: %s.\n", strerror(errno));
 				return(-1);
 			}
 			break;
 		default:
 		
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) {
-				fprintf(stderr, "SubmitMWServ Error - Select failed.\n");
+				fprintf(stderr, "SubmitMWserv Error - Select failed.\n");
 				exit(EXIT_FAILURE);
 			}
 
 			handles = 0;
-			logmsg(LOG_DEBUG, 1, "SubmitMWServ - Data to process.\n");
+			logmsg(LOG_DEBUG, 1, "SubmitMWserv - Data to process.\n");
 			
 			
 			while(curl_multi_perform(mhandle, &handles) == CURLM_CALL_MULTI_PERFORM && handles);
@@ -264,7 +264,7 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 					{
 						if(message->data.result)
 						{
-							logmsg(LOG_ERR, 1, "SubmitMWServ Error - HTTP failure: %s\n", curl_easy_strerror(message->data.result));
+							logmsg(LOG_ERR, 1, "SubmitMWserv Error - HTTP failure: %s\n", curl_easy_strerror(message->data.result));
 							return TSS_ERROR;
 						}
 						else
@@ -297,14 +297,14 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 	memset(sport, 0, 6);
 	memset(dport, 0, 6);
 
-	logmsg(LOG_DEBUG, 1, "SubmitMWServ - Creating easy handle.\n");
+	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Creating easy handle.\n");
 	if (!(*curlhandle = curl_easy_init()) || !(*multihandle = curl_multi_init())) {
 		logmsg(LOG_ERR, 1, "SubmitMWserv - Unable to create easy hanlde.\n");
 		return(NULL);
 	}
 	
 		
-	logmsg(LOG_NOISY, 1, "SubmitMWServ - Constructing HTTP form for request type %d.\n", type);
+	logmsg(LOG_NOISY, 1, "SubmitMWserv - Constructing HTTP form for request type %d.\n", type);
 	
 	if (guid)
 		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "guid", CURLFORM_PTRCONTENTS, guid, CURLFORM_END);
@@ -357,10 +357,10 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 	curl_easy_setopt(*curlhandle, CURLOPT_WRITEFUNCTION, get_response);
 	curl_easy_setopt(*curlhandle, CURLOPT_TIMEOUT, timeout);
 
-	logmsg(LOG_DEBUG, 1, "SubmitMWServ - Creating multi handle.\n");
+	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Creating multi handle.\n");
 	CURLMcode error;
 	if ((error = curl_multi_add_handle(*multihandle, *curlhandle))) {
-		logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to create multi handle: %s\n", curl_multi_strerror(error));
+		logmsg(LOG_ERR, 1, "SubmitMWserv Error - Unable to create multi handle: %s\n", curl_multi_strerror(error));
 		curl_easy_cleanup(*curlhandle);
 		return(NULL);
 	}
@@ -394,11 +394,11 @@ int submit_mwserv(Attack *attack) {
 		if (!attack->download[i].dl_payload.sha512sum) continue;
 
 		// test hash
-		logmsg(LOG_INFO, 1, "SubmitMWServ - Checking SHA512 hash at %s.\n", mwserv_url);
+		logmsg(LOG_INFO, 1, "SubmitMWserv - Checking SHA512 hash at %s.\n", mwserv_url);
 		memset(&response, 0, sizeof(bstr));
 
 		if (build_uri(&uri, attack->download[i]) == -1) {
-			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Unable to create URI: %m.\n");
+			logmsg(LOG_ERR, 1, "SubmitMWserv Error - Unable to create URI: %m.\n");
 			return(0);
 		}
 		
@@ -411,13 +411,13 @@ int submit_mwserv(Attack *attack) {
 		switch (transfer_data(multihandle, &response))
 		{
 		case TSS_OK:
-			logmsg(LOG_NOTICE, 1, "SubmitMWServ - Sample is already present at %s, skipping submission.\n", mwserv_url);
+			logmsg(LOG_NOTICE, 1, "SubmitMWserv - Sample is already present at %s, skipping submission.\n", mwserv_url);
 			free(response.data);
 			
 			continue;
 		
 		case TSS_ERROR:
-			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Hash test failed.\n");
+			logmsg(LOG_ERR, 1, "SubmitMWserv Error - Hash test failed.\n");
 			free(response.data);
 			
 			continue;
@@ -427,7 +427,7 @@ int submit_mwserv(Attack *attack) {
 
 
 		// submit sample
-		logmsg(LOG_INFO, 1, "SubmitMWServ - Submitting sample to %s.\n", mwserv_url);
+		logmsg(LOG_INFO, 1, "SubmitMWserv - Submitting sample to %s.\n", mwserv_url);
 
 		memset(&response, 0, sizeof(bstr));
 		
@@ -439,9 +439,9 @@ int submit_mwserv(Attack *attack) {
 		}
 
 		if (transfer_data(multihandle, &response) == TSS_OK)
-			logmsg(LOG_NOTICE, 1, "SubmitMWServ - Sample successfully submitted to %s.\n", mwserv_url);
+			logmsg(LOG_NOTICE, 1, "SubmitMWserv - Sample successfully submitted to %s.\n", mwserv_url);
 		else
-			logmsg(LOG_ERR, 1, "SubmitMWServ Error - Sample submission failed.\n");
+			logmsg(LOG_ERR, 1, "SubmitMWserv Error - Sample submission failed.\n");
 
 		free(uri);
 		free(response.data);
