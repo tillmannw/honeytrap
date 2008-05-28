@@ -19,6 +19,7 @@
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
 int id;
+struct nfq_handle *h;
 struct nfq_q_handle *qh;
 
 int start_nfq_mon(void);

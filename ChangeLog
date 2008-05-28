@@ -3,6 +3,8 @@ Version 1.0.1
 - Error handling for failed malloc()'s where it was missing
 - Fix: Improper logging of IP address pairs
 - Nebula submission plugin
+- reworked NFQ stream monitor hooking to prevent unbinding errors
+- hex2bin tool: Command line switch for byte order swapping added
 Version 1.0.0
 - Improved configure script
 - New plugin: Basic http download wrapper

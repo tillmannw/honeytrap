@@ -143,7 +143,6 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 
 int start_nfq_mon(void) {
-	struct nfq_handle	*h;
 	struct nfnl_handle	*nh;
 	int			nfq_fd, rv;
 	struct timeval		mainloop_timeout;
@@ -162,14 +161,14 @@ int start_nfq_mon(void) {
 		clean_exit(EXIT_FAILURE);
 	}
 
-	if (nfq_unbind_pf(h, AF_INET) < 0) {
-		logmsg(LOG_ERR, 1, "Error - Could not unbind existing NFQ handle: %m.\n");
-		logmsg(LOG_ERR, 1, "Do you have root privileges?\n");
-		clean_exit(EXIT_FAILURE);
-	}
+	if (nfq_unbind_pf(h, AF_INET) < 0)
+		logmsg(LOG_WARN, 1, "Warning - Could not unbind existing NFQ handle: %m.\n");
 
 	if (nfq_bind_pf(h, AF_INET) < 0) {
 		logmsg(LOG_ERR, 1, "Error - Could not bind existing NFQ handle: %m.\n");
+		logmsg(LOG_ERR, 1, "Do you have root privileges?\n");
+
+		h = NULL;
 		clean_exit(EXIT_FAILURE);
 	}
 

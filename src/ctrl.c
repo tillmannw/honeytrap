@@ -22,6 +22,7 @@
 #include "ctrl.h"
 #include "honeytrap.h"
 #include "logging.h"
+#include "nfqmon.h"
 #include "pcapmon.h"
 #include "plugin.h"
 #include "response.h"
@@ -58,8 +59,23 @@ void usage(char *progname) {
 
 void clean_exit(int status) {
 #ifdef USE_PCAP_MON
-	/* free bpf filter string */
+	// free bpf filter string
+	logmsg(LOG_DEBUG, 1, "Freeing BPF filter string.\n");
 	free(bpf_filter_string);
+#endif
+#ifdef USE_NFQ_MON
+	// unhook from netfilter-queue
+	if (h) {
+		logmsg(LOG_DEBUG, 1, "Destroying NFQ handle.\n");
+		if (qh && nfq_destroy_queue(qh) != 0) {
+			logmsg(LOG_ERR, 1, "Error - Could not destroy NFQ handle: %m.\n");
+		}
+
+		logmsg(LOG_DEBUG, 1, "Unhooking NFQ connection monitor.\n");
+		if (nfq_close(h) != 0) {
+			logmsg(LOG_ERR, 1, "Error - Could not close NFQ connection monitor: %m.\n");
+		}
+	}
 #endif
 
 	logmsg(LOG_DEBUG, 1, "Unloading default responses.\n");
