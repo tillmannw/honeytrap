@@ -163,7 +163,7 @@ int find_shellcode(Attack *attack) {
 		struct emu_memory	*mem = emu_memory_get(e);
 
 		int j;
-		for ( j=0;j<8;j++ ) emu_cpu_reg32_set(cpu,j , 0);
+		for (j=0; j<8; j++)  emu_cpu_reg32_set(cpu,j , 0);
 
 		emu_memory_write_dword(mem, 0xef787c3c, 4711);
 		emu_memory_write_dword(mem, 0x0,        4711);
@@ -179,35 +179,37 @@ int find_shellcode(Attack *attack) {
 		emu_cpu_eflags_set(cpu, 0);
 
 		// write code to offset
-		int static_offset = CODE_OFFSET;
-		emu_memory_write_block(mem, static_offset, opts.scode,  opts.size);
+		emu_memory_write_block(mem, CODE_OFFSET, opts.scode,  opts.size);
 
 		// set eip to code
-		emu_cpu_eip_set(emu_cpu_get(e), static_offset + opts.offset);
+		emu_cpu_eip_set(emu_cpu_get(e), CODE_OFFSET + opts.offset);
 		emu_cpu_reg32_set(emu_cpu_get(e), esp, 0x0012fe98);
 
 		// run code in emulated CPU
 		run(e);
 
 		emu_free(e);
+
+		logmsg(LOG_NOISY, 1, "CPU Emulation - %u bytes processed.\n", attack->a_conn.payload.size);
 		return(1);
 	}
 
 	logmsg(LOG_NOISY, 1, "CPU Emulation - %u bytes processed.\n", attack->a_conn.payload.size);
-
 	return(0);
 }
 
 
 // run detected asm code on emulated CPU
 int run(struct emu *e) {
-	int			j, ret;
-	uint32_t		eipsave;
+	int 			j, ret;
+	uint32_t		eipsave = 0;
 	struct emu_cpu		*cpu = emu_cpu_get(e);
 	struct emu_env		*env = emu_env_new(e);
+	struct emu_hashtable	*eh = NULL;
+
 
 	if (env == NULL) {
-		logmsg(LOG_ERR, 1, "CPU Emulation Error - %s.\n", emu_strerror(e));
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create environment: %s.\n", emu_strerror(e));
 		return -1;
 	}
 
@@ -215,6 +217,7 @@ int run(struct emu *e) {
 
 	emu_env_w32_export_hook(env, "ExitProcess", user_hook_ExitProcess, NULL);
 	emu_env_w32_export_hook(env, "ExitThread", user_hook_ExitThread, NULL);
+
 	emu_env_w32_export_hook(env, "CreateProcessA", user_hook_CreateProcess, NULL);
 	emu_env_w32_export_hook(env, "WaitForSingleObject", user_hook_WaitForSingleObject, NULL);
 
@@ -229,18 +232,16 @@ int run(struct emu *e) {
 	emu_env_w32_export_hook(env, "socket", user_hook_socket, NULL);
 	emu_env_w32_export_hook(env, "WSASocketA", user_hook_WSASocket, NULL);
 
-	opts.steps = 1000000;
+        opts.steps = 1000000;
 
 	// run the code
 	logmsg(LOG_NOISY, 1, "CPU Emulation - Running code...\n");
 
-	struct emu_hashtable *eh = NULL;
-	for (eipsave=0, j=0;j<opts.steps;j++ ) {
-		if (cpu->repeat_current_instr == false) eipsave = emu_cpu_eip_get(emu_cpu_get(e));
+	for (j=0;j<opts.steps;j++) {
+		if ( cpu->repeat_current_instr == false ) eipsave = emu_cpu_eip_get(emu_cpu_get(e));
 
-		struct emu_env_hook *hook = NULL;
-
-		ret = 0;
+		struct emu_env_hook *hook	= NULL;
+		ret				= 0;
 
 		if ((hook = emu_env_w32_eip_check(env)) != NULL) {
 			if (hook->hook.win->fnhook == NULL) {
@@ -248,17 +249,26 @@ int run(struct emu *e) {
 				break;
 			}
 		} else {
-			if ((ret = emu_cpu_parse(emu_cpu_get(e))) == -1) {
-				logmsg(LOG_WARN, 1, "CPU Emulation Warning - CPU Error: %s", emu_strerror(e));
-				break;
-			}
+			ret = emu_cpu_parse(emu_cpu_get(e));
+
 			if (log_level == LOG_DEBUG) {
 				emu_log_level_set(emu_logging_get(e),EMU_LOG_DEBUG);
 				logDebug(e, "%s\n", cpu->instr_string);
 				emu_log_level_set(emu_logging_get(e),EMU_LOG_NONE);
 			}
+
+			struct emu_env_hook *hook = NULL;
+
+			if ( ret != -1 ) {
+				if ( hook == NULL ) ret = emu_cpu_step(emu_cpu_get(e));
+				else break;
+			} else {
+				logmsg(LOG_WARN, 1, "CPU Emulation Warning - CPU error: %s", emu_strerror(e));
+				break;
+			}
 		}
 	}
+
 	if (eh != NULL) emu_hashtable_free(eh);
 
 	return 0;
