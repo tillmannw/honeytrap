@@ -5,6 +5,7 @@ Version 1.0.1
 - Nebula submission plugin
 - reworked NFQ stream monitor hooking to prevent unbinding errors
 - hex2bin tool: Command line switch for byte order swapping added
+- reworked emu plugin
 Version 1.0.0
 - Improved configure script
 - New plugin: Basic http download wrapper
