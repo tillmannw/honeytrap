@@ -740,12 +740,20 @@ else
 fi
 
 
+AC_ARG_WITH(submit-postgres,
+	[  --with-submit-postgres          store attack data in PostgreSQL database])
+AM_CONDITIONAL(BUILD_SUBMIT_POSTGRES_PLUGIN, test x$with_submit_postgres = xyes)
+if test "$with_submit_postgres" = "yes"; then
+	if test "$enable_devmodules" != "X"; then
+		echo
+		echo "   The submitPostgres plugin is still unstable and should not be used in production setups."
+		bold "   Use %B--enable-devmodules%b to build it anyway."
+		echo
+		echo
+		exit
+	fi
 
-AC_ARG_WITH(postgres,
-	[  --with-postgres                 store attack data in PostgreSQL database])
-AM_CONDITIONAL(BUILD_POSTGRES_PLUGIN, test x$with_postgres = xyes)
-if test "$with_postgres" = "yes"; then
-  with_postgres="X"
+  with_submit_postgres="X"
   AC_ARG_WITH(libpq_includes,
     [  --with-libpq-includes=DIR       libpq include directory],
     [with_libpq_includes="$withval"],[with_libpq_includes=no])
@@ -763,7 +771,7 @@ if test "$with_postgres" = "yes"; then
     echo
     bold "   %BError%b - libpq headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libpq-includes=%b\133location of libpq header files\135"
+    bold "   %B--with-libpq-includes=%b\x5blocation of libpq header files\x5d"
     echo
     exit
   fi
@@ -777,14 +785,14 @@ if test "$with_postgres" = "yes"; then
     echo
     bold "   %BError%b - libpq library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libpq-libraries=%b\133location of libpq shared library files\135"
+    bold "   %B--with-libpq-libraries=%b\x5blocation of libpq shared library files\x5d"
     echo
     exit
   fi
 
   AC_DEFINE([USE_POSTGRES_DB], [], [Define to store attacks in PostgreSQL database])
 else
-  with_postgres=" "
+  with_submit_postgres=" "
 fi
 
 #-------------------------------------------------------------
@@ -901,7 +909,7 @@ bold "    (%B$with_cpuemu%b)  cpuEmu"
 echo
 bold "    (%B$with_cspm%b)  CSPM"
 echo
-bold "    (%B$with_postgres%b)  PostgeSQL"
+bold "    (%B$with_submit_postgres%b)  PostgeSQL"
 echo
 bold "    (%B$with_spamsum%b)  SpamSum"
 echo

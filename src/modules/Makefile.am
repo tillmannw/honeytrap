@@ -20,10 +20,6 @@ if BUILD_SPAMSUM_PLUGIN
 lib_LTLIBRARIES += htm_SpamSum.la
 endif
 
-if BUILD_POSTGRES_PLUGIN
-lib_LTLIBRARIES += htm_SavePostgres.la
-endif
-
 if BUILD_CPUEMU_PLUGIN
 lib_LTLIBRARIES += htm_cpuEmu.la
 endif
@@ -38,6 +34,10 @@ endif
 
 if BUILD_SUBMIT_NEBULA_PLUGIN
 lib_LTLIBRARIES += htm_submitNebula.la
+endif
+
+if BUILD_SUBMIT_POSTGRES_PLUGIN
+lib_LTLIBRARIES += htm_submitPostgres.la
 endif
 
 htm_SaveFile_la_SOURCES = htm_SaveFile.c htm_SaveFile.h
@@ -63,11 +63,6 @@ htm_SpamSum_la_SOURCES = htm_SpamSum.c htm_SpamSum.h
 htm_SpamSum_la_LDFLAGS = -module -no-undefined -avoid-version
 endif
 
-if BUILD_POSTGRES_PLUGIN
-htm_SavePostgres_la_SOURCES = htm_SavePostgres.c htm_SavePostgres.h
-htm_SavePostgres_la_LDFLAGS = -module -no-undefined -avoid-version -lpq
-endif
-
 if BUILD_CPUEMU_PLUGIN
 htm_cpuEmu_la_SOURCES = htm_cpuEmu.c htm_cpuEmu.h
 htm_cpuEmu_la_LDFLAGS = -module -no-undefined -avoid-version -lemu
@@ -86,6 +81,11 @@ endif
 if BUILD_SUBMIT_NEBULA_PLUGIN
 htm_submitNebula_la = htm_submitNebula.c htm_submitNebula.h
 htm_submitNebula_la_LDFLAGS = -module -no-undefined -avoid-version -lz
+endif
+
+if BUILD_SUBMIT_POSTGRES_PLUGIN
+htm_submitPostgres_la = htm_submitPostgres.c htm_submitPostgres.h
+htm_submitPostgres_la_LDFLAGS = -module -no-undefined -avoid-version -lpq
 endif
 
 

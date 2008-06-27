@@ -466,7 +466,8 @@ uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook,
 			dup2(psiStartInfo->hStdOutput, fileno(stdout));
 			dup2(psiStartInfo->hStdError,  fileno(stderr));
 
-			system("/bin/sh -c \"cd ~/.wine/drive_c/; wine 'c:\\windows\\system32\\cmd_orig.exe' \"");
+//			system("/bin/sh -c \"cd ~/.wine/drive_c/; WINEDEBUG=-all wine 'c:\\windows\\system32\\cmd_orig.exe' \"");
+			system("WINEDEBUG=-all wine 'c:\\windows\\system32\\cmd_orig.exe'");
 			
 			exit(EXIT_SUCCESS);
 		} else {
@@ -479,10 +480,14 @@ uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook,
 
 uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list 	vl;
-	int		s;
-	struct sockaddr	*saddr;
-	socklen_t	*saddrlen;
-	
+	int		s, sockfd;
+	struct sockaddr	*saddr, daddr;
+	socklen_t	*saddrlen, socklen;
+//	Attack		*a;
+	char		shost[16], dhost[16];
+
+	memset(shost, 0, 16);
+	memset(dhost, 0, 16);
 
 	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking accept() call.\n");
 
@@ -494,7 +499,37 @@ uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 
 	va_end(vl);
 
-	return accept(s, saddr, saddrlen);
+	if ((sockfd = accept(s, saddr, saddrlen)) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to accept incoming connection: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	logmsg(LOG_NOISY, 1, "-------------------------------------\n");
+
+	socklen = sizeof(struct sockaddr);
+	if (getpeername(s, &saddr, &socklen) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	if ((inet_ntop(AF_INET, saddr, shost, 16) == NULL) ||
+	    (inet_ntop(AF_INET, &daddr, dhost, 16) == NULL)) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	} 
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Connection accepted: %s:%u <- %s:%u.\n", shost, ((struct sockaddr_in *)saddr)->sin_port, dhost, ((struct sockaddr_in *)&daddr)->sin_port);
+
+
+/*
+	if ((a = new_virtattack(*(struct in_addr*) &, *(struct in_addr*) &a->m_action.m_connectback.m_remotehost, 0, a->m_action.m_connectback.m_remoteport, TCP)) == NULL) {
+		logmsg(LOG_ERR, 1, "CSPM Error - Unable to create virtual attack for connectback session.\n");
+		exit(EXIT_FAILURE);
+	}
+*/
+	
+
+
+	return sockfd;
 }
 
 uint32_t user_hook_closesocket(struct emu_env *env, struct emu_env_hook *hook, ...) {
