@@ -42,9 +42,10 @@
 #include "htm_submitPostgres.h"
 
 const char	module_name[]		= "submitPostgres";
-const char	module_version[]	= "0.1.0";
+const char	module_version[]	= "0.1.1";
 
 static const char *config_keywords[] = {
+	"sensor_id",
 	"db_host",
 	"db_port",
 	"db_name",
@@ -53,25 +54,45 @@ static const char *config_keywords[] = {
 };
 
 struct pg_conn	*db_connection;
-char		*db_host = NULL,
+char		*sensor_id = NULL,
+		*db_host = NULL,
 		*db_port = NULL,
 		*db_name = NULL,
 		*db_user = NULL,
 		*db_pass = NULL,
 		*db_info = NULL;
 
-#define MAX_SQL_BUFFER	10485760		// 10 MB
-#define MAX_URI_SIZE	2048
-
 
 void plugin_init(void) {
-	/* TODO: register sensor in db, if not existent */
 	plugin_register_hooks();
 	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
 	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
 		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
 		exit(EXIT_FAILURE);
 	}
+
+	// check if all needed options are given
+	if (db_host == NULL) {
+		fprintf(stderr, "  SubmitPostgres Error - Incomplete configuration: Database host missing.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (db_name == NULL) {
+		fprintf(stderr, "  SubmitPostgres Error - Incomplete configuration: Database name missing.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (db_user == NULL) {
+		fprintf(stderr, "  SubmitPostgres Error - Incomplete configuration: Database user missing.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (db_pass == NULL) {
+		fprintf(stderr, "  SubmitPostgres Error - Incomplete configuration: Database password missing.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (sensor_id == NULL) {
+		fprintf(stderr, "  SubmitPostgres Error - Incomplete configuration: Sensor ID missing.\n");
+		exit(EXIT_FAILURE);
+	}
+
 	return;
 }
 
@@ -94,11 +115,11 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 	char		*value = NULL;
 	conf_node	*confopt = NULL;
 
-	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return NULL;
 
 	while (node->val) {
 		if ((value = malloc(node->val->size+1)) == NULL) {
-			perror("  Error - Unable to allocate memory");
+			fprintf(stderr, "  SubmitPostgres Error - Unable to allocate memory: %s.", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 		memset(value, 0, node->val->size+1);
@@ -116,12 +137,15 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 			db_user = value;
 		} else if OPT_IS("db_pass") {
 			db_pass = value;
+		} else if OPT_IS("sensor_id") {
+			sensor_id = value;
 		} else {
-			fprintf(stderr, "  Error - Invalid configuration option for plugin %s: %s\n", module_name, node->keyword);
+			fprintf(stderr, "  SubmitPostgres Error - Invalid configuration option for plugin %s: %s\n", module_name, node->keyword);
 			exit(EXIT_FAILURE);
 		}
 	}
-	return(node);
+
+	return node;
 }
 
 
@@ -133,46 +157,30 @@ int db_connect(void) {
 			exit(EXIT_FAILURE);
 		}
 	}
-	if (db_host == NULL) {
-		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Database connection info is incomplete: Host missing.\n");
-		return(-1);
-	}
-	if (db_name == NULL) {
-		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Database connection info is incomplete: Database name missing.\n");
-		return(-1);
-	}
-	if (db_user == NULL) {
-		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Database connection info is incomplete: User missing.\n");
-		return(-1);
-	}
-	if (db_pass == NULL) {
-		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Database connection info is incomplete: Password missing.\n");
-		return(-1);
-	}
 
 	if (asprintf(&db_info, "port=%s host=%s user=%s password=%s dbname=%s", db_port, db_host, db_user, db_pass, db_name) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to allocate memory: %s.\n", strerror(errno));
-		return(-1);
+		return -1;
 	}
 
 	// connect to database
 	if (PQstatus(db_connection = PQconnectdb(db_info)) != CONNECTION_OK) {
 		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Could not connect to database: %s.\n", PQerrorMessage(db_connection));
 		PQfinish(db_connection);
-		return(-1);
+		return -1;
 	}
 	logmsg(LOG_DEBUG, 1, "SubmitPostgres - Database connection established.\n");
 	if (PQsetClientEncoding(db_connection, "UTF8") != 0) {
 		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Could not set database character encoding to UTF8: %s.\n", PQerrorMessage(db_connection));
 		PQfinish(db_connection);
-		return(-1);
+		return -1;
 	}
-	return(0);
+	return 0;
 }
 
 
 void db_disconnect(void) {
-	/* disconnect from database */
+	// disconnect from database
 	PQfinish(db_connection);
 	free(db_info);
 	logmsg(LOG_DEBUG, 1, "SubmitPostgres - Database connection closed.\n");
@@ -187,7 +195,7 @@ char *build_uri(struct s_download *download) {
 
 	if (download->dl_type == NULL) {
 		logmsg(LOG_WARN, 1, "SubmitPostgres Warning - Could not build URI: Unknown protocol type.\n");
-		return(NULL);
+		return NULL;
 	}
 
 	if (asprintf(&uri, "%s://%s:%s@%s:%u/%s:%s",
@@ -201,7 +209,7 @@ char *build_uri(struct s_download *download) {
 		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to allocate memory: %s.\n", strerror(errno));
 	}
 
-	return(uri);
+	return uri;
 }
 
 
@@ -213,10 +221,10 @@ int db_submit(Attack *attack) {
 	size_t		length;
 	char		*locationID = NULL;
 
-	// no data - nothing todo
+	// no data - nothing to do
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
 		logmsg(LOG_DEBUG, 1, "SubmitPostgres - No data received, nothing to save.\n");
-		return(0);
+		return 0;
 	}
 
 
@@ -224,7 +232,7 @@ int db_submit(Attack *attack) {
 	logmsg(LOG_DEBUG, 1, "SubmitPostgres - Connecting to database.\n");
 	if (db_connect() != 0) {
 		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to connect to database: %s.\n", PQerrorMessage(db_connection));
-		return(-1);
+		return -1;
 	}
 	logmsg(LOG_DEBUG, 1, "SubmitPostgres - Connection to database established.\n");
 
@@ -234,7 +242,7 @@ int db_submit(Attack *attack) {
 		logmsg(LOG_ERR, 1, "SubmitPostgres Error - BEGIN command failed: %s.\n", PQerrorMessage(db_connection));
 		PQclear(res);
 		db_disconnect();
-		return(-1);
+		return -1;
 	}
 	PQclear(res);
 
@@ -242,29 +250,23 @@ int db_submit(Attack *attack) {
 	// submit attack data
 	if (attack->a_conn.payload.size > 0 && attack->a_conn.payload.data != NULL) {
 	  logmsg(LOG_DEBUG, 1, "SubmitPostgres - Submitting attack string.\n");
-		if ((query = malloc(MAX_SQL_BUFFER + 1)) == NULL) {
-			logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to allocate memory: %s.\n", strerror(errno));
-			return(-1);
-		}
-		memset(query, 0, MAX_SQL_BUFFER + 1);
-
 		// escape attack string
 		if ((esc_bytea = PQescapeByteaConn(db_connection, attack->a_conn.payload.data, attack->a_conn.payload.size, &length)) == NULL) {
 			logmsg(LOG_ERR, 1, "Database error - Could not escape attack string: %s.\n", PQerrorMessage(db_connection));
 			db_disconnect();
-			return(-1);
+			return -1;
 		}
 
 		if (((starttime = calloc(1, 40)) == NULL) || ((endtime = calloc(1, 40)) == NULL)) {
 			logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to allocate memory: %s.\n", strerror(errno));
 			db_disconnect();
-			return(-1);
+			return -1;
 		}
 		if ((strftime(starttime, 40, "%Y-%m-%d %T %Z", localtime(&attack->start_time)) == 0) || 
 		    (strftime(endtime, 40, "%Y-%m-%d %T %Z", localtime(&attack->end_time)) == 0)) {
 			logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to convert timestamps.\n");
 			db_disconnect();
-			return(-1);
+			return -1;
 		}
 
 		char *src_ip, *dst_ip, *fwd_ip;
@@ -274,10 +276,10 @@ int db_submit(Attack *attack) {
 			logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to allocate memory: %s.\n", strerror(errno));
 			db_disconnect();
 			free(query);
-			return(-1);
+			return -1;
 		}
 		
-		if (snprintf(query, MAX_SQL_BUFFER,
+		if (asprintf(&query,
 			     "SELECT attacks.honeytrap_add_attack_string('%s'::varchar, %d::integer, '%s'::timestamptz, '%s'::timestamptz, '%s'::inet, %s::integer, %d::integer, '%s'::inet, %d::integer, %d, %d::smallint, '%s'::inet, %d::integer, E'%s'::bytea)",
 			     attack->a_conn.payload.md5sum,
 			     0,
@@ -292,18 +294,17 @@ int db_submit(Attack *attack) {
 			     attack->op_mode,
 			     fwd_ip,
 			     attack->p_conn.r_port,
-			     esc_bytea) >= MAX_SQL_BUFFER) {
-		  logmsg(LOG_ERR, 1, "Error - Could not save attack: SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile).\n");
-		  free(query);
-		  return(-1);
-		  }
+			     esc_bytea) == -1) {
+			logmsg(LOG_ERR, 1, "SubmitPostgres Error - Could not create SQL query: %s.\n", strerror(errno));
+			return -1;
+		}
 
 		if (PQresultStatus(res = PQexec(db_connection, query)) != PGRES_TUPLES_OK) {
 			logmsg(LOG_ERR, 1, "SubmitPostgres Error - Attack submission failed: %s.\n", PQerrorMessage(db_connection));
 			PQclear(res);
 			db_disconnect();
 			free(query);
-			return(-1);
+			return -1;
 		}
 		
 		logmsg(LOG_NOISY, 1, "SubmitPostgres - Attack saved.\n");
@@ -325,18 +326,13 @@ int db_submit(Attack *attack) {
 			logmsg(LOG_DEBUG, 1, "SubmitPostgres - Submitting malware to database (%d files).\n", attack->dl_count);
 
 			for(i=0;i<attack->dl_count;i++) {
-				if ((query = calloc(1, MAX_SQL_BUFFER + 1)) == NULL) {
-					logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
-					return(-1);
-				}
-
 				// escape data
 				if ((esc_bytea = PQescapeByteaConn(db_connection, attack->download[i].dl_payload.data, attack->download[i].dl_payload.size, &length)) == NULL) {
 					logmsg(LOG_ERR, 1, "SubmitPostgres Error - Could not escape malware binary string: %s.\n", PQerrorMessage(db_connection));
 					PQclear(res);
 					db_disconnect();
 					free(query);
-					return(-1);
+					return -1;
 				}
 
 				if ((url = build_uri(&attack->download[i])) == NULL) {
@@ -348,23 +344,22 @@ int db_submit(Attack *attack) {
 				    ((r_ip = strdup(inet_ntoa(*(struct in_addr*)&(attack->a_conn.r_addr)))) == NULL)) {
 					logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to allocate memory: %s.\n", strerror(errno));
 					free(url);
-					return(-1);
+					return -1;
 				}
-				if (snprintf(query, MAX_SQL_BUFFER, "SELECT malware.sensor_honeytrap_add_sample('%s', '%s', %d, '%s', '%s', '%s', %d, %d, E'%s')",
-				    attack->download[i].dl_payload.sha512sum,
-				    "UBN_HT",
-				    attack_inst,
-				    url,
-				    l_ip,
-				    r_ip,
-				    attack->a_conn.l_port,
-				    attack->download->r_port,
-				    esc_bytea) >= MAX_SQL_BUFFER) {
+				if (asprintf(&query, "SELECT malware.sensor_honeytrap_add_sample('%s', '%s', %d, '%s', '%s', '%s', %d, %d, E'%s')",
+					     attack->download[i].dl_payload.sha512sum,
+					     sensor_id,
+					     attack_inst,
+					     url,
+					     l_ip,
+					     r_ip,
+					     attack->a_conn.l_port,
+					     attack->download->r_port,
+					     esc_bytea) == -1) {
 					logmsg(LOG_ERR, 1,
-						"SubmitPostgres Error - SQL query exceeds maximum size (increase MAX_SQL_BUFFER and recompile plugin).\n");
+						"SubmitPostgres Error - Could not create SQL query: %s.\n", strerror(errno));
 					free(url);
-					free(query);
-					return(-1);
+					return -1;
 				}
 				free(url);
 
@@ -373,7 +368,7 @@ int db_submit(Attack *attack) {
 					PQclear(res);
 					db_disconnect();
 					free(query);
-					return(-1);
+					return -1;
 				}
 				free(query);
 				PQfreemem(esc_bytea);
@@ -384,15 +379,15 @@ int db_submit(Attack *attack) {
 
 	}
 
-	/* end transaction and disconnect */
+	// end transaction and disconnect
 	if (PQresultStatus(res = PQexec(db_connection, "END")) != PGRES_COMMAND_OK) {
 		logmsg(LOG_ERR, 1, "SubmitPostgres Error - END command failed: %s.\n", PQerrorMessage(db_connection));
 		PQclear(res);
 		db_disconnect();
-		return(-1);
+		return -1;
 	}
 
 	PQclear(res);
 	db_disconnect();
-	return(0);
+	return 0;
 }
