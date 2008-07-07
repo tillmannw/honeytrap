@@ -401,7 +401,7 @@ uint32_t user_hook_WaitForSingleObject(struct emu_env *env, struct emu_env_hook 
 	va_start(vl, hook);
 
 	hHandle = va_arg(vl, int32_t);
-	va_arg(vl, int32_t);
+	(void) va_arg(vl, int32_t);
 
 	va_end(vl);
 
@@ -424,9 +424,9 @@ uint32_t user_hook_WSASocket(struct emu_env *env, struct emu_env_hook *hook, ...
 	domain		= va_arg(vl,  int);
 	type		= va_arg(vl,  int);
 	protocol	= va_arg(vl, int);
-	va_arg(vl, int);
-	va_arg(vl, int);
-	va_arg(vl, int);
+	(void) va_arg(vl, int);
+	(void) va_arg(vl, int);
+	(void) va_arg(vl, int);
 
 	va_end(vl);
 
