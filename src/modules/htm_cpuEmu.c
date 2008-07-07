@@ -443,14 +443,14 @@ uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook,
 
 	va_start(vl, hook);
 
-	va_arg(vl, char *);	// pszImageName
+	(void) va_arg(vl, char *);	// pszImageName
 	pszCmdLine = va_arg(vl, char *);               
-	va_arg(vl, void *);	// psaProcess
-	va_arg(vl, void *);	// psaThread
-	va_arg(vl, char *);	// fInheritHandles
-	va_arg(vl, uint32_t);	// fdwCreate
-	va_arg(vl, void *);	// pvEnvironment
-	va_arg(vl, char *);	// pszCurDir
+	(void) va_arg(vl, void *);	// psaProcess
+	(void) va_arg(vl, void *);	// psaThread
+	(void) va_arg(vl, char *);	// fInheritHandles
+	(void) va_arg(vl, uint32_t);	// fdwCreate
+	(void) va_arg(vl, void *);	// pvEnvironment
+	(void) va_arg(vl, char *);	// pszCurDir
 	psiStartInfo	=  va_arg(vl, STARTUPINFO *);
 	pProcInfo	=  va_arg(vl, PROCESS_INFORMATION *); 
 
@@ -506,7 +506,7 @@ uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	logmsg(LOG_NOISY, 1, "-------------------------------------\n");
 
 	socklen = sizeof(struct sockaddr);
-	if (getpeername(s, &saddr, &socklen) == -1) {
+	if (getpeername(s, saddr, &socklen) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
