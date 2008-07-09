@@ -1,4 +1,4 @@
-* pcapmon.c
+/* pcapmon.c
  * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
@@ -356,7 +356,7 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 						fprintf(stderr, "Error - Unable to allocate memory: %m.\n");
 						exit(EXIT_FAILURE);
 					}
-					snprintf(bpf_ip_filter, "%s%c",
+					snprintf(bpf_ip_filter, newstrsize+1, "%s%c",
 						inet_ntoa(*(struct in_addr*)
 						&(((struct sockaddr_in *)curaddr->addr)->sin_addr)), 0);
 				} else {
