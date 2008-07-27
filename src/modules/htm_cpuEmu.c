@@ -49,6 +49,7 @@
 #include <emu/emu_shellcode.h>
 #include <emu/environment/emu_env.h>
 #include <emu/environment/win32/emu_env_w32.h>
+#include <emu/environment/win32/emu_env_w32_dll.h>
 #include <emu/environment/win32/emu_env_w32_dll_export.h>
 #include <emu/environment/win32/env_w32_dll_export_kernel32_hooks.h>
 #include <emu/emu_getpc.h>
@@ -61,6 +62,7 @@ uint32_t user_hook_socket(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_WaitForSingleObject(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_WinExec(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_WSASocket(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...);
@@ -111,7 +113,6 @@ void logmsg_emu(struct emu *e, enum emu_log_level level, const char *msg) {
 		break;
 	case EMU_LOG_DEBUG:
 		loglevel	= LL_DEBUG;
-		return;
 		break;
 	case EMU_LOG_NONE:
 	default:
@@ -224,6 +225,7 @@ int run(struct emu *e) {
 
 	emu_env_w32_export_hook(env, "CreateProcessA", user_hook_CreateProcess, NULL);
 	emu_env_w32_export_hook(env, "WaitForSingleObject", user_hook_WaitForSingleObject, NULL);
+	emu_env_w32_export_hook(env, "WinExec", user_hook_WinExec, NULL);
 
 	emu_env_w32_load_dll(env->env.win,"ws2_32.dll");
 	emu_env_w32_export_hook(env, "accept", user_hook_accept, NULL);
@@ -338,7 +340,6 @@ uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	int			s;
 	struct sockaddr		*saddr;
 	socklen_t		saddrlen;
-	struct sockaddr_in	*si;
 
 	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking bind() call.\n");
 
@@ -348,17 +349,13 @@ uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	saddr		= va_arg(vl, struct sockaddr *);
 	saddrlen	= va_arg(vl, socklen_t);
 
-	if (opts.override.bind.host != NULL) {
-		si			= (struct sockaddr_in *) saddr;
-		si->sin_addr.s_addr	= inet_addr(opts.override.bind.host);
-	}
-
-	if (opts.override.connect.port > 0) {
-		si		= (struct sockaddr_in *) saddr;
-		si->sin_port	= htons(opts.override.bind.port);
-	}
-
 	va_end(vl);
+
+	if (opts.override.bind.host != NULL)		// override listen address?
+		((struct sockaddr_in *)saddr)->sin_addr.s_addr = inet_addr(opts.override.connect.host);
+
+	if (opts.override.bind.port > 0)		// override listen port?
+		((struct sockaddr_in *)saddr)->sin_port = htons(opts.override.connect.port);
 
 	return bind(s, saddr, saddrlen);
 }
@@ -366,33 +363,50 @@ uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...) {
 
 uint32_t user_hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list			vl;
-	int			s;
-	struct sockaddr		*saddr;
-	struct sockaddr_in	*si;
-	socklen_t		saddrlen;
+	int			s, sockfd;
+	struct sockaddr		*saddr, daddr;
+	socklen_t		saddrlen, daddrlen;
+	char			shost[16], dhost[16];
 
 	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking connect() call.\n");
 
 	va_start(vl, hook);
 
-	s	= va_arg(vl,  int);
-	saddr	= va_arg(vl,  struct sockaddr *);
-
-	if (opts.override.connect.host != NULL) {
-		si			= (struct sockaddr_in *) saddr;
-		si->sin_addr.s_addr	= inet_addr(opts.override.connect.host);
-	}
-
-	if (opts.override.connect.port > 0) {
-		si		= (struct sockaddr_in *) saddr;
-		si->sin_port	= htons(opts.override.connect.port);
-	}
-
-	saddrlen = va_arg(vl,  socklen_t);
+	s		= va_arg(vl,  int);
+	saddr		= va_arg(vl,  struct sockaddr *);
+	saddrlen	= va_arg(vl,  socklen_t);
 
 	va_end(vl);
 
-	return connect(s, saddr, saddrlen);
+	if (opts.override.connect.host != NULL)		// override dst address?
+		((struct sockaddr_in *)saddr)->sin_addr.s_addr = inet_addr(opts.override.connect.host);
+
+	if (opts.override.connect.port > 0)		// override dst port?
+		((struct sockaddr_in *)saddr)->sin_port = htons(opts.override.connect.port);
+
+	if ((sockfd = connect(s, saddr, saddrlen)) != -1) {
+		daddrlen = sizeof(struct sockaddr);
+		if (getsockname(sockfd, &daddr, &daddrlen) == -1) {
+			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (getpeername(sockfd, saddr, &saddrlen) == -1) {
+			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
+		    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
+			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		} 
+
+		logmsg(LOG_NOISY, 1, "CPU Emulation - Connection established: %s:%u -> %s:%u.\n", 
+			   shost, ntohs(((struct sockaddr_in *)saddr)->sin_port), 
+			   dhost, ntohs(((struct sockaddr_in *)&daddr)->sin_port));
+	}
+
+	return sockfd;
 }
 
 uint32_t user_hook_WaitForSingleObject(struct emu_env *env, struct emu_env_hook *hook, ...) {
@@ -471,7 +485,7 @@ uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook,
 			dup2(psiStartInfo->hStdError,  fileno(stderr));
 
 //			system("/bin/sh -c \"cd ~/.wine/drive_c/; WINEDEBUG=-all wine 'c:\\windows\\system32\\cmd_orig.exe' \"");
-			system("WINEDEBUG=-all wine 'c:\\windows\\system32\\cmd_orig.exe'");
+			system("/bin/sh -c \"cd .wine/drive_c; WINEDEBUG=-all wine 'c:\\windows\\system32\\cmd_orig.exe'\"");
 			
 			exit(EXIT_SUCCESS);
 		} else {
@@ -482,12 +496,19 @@ uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook,
 	return 1;
 }
 
+
+uint32_t user_hook_WinExec(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking WinExec() call.\n");
+
+	return 0;
+}
+
+
 uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list 	vl;
 	int		s, sockfd;
 	struct sockaddr	*saddr, daddr;
-	socklen_t	*saddrlen, socklen;
-//	Attack		*a;
+	socklen_t	*saddrlen, daddrlen;
 	char		shost[16], dhost[16];
 
 	memset(shost, 0, 16);
@@ -503,37 +524,27 @@ uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 
 	va_end(vl);
 
-	if ((sockfd = accept(s, saddr, saddrlen)) == -1) {
-		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to accept incoming connection: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+	if ((sockfd = accept(s, saddr, saddrlen)) != -1) {
+		daddrlen = sizeof(struct sockaddr);
+		if (getsockname(sockfd,&daddr, &daddrlen) == -1) {
+			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		if (getpeername(sockfd,saddr, saddrlen) == -1) {
+			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
+		    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
+			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		} 
+
+		logmsg(LOG_NOISY, 1, "CPU Emulation - Connection accepted: %s:%u <- %s:%u.\n", 
+			   shost, ntohs(((struct sockaddr_in *)saddr)->sin_port), 
+			   dhost, ntohs(((struct sockaddr_in *)&daddr)->sin_port));
 	}
-	logmsg(LOG_NOISY, 1, "-------------------------------------\n");
-
-	socklen = sizeof(struct sockaddr);
-	if (getsockname(sockfd,&daddr, &socklen) == -1) {
-		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
-	    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
-		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
-	} 
-
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Connection accepted: %s:%u <- %s:%u.\n", 
-		   shost, ((struct sockaddr_in *)saddr)->sin_port, 
-		   dhost, ((struct sockaddr_in *)&daddr)->sin_port);
-
-
-/*
-	if ((a = new_virtattack(*(struct in_addr*) &, *(struct in_addr*) &a->m_action.m_connectback.m_remotehost, 0, a->m_action.m_connectback.m_remoteport, TCP)) == NULL) {
-		logmsg(LOG_ERR, 1, "CSPM Error - Unable to create virtual attack for connectback session.\n");
-		exit(EXIT_FAILURE);
-	}
-*/
-	
-
 
 	return sockfd;
 }
