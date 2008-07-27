@@ -111,12 +111,13 @@ void logmsg_emu(struct emu *e, enum emu_log_level level, const char *msg) {
 		break;
 	case EMU_LOG_DEBUG:
 		loglevel	= LL_DEBUG;
+		return;
 		break;
 	case EMU_LOG_NONE:
 	default:
 		break;
 	}
-	logmsg(loglevel, 1, "CPU Emulation - CPU reports: %s.\n", msg);
+	logmsg(loglevel, 1, "CPU Emulation - CPU reports: %s", msg);
 
 	return;
 }
@@ -139,6 +140,8 @@ int find_shellcode(Attack *attack) {
 		return(-1);
 	}
 
+	emu_log_set_logcb(emu_logging_get(e), logmsg_emu);
+
 	logmsg(LOG_NOISY, 1, "CPU Emulation - Analyzing %u bytes.\n", attack->a_conn.payload.size);
 
 	if ((offset = emu_shellcode_test(e, (u_char *) attack->a_conn.payload.data, attack->a_conn.payload.size)) >= 0) {
@@ -148,6 +151,7 @@ int find_shellcode(Attack *attack) {
 
 		// prepare emu for running shellcode
 		e = emu_new();
+		emu_log_set_logcb(emu_logging_get(e), logmsg_emu);
 
 		if ((opts.scode = malloc(attack->a_conn.payload.size)) == NULL) {
 			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to allocate memory: %s\n", strerror(errno));
@@ -506,18 +510,20 @@ uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	logmsg(LOG_NOISY, 1, "-------------------------------------\n");
 
 	socklen = sizeof(struct sockaddr);
-	if (getpeername(s, saddr, &socklen) == -1) {
+	if (getsockname(sockfd,&daddr, &socklen) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
-	if ((inet_ntop(AF_INET, saddr, shost, 16) == NULL) ||
-	    (inet_ntop(AF_INET, &daddr, dhost, 16) == NULL)) {
+	if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
+	    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	} 
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Connection accepted: %s:%u <- %s:%u.\n", shost, ((struct sockaddr_in *)saddr)->sin_port, dhost, ((struct sockaddr_in *)&daddr)->sin_port);
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Connection accepted: %s:%u <- %s:%u.\n", 
+		   shost, ((struct sockaddr_in *)saddr)->sin_port, 
+		   dhost, ((struct sockaddr_in *)&daddr)->sin_port);
 
 
 /*
