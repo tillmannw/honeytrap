@@ -1,5 +1,5 @@
 /* sock.c
- * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -57,7 +57,7 @@ int get_boundsock(struct sockaddr_in *server_addr, uint16_t port, int type) {
 
 	bzero((char *) server_addr, sizeof(struct sockaddr_in));
 	server_addr->sin_family		= AF_INET;
-	server_addr->sin_addr.s_addr	= htonl(INADDR_ANY);
+	server_addr->sin_addr.s_addr	= bind_address.s_addr;
 	server_addr->sin_port		= port;
 	if ((bind(fd, (struct sockaddr *) server_addr, sizeof(struct sockaddr_in))) != 0) {
 	    /* we already got one server process */

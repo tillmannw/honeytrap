@@ -1,5 +1,5 @@
 /* readconf.c
- * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -54,6 +54,7 @@ static const char *config_keywords[] = {
 	"response_dir",
 	"plugin_dir",
 	"read_limit",
+	"bind_address",
 	"replace_private_ips",
 #ifdef USE_PCAP_MON
 	"promisc",
@@ -136,6 +137,8 @@ int configure(int my_argc, char *my_argv[]) {
 
 	config_keywords_tree	= NULL;
 	config_tree		= NULL;
+
+	bind_address.s_addr 	= INADDR_ANY;
 
 	/* build tree of allowed configuration keywords */
 	for (i=0; i<sizeof(config_keywords)/sizeof(char *); i++) {
@@ -469,6 +472,13 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 		else if (OPT_IS("logfile")) OPT_SET("  Setting logfile to %s.\n", logfile_name)
 		else if (OPT_IS("response_dir")) OPT_SET("  Loading default responses from %s.\n", response_dir)
 		else if (OPT_IS("plugin_dir")) OPT_SET("  Loading plugins from %s.\n", plugin_dir)
+		else if (OPT_IS("bind_address")) {
+			if (inet_aton(value, &bind_address) == 0) {
+				fprintf(stderr, "  Error - Unable to convert IP address: %s.\n", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+			DEBUG_FPRINTF(stdout, "  Binding dynamic servers to %s.\n", inet_ntoa(bind_address));
+		}
 		else if (OPT_IS("user")) {
 			if ((pwd_entry = getpwnam(value)) == NULL) {
 				if (errno) fprintf(stderr, "  Error - Invalid user '%s': %m.\n", value);
@@ -477,7 +487,7 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 			}
 			u_id = pwd_entry->pw_uid;
 			user = value;
-			DEBUG_FPRINTF(stdout, "  Setting user to %s\n", user);
+			DEBUG_FPRINTF(stdout, "  Setting user to %ss\n", user);
 		} else if (OPT_IS("group")) {
 			if ((grp_entry = getgrnam(value)) == NULL) {
 				if (errno) fprintf(stderr, "  Error - Invalid group '%s': %m.\n", value);
@@ -486,7 +496,7 @@ conf_node *process_confopt(conf_node *tree, conf_node *node, void *opt_data) {
 			}
 			g_id = grp_entry->gr_gid;
 			group = value;
-			DEBUG_FPRINTF(stdout, "  Setting group to %s\n", group);
+			DEBUG_FPRINTF(stdout, "  Setting group to %s.\n", group);
 		} else if (OPT_IS("portconf")) {
 			if (process_conftree(node, node->first_leaf, process_confopt_portconf, NULL) == NULL) return(NULL);
 			node->first_leaf = NULL;

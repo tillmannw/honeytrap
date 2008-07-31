@@ -1,26 +1,23 @@
 /* 
- * honeytrap 1.0 configuration file template -- please adjust
+ * honeytrap 1.0.1 configuration file template -- please adjust
  * (c) Tillmann Werner <tillmann.werner@gmx.de>
  */
 
-/* log to this file */
+// log to this file
 logfile		= "/opt/honeytrap/honeytrap.log"
 
-/* PID file */
+// store process ID in this file
 pidfile		= "/var/run/honeytrap.pid"
 
 /* where to look for default responses
  * these are sent for connections handled in "normal mode" */
 response_dir	= "/opt/honeytrap/etc/honeytrap/responses"
 
-/* replace rfc1918 ip addresses with attacking ip address */
+// replace rfc1918 IP addresses with attacking IP address
 replace_private_ips = "no"
 
-/* default port mode -- valid values are "ignore", "normal" and "mirror"
-portconf_default = "normal"
-
 /* put network interface into promiscuous mode
- * (only availabel when compiled with --with-pcap-mon) */
+ * (only availabel when compiled with --with-stream-mon=pcap) */
 //promisc = "on"
 
 /* the user and group under which honeytrap should run
@@ -31,18 +28,18 @@ group	= "nogroup"
 // do not read more than 20 MB - used to prevent DoS attacks
 read_limit = "20971520"
 
-/* include a file */
+// include a file
 //include = "ports.conf"
 
 
 /* ----- plugin stuff below ----- */
 
 /* where to look for plugins
-   need to be set before loading plugins */
+   needs to be set before loading plugins */
 plugin_dir	= "/opt/honeytrap/etc/honeytrap/plugins"
 
 
-/* include a plugin via plugin-[ModuleName] = "" */
+// include a plugin via plugin-[ModuleName] = ""
 
 plugin-ftpDownload = ""
 plugin-tftpDownload = ""
@@ -50,28 +47,32 @@ plugin-b64Decode = ""
 plugin-vncDownload = ""
 
 
-/* store attacks on disk */
+// store attacks on disk
 plugin-SaveFile = {
 	attacks_dir	= "/opt/honeytrap/attacks"
 	downloads_dir	= "/opt/honeytrap/downloads"
 }
 
 
-/* scan downloaded samples with ClamAV engine */
+// scan downloaded samples with ClamAV engine
+/*
 plugin-ClamAV = {
 	temp_dir	= "/tmp"
 	clamdb_path	= "/var/lib/clamav"
 }
+*/
 
 
-/* calculate locality sensitive hashes */
+// calculate locality sensitive hashes
+/*
 plugin-SpamSum = {
 	md5sum_sigfile	= "/opt/honeytrap/md5sum.sigs"
 	spamsum_sigfile	= "/opt/honeytrap/spamsum.sigs"
 }
+*/
 
 
-/* store attacks in PostgeSQL database */
+// store attacks in PostgeSQL database
 /*
 plugin-SavePostgres = {
 	db_host	= "localhost"
@@ -83,7 +84,7 @@ plugin-SavePostgres = {
 */
 
 
-/* invoke wget to download files via http */
+// invoke an external program (f.e. wget) to download files via http
 /*
 plugin-httpDownload = {
 	http_program = "/usr/bin/wget"
@@ -105,7 +106,7 @@ portconf_default = "normal"
 
 // explicit port configuration
 portconf = {
-	/* ignore these ports */
+	// ignore connection requests on these ports
 	ignore = {
 		protocol	= "tcp"
 		port		= "22"

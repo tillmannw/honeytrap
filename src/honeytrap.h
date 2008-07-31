@@ -1,5 +1,5 @@
 /* honeytrap.h
- * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -104,20 +104,21 @@ int arg_c;
 
 // global variables regarding configuration
 
-char	*pidfile_name;
-char	*logfile_name;
-char	*dev;
-char	*response_dir;
-char	*plugin_dir;
-u_char	daemonize;
-u_char	promisc_mode;
-u_char	replace_private_ips;
-uid_t	u_id;
-gid_t	g_id;
-int32_t	conn_timeout;
-int32_t	read_timeout;
-int32_t	m_read_timeout;
-int32_t read_limit;
+char		*pidfile_name;
+char		*logfile_name;
+char		*dev;
+char		*response_dir;
+char		*plugin_dir;
+u_char		daemonize;
+u_char		promisc_mode;
+u_char		replace_private_ips;
+uid_t		u_id;
+gid_t		g_id;
+int32_t		conn_timeout;
+int32_t		read_timeout;
+int32_t		m_read_timeout;
+int32_t		read_limit;
+struct in_addr	bind_address;
 
 /* explicit port configurations */
 u_char	portconf_default;
