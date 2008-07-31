@@ -16,6 +16,9 @@ response_dir	= "/opt/honeytrap/etc/honeytrap/responses"
 // replace rfc1918 IP addresses with attacking IP address
 replace_private_ips = "no"
 
+// bind dynamic servers to a specific address
+//bind_address = "127.0.0.1"
+
 /* put network interface into promiscuous mode
  * (only availabel when compiled with --with-stream-mon=pcap) */
 //promisc = "on"
