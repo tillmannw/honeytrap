@@ -180,6 +180,7 @@ char *hmac(u_char **msg, ssize_t len) {
 int submit_nebula(Attack *attack) {
 	struct hostent		*host;
 	unsigned long		cbuf_len;
+	long			tsecs;
 	u_char			*cbuf, response[9];
 	u_int32_t		nonce, len;
 	u_int16_t		hmac_len, hmac_port;
@@ -190,6 +191,7 @@ int submit_nebula(Attack *attack) {
 	struct timeval		r_timeout;
 	fd_set			rfds;
 
+	tsecs			= 10;	// select timeout in seconds
 	cbuf_len		= 0;
 	cbuf			= NULL;
 	host			= NULL;
@@ -235,8 +237,8 @@ int submit_nebula(Attack *attack) {
 	FD_SET(sigpipe[0], &rfds);
 	FD_SET(sock_fd, &rfds);
 
-	r_timeout.tv_sec = 10;
-	r_timeout.tv_usec = 0;
+	r_timeout.tv_sec	= tsecs;
+	r_timeout.tv_usec	= 0;
 
 	/* wait for incoming data, close connection on timeout */
 	logmsg(LOG_DEBUG, 1, "SubmitNebula - Waiting for nonce, timeout is %d seconds.\n",
@@ -252,7 +254,7 @@ int submit_nebula(Attack *attack) {
 		close(sock_fd);
 		return(-1);
 	case 0:
-		logmsg(LOG_ERR, 1, "SubmitNebula Warning - Did not receive nonce within %u seconds.\n", (unsigned int) r_timeout.tv_sec);
+		logmsg(LOG_ERR, 1, "SubmitNebula Warning - Did not receive nonce within %ld seconds.\n", tsecs);
 		close(sock_fd);
 		return(-1);
 	default:

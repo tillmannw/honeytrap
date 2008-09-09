@@ -21,13 +21,6 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "pcapmon.h"
-
-#ifndef HAVE_PCAP_BPF_H
-  #ifdef HAVE_NET_BPF_H
-    #include <net/bpf.h>
-  #endif
-#endif
 
 #ifndef ETHER_HDRLEN
  #define ETHER_HDRLEN 14
@@ -35,11 +28,17 @@
 
 #include "ctrl.h"
 #include "dynsrv.h"
+#include "event.h"
 #include "logging.h"
-#include "readconf.h"
-#include "tcpip.h"
-#include "signals.h"
+#ifndef HAVE_PCAP_BPF_H
+  #ifdef HAVE_NET_BPF_H
+    #include <net/bpf.h>
+  #endif
+#endif
 #include "pcapmon.h"
+#include "readconf.h"
+#include "signals.h"
+#include "tcpip.h"
 
 
 u_char *icmp_dissect(const struct ip_header *packet) {
@@ -263,13 +262,14 @@ int start_pcap_mon(void) {
 
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks on %s via PCAP. ----\n", dev);
 
+	// receive packets
+	mainloop_timeout.tv_sec = 0;
+	mainloop_timeout.tv_usec = 0;
+
 	for (;;) {
 		FD_ZERO(&rfds);
 		FD_SET(sigpipe[0], &rfds);
 		FD_SET(pcap_fd, &rfds);
-
-		mainloop_timeout.tv_sec = 360;
-		mainloop_timeout.tv_usec = 0;
 
 		switch (select(MAX(pcap_fd, sigpipe[0]) + 1, &rfds, NULL, NULL, &mainloop_timeout)) {
 		case -1:
@@ -281,6 +281,10 @@ int start_pcap_mon(void) {
 			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %m.\n");
 			exit(EXIT_FAILURE);
 		case 0:
+			// select timed out, handle events
+			mainloop_timeout.tv_sec = event_execute();
+			mainloop_timeout.tv_usec = 0;
+
 			break;
 		default:
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))

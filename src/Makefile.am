@@ -5,6 +5,7 @@ AM_CFLAGS=-export-dynamic -Wall -Werror
 sbin_PROGRAMS = honeytrap
 honeytrap_SOURCES = 	honeytrap.c honeytrap.h \
 			logging.c logging.h \
+			event.c event.h \
 			ctrl.c ctrl.h \
 			signals.c signals.h \
 			readconf.c readconf.h \

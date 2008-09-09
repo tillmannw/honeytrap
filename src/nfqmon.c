@@ -18,12 +18,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "logging.h"
-#include "dynsrv.h"
 #include "ctrl.h"
+#include "dynsrv.h"
+#include "event.h"
+#include "logging.h"
+#include "nfqmon.h"
 #include "readconf.h"
 #include "signals.h"
-#include "nfqmon.h"
 
 /* Set BUFSIZE to 1500 (ethernet frame size) to prevent
  * errors within ipq_read due to truncated messages.
@@ -189,15 +190,14 @@ int start_nfq_mon(void) {
 
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via NFQ. ----\n");
 
-	/* receive packets */
+	// receive packets
+	mainloop_timeout.tv_sec = 0;
+	mainloop_timeout.tv_usec = 0;
 	
 	for (;;) {
 		FD_ZERO(&rfds);
 		FD_SET(sigpipe[0], &rfds);
 		FD_SET(nfq_fd, &rfds);
-
-		mainloop_timeout.tv_sec = 360;
-		mainloop_timeout.tv_usec = 0;
 
 		switch (select(MAX(nfq_fd, sigpipe[0]) + 1, &rfds, NULL, NULL, &mainloop_timeout)) {
 		case -1:
@@ -205,10 +205,13 @@ int start_nfq_mon(void) {
 				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
 				break;
 			}
-			/* error */
 			logmsg(LOG_ERR, 1, "Error - select() call failed in main loop: %m.\n");
 			exit(EXIT_FAILURE);
 		case 0:
+			// select timed out, handle events
+			mainloop_timeout.tv_sec = event_execute();
+			mainloop_timeout.tv_usec = 0;
+
 			break;
 		default:
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))

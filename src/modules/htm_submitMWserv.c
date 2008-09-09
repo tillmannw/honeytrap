@@ -36,6 +36,7 @@
 #include <curl/curl.h>
 
 #include <conftree.h>
+#include <event.h>
 #include <honeytrap.h>
 #include <logging.h>
 #include <plughook.h>
@@ -56,6 +57,7 @@
 #define ST_HASHTEST	2
 #define ST_HEARTBEAT	3
 
+#define HEARTBEAT_INTERVAL 10	// send a heartbeat every 10 seconds
 
 const char module_name[]="submitMwserv";
 const char module_version[]="0.1.0";
@@ -76,6 +78,17 @@ const char	*secret;
 u_char		timeout;
 
 
+int send_heartbeat(void) {
+	time_t	t = time(0);
+
+	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Sending heartbeat.\n");
+
+	// enqueue next heartbeat event
+	event_enqueue(t + HEARTBEAT_INTERVAL, send_heartbeat);
+
+	return 1;
+}
+
 void plugin_init(void) {
 	plugin_register_hooks();
 	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
@@ -83,6 +96,7 @@ void plugin_init(void) {
 		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
 		exit(EXIT_FAILURE);
 	}
+	send_heartbeat();
 	return;
 }
 
@@ -141,7 +155,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 int build_uri(char **uri, struct s_download download) {
 	// build a generic malware URI of format 'type://user:pass@path/to/file:port/protocol'
 
-	logmsg(LOG_DEBUG, 1, "SavePostgres - Building generic malware resource URI.\n");
+	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Building generic malware resource URI.\n");
 
 	if (strlen(download.dl_type) == 3 && !strcmp(download.dl_type, "ftp"))
 		return(asprintf(uri, "%s://%s:%s@%s:%d/%s:%s",
