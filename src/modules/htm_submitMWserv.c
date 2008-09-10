@@ -1,5 +1,6 @@
 /* htm_submitMWserv.c
  * Copyright (C) 2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2008 Georg Wicherski <gw@mwcollect.org>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -57,7 +58,7 @@
 #define ST_HASHTEST	2
 #define ST_HEARTBEAT	3
 
-#define HEARTBEAT_INTERVAL 10	// send a heartbeat every 10 seconds
+#define HEARTBEAT_INTERVAL 180	// send a heartbeat every 180 seconds
 
 const char module_name[]="submitMwserv";
 const char module_version[]="0.1.0";
@@ -71,6 +72,7 @@ static const char *config_keywords[] = {
 
 const char	*mwserv_url;
 char * submit_url;
+char * heartbeat_url;
 
 const char	*guid;
 const char	*maintainer;
@@ -78,16 +80,7 @@ const char	*secret;
 u_char		timeout;
 
 
-int send_heartbeat(void) {
-	time_t	t = time(0);
-
-	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Sending heartbeat.\n");
-
-	// enqueue next heartbeat event
-	event_enqueue(t + HEARTBEAT_INTERVAL, send_heartbeat);
-
-	return 1;
-}
+int send_heartbeat(void);
 
 void plugin_init(void) {
 	plugin_register_hooks();
@@ -131,7 +124,8 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 
 		if OPT_IS("mwserv_url") {
 			mwserv_url = value;
-			asprintf(&submit_url, "%shoneytrap/submit-binary", mwserv_url);
+			asprintf(&submit_url, "%shoneytrap/submit", mwserv_url);
+			asprintf(&heartbeat_url, "%sheartbeat", mwserv_url);
 		} else if OPT_IS("guid") {
 			guid = value;
 		} else if OPT_IS("maintainer") {
@@ -302,8 +296,8 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 	char			saddr[16], daddr[16], sport[6], dport[6];
 
 
-	if (type != ST_HASHTEST && type != ST_SUBMIT) return(NULL);
-	if (!download) return(NULL);
+	if (type != ST_HASHTEST && type != ST_SUBMIT && type != ST_HEARTBEAT) return(NULL);
+	if (!download && type != ST_HEARTBEAT) return(NULL);
 
 	pinfo = pinfo_last = NULL;
 	memset(saddr, 0, 16);
@@ -318,7 +312,7 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 	}
 	
 		
-	logmsg(LOG_NOISY, 1, "SubmitMWserv - Constructing HTTP form for request type %d.\n", type);
+	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Constructing HTTP form for request type %d.\n", type);
 	
 	if (guid)
 		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "guid", CURLFORM_PTRCONTENTS, guid, CURLFORM_END);
@@ -326,38 +320,46 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "maintainer", CURLFORM_PTRCONTENTS, maintainer, CURLFORM_END);
 	if (secret)
 		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "secret", CURLFORM_PTRCONTENTS, secret, CURLFORM_END); 
-	if (download->dl_payload.sha512sum)
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "sha512", CURLFORM_PTRCONTENTS, download->dl_payload.sha512sum, CURLFORM_END); 
-	if (attack->a_conn.r_addr) {
-		rv = snprintf(saddr, 16, "%s", inet_ntoa(*(struct in_addr *)&attack->a_conn.r_addr));
-		if (rv == -1 || rv > 16) return(NULL);
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "saddr", CURLFORM_COPYCONTENTS, saddr, CURLFORM_END); 
+
+	if(type != ST_HEARTBEAT) {	
+		if (download->dl_payload.sha512sum)
+			curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "sha512", CURLFORM_PTRCONTENTS, download->dl_payload.sha512sum, CURLFORM_END); 
+		if (attack->a_conn.r_addr) {
+			rv = snprintf(saddr, 16, "%s", inet_ntoa(*(struct in_addr *)&attack->a_conn.r_addr));
+			if (rv == -1 || rv > 16) return(NULL);
+			curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "saddr", CURLFORM_COPYCONTENTS, saddr, CURLFORM_END); 
+		}
+		if (attack->a_conn.l_addr) {
+			rv = snprintf(daddr, 16, "%s", inet_ntoa(*(struct in_addr *)&attack->a_conn.l_addr));
+			if (rv == -1 || rv > 16) return(NULL);
+			curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "daddr", CURLFORM_COPYCONTENTS, daddr, CURLFORM_END); 
+		}
+		if (attack->a_conn.r_port) {
+			rv = snprintf(sport, 6, "%d", attack->a_conn.r_port);
+			if (rv == -1 || rv > 16) return(NULL);
+			curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "sport", CURLFORM_COPYCONTENTS, sport, CURLFORM_END); 
+		}
+		if (attack->a_conn.l_port) {
+			rv = snprintf(dport, 6, "%d", attack->a_conn.l_port);
+			if (rv == -1 || rv > 16) return(NULL);
+			curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "dport", CURLFORM_COPYCONTENTS, dport, CURLFORM_END); 
+		}
+		if (uri) {
+			curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "url",
+					CURLFORM_PTRCONTENTS, uri, CURLFORM_CONTENTSLENGTH, strlen(uri), CURLFORM_END);
+		}
+
+		if (type == ST_SUBMIT)
+			curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "data",
+					CURLFORM_PTRCONTENTS, download->dl_payload.data,
+					CURLFORM_CONTENTSLENGTH, download->dl_payload.size,
+					CURLFORM_END);
 	}
-	if (attack->a_conn.l_addr) {
-		rv = snprintf(daddr, 16, "%s", inet_ntoa(*(struct in_addr *)&attack->a_conn.l_addr));
-		if (rv == -1 || rv > 16) return(NULL);
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "daddr", CURLFORM_COPYCONTENTS, daddr, CURLFORM_END); 
+	#define SW_STRING "honeytrap " VERSION " (" MY_OS ", " MY_ARCH ", " MY_COMPILER ")"
+	else {
+		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "software",
+			CURLFORM_PTRCONTENTS, SW_STRING, CURLFORM_CONTENTSLENGTH, sizeof(SW_STRING) - 1, CURLFORM_END);
 	}
-	if (attack->a_conn.r_port) {
-		rv = snprintf(sport, 6, "%d", attack->a_conn.r_port);
-		if (rv == -1 || rv > 16) return(NULL);
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "sport", CURLFORM_COPYCONTENTS, sport, CURLFORM_END); 
-	}
-	if (attack->a_conn.l_port) {
-		rv = snprintf(dport, 6, "%d", attack->a_conn.l_port);
-		if (rv == -1 || rv > 16) return(NULL);
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "dport", CURLFORM_COPYCONTENTS, dport, CURLFORM_END); 
-	}
-	if (uri) {
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "url",
-			CURLFORM_PTRCONTENTS, uri, CURLFORM_CONTENTSLENGTH, strlen(uri), CURLFORM_END);
-	}
-	
-	if (type == ST_SUBMIT)
-		curl_formadd(&pinfo, &pinfo_last, CURLFORM_PTRNAME, "data",
-			CURLFORM_PTRCONTENTS, download->dl_payload.data,
-			CURLFORM_CONTENTSLENGTH, download->dl_payload.size,
-			CURLFORM_END);
 
 	// attack: cli:port->srv:port, mode
 
@@ -365,11 +367,12 @@ struct curl_httppost *init_handle(CURLM **multihandle, CURL **curlhandle,
 	curl_easy_setopt(*curlhandle, CURLOPT_FORBID_REUSE, 1);
 	curl_easy_setopt(*curlhandle, CURLOPT_SSL_VERIFYHOST, 0);
 	curl_easy_setopt(*curlhandle, CURLOPT_SSL_VERIFYPEER, 0);
-	curl_easy_setopt(*curlhandle, CURLOPT_URL, submit_url);
-	curl_easy_setopt(*curlhandle, CURLOPT_USERAGENT, "honeytrap " VERSION " (" MY_OS ", " MY_ARCH ", " MY_COMPILER ")");
+	curl_easy_setopt(*curlhandle, CURLOPT_URL, type == ST_HEARTBEAT ? heartbeat_url : submit_url);
+	curl_easy_setopt(*curlhandle, CURLOPT_USERAGENT, SW_STRING);
 	curl_easy_setopt(*curlhandle, CURLOPT_WRITEDATA, response);
 	curl_easy_setopt(*curlhandle, CURLOPT_WRITEFUNCTION, get_response);
 	curl_easy_setopt(*curlhandle, CURLOPT_TIMEOUT, timeout);
+	#undef SW_STRING
 
 	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Creating multi handle.\n");
 	CURLMcode error;
@@ -471,3 +474,47 @@ int submit_mwserv(Attack *attack) {
 
 	return(1);
 }
+
+int send_heartbeat(void) {
+	time_t	t = time(0);
+
+	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Sending heartbeat.\n");
+
+	// enqueue next heartbeat event
+	event_enqueue(t + HEARTBEAT_INTERVAL, send_heartbeat);
+
+
+	CURL			*curlhandle;
+	CURLM			*multihandle;
+	struct curl_httppost	*pinfo;
+	bstr			response = { 0 };
+
+	if ((pinfo = init_handle(&multihandle, &curlhandle, 0,
+		0, 0, &response, ST_HEARTBEAT)) == NULL) {
+		logmsg(LOG_ERR, 1, "SubmitMWserv - Could not initialize CURL handle!\n");
+		return 0;
+	}
+	
+	pid_t child = fork();
+
+	if(child < 0) {
+		logmsg(LOG_ERR, 1, "SubmitMWserv - failed to fork for heartbeat!\n");
+		return 0;
+	}
+	else if(child > 0)
+		return 1;
+
+	switch (transfer_data(multihandle, &response))
+	{
+	case TSS_OK:
+		logmsg(LOG_DEBUG, 1, "SubmitMWserv - Successfully sent heartbeat to %s.\n", heartbeat_url);
+		break;
+	
+	case TSS_ERROR:
+		logmsg(LOG_ERR, 1, "SubmitMWserv Error - Server %s reported error when sending heartbeat!\n", heartbeat_url);
+		break;	
+	}
+
+	_exit(0);
+}
+
