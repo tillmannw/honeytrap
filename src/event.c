@@ -51,8 +51,9 @@ event *event_dequeue(void) {
 }
 
 time_t event_execute(void) {
-	// select timed out, handle events
-	if (eventlist == NULL) return 1;	// event list is empty set timeout to 1 second
+	if (eventlist == NULL)
+		// event list is empty, return 1 second as new timeout
+		return 1;
 
 	event *e = event_dequeue();
 

@@ -31,9 +31,6 @@ group	= "nogroup"
 // do not read more than 20 MB - used to prevent DoS attacks
 read_limit = "20971520"
 
-// include a file
-//include = "ports.conf"
-
 
 /* ----- plugin stuff below ----- */
 
@@ -98,6 +95,16 @@ plugin-httpDownload = {
 */
 
 
+// submit downloaded malware samples to the mwcollect alliance
+/*
+plugin-submitMWserv = {
+	mwserv_url      = "https://submission-url/"
+	guid            = "your-guid"
+	maintainer      = "your-maintainer" 
+	secret          = "your-secret"
+	timeout		= "120"
+}
+*/
 
 /* ----- port mode configuration below ----- */
 
@@ -115,3 +122,6 @@ portconf = {
 		port		= "22"
 	}
 }
+
+// include a file
+//include = "ports.conf"

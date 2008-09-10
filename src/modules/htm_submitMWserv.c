@@ -1,5 +1,5 @@
 /* htm_submitMWserv.c
- * Copyright (C) 2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2007-2008 Tillmann Werner <tillmann.werner@gmx.de>
  * Copyright (C) 2008 Georg Wicherski <gw@mwcollect.org>
  *
  * This file is free software; as a special exception the author gives
@@ -12,7 +12,8 @@
  *
  *
  * Description:
- *   still to come...
+ *   Submits malware samples to the mwcollect malware repository.
+ *   For more info visit http://alliance.mwcollect.org.
  */
  
 
@@ -77,10 +78,8 @@ char * heartbeat_url;
 const char	*guid;
 const char	*maintainer;
 const char	*secret;
-u_char		timeout;
+u_int16_t	timeout;
 
-
-int send_heartbeat(void);
 
 void plugin_init(void) {
 	plugin_register_hooks();
@@ -134,7 +133,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 			secret = value;
 		} else if OPT_IS("timeout") {
 			timeout = atoi(value);
-			if (timeout < 1 || timeout > 60) {
+			if (timeout < 1 || timeout > 360) {
 				fprintf(stderr, "  Error - The value for %s in plugin %s must be between 1 and 60.\n", module_name, node->keyword);
 				exit(EXIT_FAILURE);
 			}
@@ -475,6 +474,7 @@ int submit_mwserv(Attack *attack) {
 	return(1);
 }
 
+
 int send_heartbeat(void) {
 	time_t	t = time(0);
 
@@ -498,14 +498,13 @@ int send_heartbeat(void) {
 	pid_t child = fork();
 
 	if(child < 0) {
-		logmsg(LOG_ERR, 1, "SubmitMWserv - failed to fork for heartbeat!\n");
+		logmsg(LOG_ERR, 1, "SubmitMWserv - Failed to fork for heartbeat: %s.\n", strerror(errno));
 		return 0;
 	}
 	else if(child > 0)
 		return 1;
 
-	switch (transfer_data(multihandle, &response))
-	{
+	switch (transfer_data(multihandle, &response)) {
 	case TSS_OK:
 		logmsg(LOG_DEBUG, 1, "SubmitMWserv - Successfully sent heartbeat to %s.\n", heartbeat_url);
 		break;

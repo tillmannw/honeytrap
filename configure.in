@@ -564,15 +564,6 @@ AC_ARG_WITH(submit-mwserv,
 	[  --with-submit-mwserv            submit malware samples to a central server])
 AM_CONDITIONAL(BUILD_SUBMIT_MWSERV_PLUGIN, test x$with_submit_mwserv = xyes)
 if test "$with_submit_mwserv" = "yes"; then
-	if test "$enable_devmodules" != "X"; then
-		echo
-		echo "   The submitMWserv plugin is still unstable and should not be used in production setups."
-		bold "   Use %B--enable-devmodules%b to build it anyway."
-		echo
-		echo
-		exit
-	fi
-
 	with_submit_mwserv="X"
 
 	AC_CHECK_FUNC(gethostbyname, , AC_CHECK_LIB(nsl, gethostbyname))

@@ -22,5 +22,7 @@ void plugin_unload(void);
 void plugin_register_hooks(void);
 conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_data);
 int submit_mwserv(Attack *attack);
+int send_heartbeat(void);
+
 
 #endif
