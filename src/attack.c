@@ -138,6 +138,8 @@ int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, co
 		return(-1);
 	}
 
+	memset(&a->download[a->dl_count], 0, sizeof(struct s_download));
+
 	if ((dl_type && ((a->download[a->dl_count].dl_type = strdup(dl_type)) == NULL)) ||
 	    (filename && ((a->download[a->dl_count].filename = strdup(filename)) == NULL)) ||
 	    (user && ((a->download[a->dl_count].user = strdup(user)) == NULL)) ||

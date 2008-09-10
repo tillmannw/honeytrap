@@ -1,5 +1,5 @@
 /* htm_SaveFile.c
- * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -41,7 +41,7 @@
 #include "htm_SaveFile.h"
 
 const char module_name[]="SaveFile";
-const char module_version[]="0.2.0";
+const char module_version[]="0.2.1";
 
 static const char *config_keywords[] = {
 	"attacks_dir",
@@ -165,13 +165,20 @@ int save_to_file(Attack *attack) {
 	/* save malware */
 	for (i=0; i<attack->dl_count; i++) {
 		/* save file */
-		/* we need the length of directory + "/" + filename plus md5 checksum */
-		if (asprintf(&mwfilename, "%s/%s-%s", downloads_dir, mem_md5sum(attack->download[i].dl_payload.data,
-			attack->download[i].dl_payload.size), attack->download[i].filename) == -1) {
-			logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %m.\n");
-			return(-1);
+		if (attack->download[i].filename) {
+			if (asprintf(&mwfilename, "%s/%s-%s", downloads_dir, mem_md5sum(attack->download[i].dl_payload.data,
+				attack->download[i].dl_payload.size), attack->download[i].filename) == -1) {
+				logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %s.\n", strerror(errno));
+				return(-1);
+			}
+		} else {
+			if (asprintf(&mwfilename, "%s/%s", downloads_dir, mem_md5sum(attack->download[i].dl_payload.data,
+				attack->download[i].dl_payload.size)) == -1) {
+				logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %s.\n", strerror(errno));
+				return(-1);
+			}
 		}
-		logmsg(LOG_DEBUG, 1, "SaveFile - Malware sample dumpfile name is %s\n", mwfilename);
+		logmsg(LOG_NOISY, 1, "SaveFile - Malware sample dumpfile name is %s\n", mwfilename);
 		if (((dumpfile_fd = open(mwfilename, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
 		    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {
 			logmsg(LOG_WARN, 1, "SaveFile error - Unable to save malware sample dumpfile %s: %s.\n", mwfilename,
@@ -188,7 +195,10 @@ int save_to_file(Attack *attack) {
 			return(-1);
 		}
 		close(dumpfile_fd);
-		logmsg(LOG_NOTICE, 1, "SaveFile - Malware sample dumpfile %s saved.\n", attack->download[i].filename);
+		if (attack->download[i].filename)
+			logmsg(LOG_NOTICE, 1, "SaveFile - Malware sample dumpfile %s saved.\n", attack->download[i].filename);
+		else
+			logmsg(LOG_NOTICE, 1, "SaveFile - Malware sample dumpfile saved.\n");
 	}
 
 	return(0);
