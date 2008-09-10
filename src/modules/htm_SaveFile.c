@@ -178,7 +178,7 @@ int save_to_file(Attack *attack) {
 				return(-1);
 			}
 		}
-		logmsg(LOG_NOISY, 1, "SaveFile - Malware sample dumpfile name is %s\n", mwfilename);
+		logmsg(LOG_DEBUG, 1, "SaveFile - Malware sample dumpfile name is %s\n", mwfilename);
 		if (((dumpfile_fd = open(mwfilename, O_WRONLY | O_CREAT | O_EXCL)) < 0) ||
 		    (fchmod(dumpfile_fd, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)) {
 			logmsg(LOG_WARN, 1, "SaveFile error - Unable to save malware sample dumpfile %s: %s.\n", mwfilename,
