@@ -1,4 +1,4 @@
-Version 1.0.1
+Version 1.1.0
 - magicPE plugin for identifying PE files that are submitted as attack strings
 - submitMWserv plugin for submissions to the mwcollect alliance
 - support for periodic events (resolution: 1 second)

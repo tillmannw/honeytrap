@@ -62,7 +62,7 @@
 #define HEARTBEAT_INTERVAL 180	// send a heartbeat every 180 seconds
 
 const char module_name[]="submitMwserv";
-const char module_version[]="0.1.0";
+const char module_version[]="0.1.1";
 
 static const char *config_keywords[] = {
 	"mwserv_url",
@@ -476,44 +476,51 @@ int submit_mwserv(Attack *attack) {
 
 
 int send_heartbeat(void) {
-	time_t	t = time(0);
-
-	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Sending heartbeat.\n");
-
-	// enqueue next heartbeat event
-	event_enqueue(t + HEARTBEAT_INTERVAL, send_heartbeat);
-
-
 	CURL			*curlhandle;
 	CURLM			*multihandle;
 	struct curl_httppost	*pinfo;
 	bstr			response = { 0 };
+	time_t			t = time(0);
 
-	if ((pinfo = init_handle(&multihandle, &curlhandle, 0,
-		0, 0, &response, ST_HEARTBEAT)) == NULL) {
-		logmsg(LOG_ERR, 1, "SubmitMWserv - Could not initialize CURL handle!\n");
-		return 0;
+	if (!running) {
+		// honeytrap is still busy setting up itself, try again in one second
+		event_enqueue(t+1, send_heartbeat);
+		return 1;
 	}
-	
-	pid_t child = fork();
 
-	if(child < 0) {
+	logmsg(LOG_DEBUG, 1, "SubmitMWserv - Forking child process.\n");
+
+	switch(fork()) {
+	case -1:
 		logmsg(LOG_ERR, 1, "SubmitMWserv - Failed to fork for heartbeat: %s.\n", strerror(errno));
 		return 0;
-	}
-	else if(child > 0)
-		return 1;
-
-	switch (transfer_data(multihandle, &response)) {
-	case TSS_OK:
-		logmsg(LOG_DEBUG, 1, "SubmitMWserv - Successfully sent heartbeat to %s.\n", heartbeat_url);
-		break;
+	case 0:
+		// child sends heartbeat
+		if ((pinfo = init_handle(&multihandle, &curlhandle, 0,
+			0, 0, &response, ST_HEARTBEAT)) == NULL) {
+			logmsg(LOG_ERR, 1, "SubmitMWserv - Could not initialize CURL handle!\n");
+			return 0;
+		}
 	
-	case TSS_ERROR:
-		logmsg(LOG_ERR, 1, "SubmitMWserv Error - Server %s reported error when sending heartbeat!\n", heartbeat_url);
-		break;	
+		logmsg(LOG_DEBUG, 1, "SubmitMWserv - Sending heartbeat.\n");
+
+		switch (transfer_data(multihandle, &response)) {
+		case TSS_OK:
+			logmsg(LOG_DEBUG, 1, "SubmitMWserv - Successfully sent heartbeat to %s.\n", heartbeat_url);
+			break;
+		
+		case TSS_ERROR:
+			logmsg(LOG_ERR, 1, "SubmitMWserv Error - Server %s reported error when sending heartbeat!\n", heartbeat_url);
+			break;	
+		}
+		_exit(0);
+	default:
+		// enqueue next heartbeat event
+		event_enqueue(t + HEARTBEAT_INTERVAL, send_heartbeat);
+		break;
 	}
 
-	_exit(0);
+	return 1;
+
 }
 

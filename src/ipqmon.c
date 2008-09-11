@@ -70,6 +70,8 @@ int start_ipq_mon(void) {
 
 	logmsg(LOG_NOTICE, 1, "---- Trapping attacks via IPQ. ----\n");
 
+	running = 1;
+
 	// receive packets
 	mainloop_timeout.tv_sec = 0;
 	mainloop_timeout.tv_usec = 0;

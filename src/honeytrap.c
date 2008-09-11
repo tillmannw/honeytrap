@@ -41,7 +41,8 @@
 int main(int argc, char **argv) {
 	/* initial configuration, will be overridden by config file and command line options  */
 
-	first_init = 1;
+	first_init	= 1;
+	running		= 0;	// will be set to != 0 once honeytrap set up itself
 
 	/* save command line arguments */
 	arg_c = argc;

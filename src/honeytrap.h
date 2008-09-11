@@ -109,6 +109,7 @@ char		*logfile_name;
 char		*dev;
 char		*response_dir;
 char		*plugin_dir;
+u_char		running;
 u_char		daemonize;
 u_char		promisc_mode;
 u_char		replace_private_ips;
