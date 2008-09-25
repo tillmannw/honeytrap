@@ -55,6 +55,16 @@ plugin-SaveFile = {
 }
 
 
+// plugin for shellcode detection and emulation
+/*
+plugin-cpuEmu = {
+	execute_shellcode = "no"
+	createprocess_cmd = "/bin/sh -c \"cd /opt/honeytrap-libemu/.wine/drive_c/windows/system32; WINEPREFIX='/opt/honeytrap-libemu/.wine/' WINEDEBUG='-all' wine 'c:\\windows\\system32\\cmd_orig.exe'\""
+}
+*/
+
+
+
 // scan downloaded samples with ClamAV engine
 /*
 plugin-ClamAV = {

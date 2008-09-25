@@ -42,7 +42,6 @@
 
 
 u_char          buffer[BUFSIZ], *attack_string;
-//#define attack_string	attack->a_conn.payload.data
 
 int drop_privileges(void) {
 	/* set gid first, it might not be permitted as unprivileged user */
