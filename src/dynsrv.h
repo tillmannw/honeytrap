@@ -18,13 +18,26 @@
 #  include <pcap.h>
 #endif
 
-#include "tcpip.h"
 #include "attack.h"
+#include "queue.h"
+#include "tcpip.h"
+
+int	portinfopipe[2];	// IPC pipe, used by connection handlers to 'register' ports in the master process, these are then handled in ignore mode
+queue	*portinfoq;		// queue for registered port information
+
+typedef struct {
+	u_int16_t	port;
+	u_char		protocol;
+	int		mode;
+//	struct in_addr	host;
+} portinfo;
+
 
 int drop_privileges(void);
 void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr ip_l, uint16_t port_l, uint16_t proto);
 int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u_char timeout, Attack *attack);
 int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd, uint16_t dport, uint16_t sport, struct in_addr ipaddr, uint16_t proto, u_char timeout, u_char fb_timeout, Attack *attack);
+int check_portinfopipe(void);
 
 
 #endif

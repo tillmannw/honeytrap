@@ -20,6 +20,14 @@
 const char module_name[]="htm_cpuEmu";
 const char module_version[]="0.1";
 
+static const char *config_keywords[] = {
+	"execute_shellcode",
+	"createprocess_cmd"
+};
+
+int	execute_shellcode;
+char	*createprocess_cmd;
+
 
 #define CODE_OFFSET 0x417001
 
@@ -42,6 +50,7 @@ static struct run_time_options {
 		} commands;
 	} override;
 } opts;
+
 
 void plugin_init(void);
 void plugin_unload(void);

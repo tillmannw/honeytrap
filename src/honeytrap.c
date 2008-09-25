@@ -22,6 +22,7 @@
 
 #include "connectmon.h"
 #include "ctrl.h"
+#include "dynsrv.h"
 #include "event.h"
 #include "honeytrap.h"
 #ifdef USE_IPQ_MON
@@ -33,6 +34,7 @@
 #endif
 #include "plughook.h"
 #include "plugin.h"
+#include "queue.h"
 #include "readconf.h"
 #include "response.h"
 #include "signals.h"
@@ -97,6 +99,17 @@ int main(int argc, char **argv) {
 
 	/* create pid file */
 	create_pid_file();
+
+
+	/* create IPC pipe and queue for port infos */
+	if (pipe(portinfopipe) == -1) {
+		logmsg(LOG_ERR, 0, "  Error - Unable to create port info IPC pipe: %m.\n");
+		exit(EXIT_FAILURE);
+	}
+	if ((portinfoq = queue_new()) == NULL) {
+		logmsg(LOG_ERR, 0, "  Error - Unable to create port info IPC pipe: %m.\n");
+		exit(EXIT_FAILURE);
+	}
 
 	
 	/* watch out for incoming connection requests */

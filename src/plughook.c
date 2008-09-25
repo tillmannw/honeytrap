@@ -24,6 +24,7 @@
 
 void init_plugin_hooks(void) {
 	funclist_unload_plugins		= NULL;
+	funclist_attack_perread		= NULL;
 	funclist_attack_preproc		= NULL;
 	funclist_attack_analyze		= NULL;
 	funclist_attack_savedata	= NULL;
@@ -86,6 +87,12 @@ PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plug
 
 	/* attach new function to list */
 	switch (priority) {
+	case PPRIO_DYNSRV:
+		func_tmp	= funclist_attack_dynsrv;
+		break;
+	case PPRIO_PERREAD:
+		func_tmp	= funclist_attack_perread;
+		break;
 	case PPRIO_PREPROC:
 		func_tmp	= funclist_attack_preproc;
 		break;
@@ -106,6 +113,12 @@ PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plug
 		while(func_tmp->next) func_tmp = func_tmp->next;
 		func_tmp->next = func_new;
 	} else switch (priority) {
+	case PPRIO_DYNSRV:
+		funclist_attack_dynsrv	= func_new;
+		break;
+	case PPRIO_PERREAD:
+		funclist_attack_perread	= func_new;
+		break;
 	case PPRIO_PREPROC:
 		funclist_attack_preproc	= func_new;
 		break;
@@ -194,6 +207,12 @@ void plughook_unload_plugins(void) {
 
 void unhook(const func_prio priority, const char *plugname, const char *funcname) {
 	switch (priority) {
+	case PPRIO_DYNSRV:
+		unhook_from_list(&funclist_attack_dynsrv, plugname, funcname);
+		break;
+	case PPRIO_PERREAD:
+		unhook_from_list(&funclist_attack_perread, plugname, funcname);
+		break;
 	case PPRIO_PREPROC:
 		unhook_from_list(&funclist_attack_preproc, plugname, funcname);
 		break;

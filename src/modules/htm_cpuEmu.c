@@ -16,28 +16,20 @@
  *   libemu was written by Paul Baecher and Markus Koetter.
  */
 
+#define _GNU_SOURCE
+
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <netdb.h>
 #include <sys/socket.h>
-#include <stdarg.h>
-#include <stdio.h>
-
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-
-#include <honeytrap.h>
-#include <logging.h>
-#include <plughook.h>
-#include <util.h>
-#include <md5.h>
-
-#include "htm_cpuEmu.h"
+#include <unistd.h>
 
 #include <emu/emu.h>
 #include <emu/emu_track.h>
@@ -53,42 +45,72 @@
 #include <emu/environment/win32/emu_env_w32_dll_export.h>
 #include <emu/environment/win32/env_w32_dll_export_kernel32_hooks.h>
 #include <emu/emu_getpc.h>
+#include <emu/emu_hashtable.h>
+#include <emu/emu_string.h>
+
+#include <conftree.h>
+#include <dynsrv.h>
+#include <honeytrap.h>
+#include <logging.h>
+#include <plughook.h>
+#include <readconf.h>
+#include <signals.h>
+#include <util.h>
+#include <md5.h>
+
+#include "htm_cpuEmu.h"
+
+struct nanny_file {
+	char		*path;
+	uint32_t	emu_file;
+	FILE		*real_file;
+};
+
+struct nanny {
+	struct emu_hashtable *files;
+};
+
+
+struct nanny *nanny_new();
+void nanny_free(struct nanny *nanny);
+struct nanny_file *nanny_add_file(struct nanny *na, const char *path, uint32_t *emu_file, FILE *real_file);
+struct nanny_file *nanny_get_file(struct nanny *na, uint32_t emu_file);
+bool nanny_del_file(struct nanny *na, uint32_t emu_file);
 
 void logmsg_emu(struct emu *e, enum emu_log_level level, const char *msg);
-int run(struct emu *e);
+int run(struct emu *e, int interactive);
+
 uint32_t user_hook_ExitProcess(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_ExitThread(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t user_hook_socket(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t user_hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t user_hook_WaitForSingleObject(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t user_hook_WinExec(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t user_hook_WSASocket(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_WaitForSingleObject(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_exit(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_bind_regport(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_closesocket(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_fclose(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_fopen(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_fwrite(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_listen(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_recv(struct emu_env *env, struct emu_env_hook *hook, ...);
 uint32_t user_hook_send(struct emu_env *env, struct emu_env_hook *hook, ...);
-uint32_t user_hook_exit(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_socket(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_WSASocket(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_CreateFile(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_WriteFile(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_CloseHandle(struct emu_env *env, struct emu_env_hook *hook, ...);
+uint32_t user_hook_URLDownloadToFile(struct emu_env *env, struct emu_env_hook *hook, ...);
 
 
 struct emu_logging *elog;
 
 
-void plugin_init(void) {
-	plugin_register_hooks();
-
-	if ((elog = emu_log_new()) == NULL){
-		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to initialize logging.\n");
-		exit(EXIT_FAILURE);
-	}
-	emu_log_set_logcb(elog, logmsg_emu);
-
-	return;
-}
-
 void plugin_unload(void) {
+	if (execute_shellcode)
+		unhook(PPRIO_PERREAD, module_name, "find_shellcode");
+
 	unhook(PPRIO_ANALYZE, module_name, "find_shellcode");
 
 	emu_log_free(elog);
@@ -103,10 +125,62 @@ void plugin_register_hooks(void) {
 	return;
 }
 
+conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_data) {
+	char		*value = NULL;
+	conf_node	*confopt = NULL;
+
+	if ((confopt = check_keyword(tree, node->keyword)) == NULL) return(NULL);
+
+	while (node->val) {
+		if ((value = malloc(node->val->size+1)) == NULL) {
+			perror("  Error - Unable to allocate memory");
+			exit(EXIT_FAILURE);
+		}
+		memset(value, 0, node->val->size+1);
+		memcpy(value, node->val->data, node->val->size);
+
+		node->val = node->val->next;
+
+		if OPT_IS("execute_shellcode") {
+			if (strcmp(value, "yes") == 0) {
+				execute_shellcode = 1;
+				add_attack_func_to_list(PPRIO_PERREAD, module_name, "find_shellcode", (void *) find_shellcode);
+			}
+		} else if OPT_IS("createprocess_cmd") {
+			createprocess_cmd = value;
+		} else {
+			fprintf(stderr, "  Error - Invalid configuration option for plugin %s: %s\n", module_name, node->keyword);
+			exit(EXIT_FAILURE);
+		}
+	}
+	return(node);
+}
+
+void plugin_init(void) {
+	plugin_register_hooks();
+
+	execute_shellcode	= 0;
+	createprocess_cmd	= NULL;
+
+	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
+	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
+		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
+		exit(EXIT_FAILURE);
+	}
+
+	if ((elog = emu_log_new()) == NULL){
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to initialize logging.\n");
+		exit(EXIT_FAILURE);
+	}
+	emu_log_set_logcb(elog, logmsg_emu);
+
+	return;
+}
 
 void logmsg_emu(struct emu *e, enum emu_log_level level, const char *msg) {
 	s_log_level loglevel	= LL_OFF;
 
+	// map libemu log level to our log level
 	switch (level) {
 	case EMU_LOG_INFO:
 		loglevel	= LL_NOISY;
@@ -125,14 +199,17 @@ void logmsg_emu(struct emu *e, enum emu_log_level level, const char *msg) {
 
 
 int find_shellcode(Attack *attack) {
-	struct emu *e = NULL;
-	int32_t offset;
+	struct emu	*e = NULL;
+	int32_t		offset;
+	int		attack_complete = 0;
 
 	/* no data - nothing todo */
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
 		logmsg(LOG_DEBUG, 1, "CPU Emulation - No data received, won't start emulation.\n");
 		return(0);
 	}
+
+	if (attack->end_time) attack_complete = 1;
 
 	logmsg(LOG_DEBUG, 1, "CPU Emulation - Parsing attack string (%d bytes) for shellcode.\n", attack->a_conn.payload.size);
 
@@ -143,57 +220,61 @@ int find_shellcode(Attack *attack) {
 
 	emu_log_set_logcb(emu_logging_get(e), logmsg_emu);
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Analyzing %u bytes.\n", attack->a_conn.payload.size);
+	if (attack_complete)
+		logmsg(LOG_NOISY, 1, "CPU Emulation - Analyzing %u bytes.\n", attack->a_conn.payload.size);
 
 	if ((offset = emu_shellcode_test(e, (u_char *) attack->a_conn.payload.data, attack->a_conn.payload.size)) >= 0) {
-		logmsg(LOG_NOISY, 1, "CPU Emulation - Possible start of shellcode detected at offset %u.\n", offset);
+		if (attack_complete)
+			logmsg(LOG_INFO, 1, "CPU Emulation - Possible start of shellcode detected at offset %u.\n", offset);
 
 		emu_free(e);
 
-		// prepare emu for running shellcode
-		e = emu_new();
-		emu_log_set_logcb(emu_logging_get(e), logmsg_emu);
+		if (execute_shellcode) {
+			// prepare emu for running shellcode
+			e = emu_new();
+			emu_log_set_logcb(emu_logging_get(e), logmsg_emu);
 
-		if ((opts.scode = malloc(attack->a_conn.payload.size)) == NULL) {
-			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to allocate memory: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
+			if ((opts.scode = malloc(attack->a_conn.payload.size)) == NULL) {
+				logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to allocate memory: %s\n", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+			memcpy(opts.scode, attack->a_conn.payload.data, attack->a_conn.payload.size);
+
+			opts.offset	= offset;
+			opts.size	= attack->a_conn.payload.size;
+
+			// set registers to the initial values
+			struct emu_cpu		*cpu = emu_cpu_get(e);
+			struct emu_memory	*mem = emu_memory_get(e);
+
+			int j;
+			for (j=0; j<8; j++)  emu_cpu_reg32_set(cpu,j , 0);
+
+			emu_memory_write_dword(mem, 0xef787c3c, 4711);
+			emu_memory_write_dword(mem, 0x0,        4711);
+			emu_memory_write_dword(mem, 0x00416f9a, 4711);
+			emu_memory_write_dword(mem, 0x0044fcf7, 4711);
+			emu_memory_write_dword(mem, 0x00001265, 4711);
+			emu_memory_write_dword(mem, 0x00002583, 4711);
+			emu_memory_write_dword(mem, 0x00e000de, 4711);
+			emu_memory_write_dword(mem, 0x01001265, 4711);
+			emu_memory_write_dword(mem, 0x8a000066, 4711);
+
+			// set flags
+			emu_cpu_eflags_set(cpu, 0);
+
+			// write code to offset
+			emu_memory_write_block(mem, CODE_OFFSET, opts.scode,  opts.size);
+
+			// set eip to code
+			emu_cpu_eip_set(emu_cpu_get(e), CODE_OFFSET + opts.offset);
+			emu_cpu_reg32_set(emu_cpu_get(e), esp, 0x0012fe98);
+
+			// run code on emulated CPU
+			run(e, attack_complete);
+
+			emu_free(e);
 		}
-		memcpy(opts.scode, attack->a_conn.payload.data, attack->a_conn.payload.size);
-
-		opts.offset	= offset;
-		opts.size	= attack->a_conn.payload.size;
-
-		// set registers to the initial values
-		struct emu_cpu		*cpu = emu_cpu_get(e);
-		struct emu_memory	*mem = emu_memory_get(e);
-
-		int j;
-		for (j=0; j<8; j++)  emu_cpu_reg32_set(cpu,j , 0);
-
-		emu_memory_write_dword(mem, 0xef787c3c, 4711);
-		emu_memory_write_dword(mem, 0x0,        4711);
-		emu_memory_write_dword(mem, 0x00416f9a, 4711);
-		emu_memory_write_dword(mem, 0x0044fcf7, 4711);
-		emu_memory_write_dword(mem, 0x00001265, 4711);
-		emu_memory_write_dword(mem, 0x00002583, 4711);
-		emu_memory_write_dword(mem, 0x00e000de, 4711);
-		emu_memory_write_dword(mem, 0x01001265, 4711);
-		emu_memory_write_dword(mem, 0x8a000066, 4711);
-
-		// set flags
-		emu_cpu_eflags_set(cpu, 0);
-
-		// write code to offset
-		emu_memory_write_block(mem, CODE_OFFSET, opts.scode,  opts.size);
-
-		// set eip to code
-		emu_cpu_eip_set(emu_cpu_get(e), CODE_OFFSET + opts.offset);
-		emu_cpu_reg32_set(emu_cpu_get(e), esp, 0x0012fe98);
-
-		// run code in emulated CPU
-		run(e);
-
-		emu_free(e);
 
 		logmsg(LOG_NOISY, 1, "CPU Emulation - %u bytes processed.\n", attack->a_conn.payload.size);
 		return(1);
@@ -205,7 +286,7 @@ int find_shellcode(Attack *attack) {
 
 
 // run detected asm code on emulated CPU
-int run(struct emu *e) {
+int run(struct emu *e, int interactive) {
 	int 			j, ret;
 	uint32_t		eipsave = 0;
 	struct emu_cpu		*cpu = emu_cpu_get(e);
@@ -218,30 +299,51 @@ int run(struct emu *e) {
 		return -1;
 	}
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Preparing function hooks.\n");
+	if (interactive) {
+		// register hook functions for interactive shellcode execution
+		struct nanny *na = nanny_new();
+		logmsg(LOG_NOISY, 1, "CPU Emulation - Preparing function hooks.\n");
 
-	emu_env_w32_export_hook(env, "ExitProcess", user_hook_ExitProcess, NULL);
-	emu_env_w32_export_hook(env, "ExitThread", user_hook_ExitThread, NULL);
+		emu_env_w32_load_dll(env->env.win,"msvcrt.dll");
+		emu_env_w32_export_hook(env, "fclose", user_hook_fclose, na);
+		emu_env_w32_export_hook(env, "fopen", user_hook_fopen, na);
+		emu_env_w32_export_hook(env, "fwrite", user_hook_fwrite, na);
 
-	emu_env_w32_export_hook(env, "CreateProcessA", user_hook_CreateProcess, NULL);
-	emu_env_w32_export_hook(env, "WaitForSingleObject", user_hook_WaitForSingleObject, NULL);
-	emu_env_w32_export_hook(env, "WinExec", user_hook_WinExec, NULL);
+		emu_env_w32_export_hook(env, "CreateProcessA", user_hook_CreateProcess, NULL);
+		emu_env_w32_export_hook(env, "WaitForSingleObject", user_hook_WaitForSingleObject, NULL);
+		emu_env_w32_export_hook(env, "CreateFileA", user_hook_CreateFile, na);
+		emu_env_w32_export_hook(env, "WriteFile", user_hook_WriteFile, na);
+		emu_env_w32_export_hook(env, "CloseHandle", user_hook_CloseHandle, na);
 
-	emu_env_w32_load_dll(env->env.win,"ws2_32.dll");
-	emu_env_w32_export_hook(env, "accept", user_hook_accept, NULL);
-	emu_env_w32_export_hook(env, "bind", user_hook_bind, NULL);
-	emu_env_w32_export_hook(env, "closesocket", user_hook_closesocket, NULL);
-	emu_env_w32_export_hook(env, "connect", user_hook_connect, NULL);
-	emu_env_w32_export_hook(env, "listen", user_hook_listen, NULL);
-	emu_env_w32_export_hook(env, "recv", user_hook_recv, NULL);
-	emu_env_w32_export_hook(env, "send", user_hook_send, NULL);
-	emu_env_w32_export_hook(env, "socket", user_hook_socket, NULL);
-	emu_env_w32_export_hook(env, "WSASocketA", user_hook_WSASocket, NULL);
 
-        opts.steps = 1000000;
+		emu_env_w32_load_dll(env->env.win,"ws2_32.dll");
+		emu_env_w32_export_hook(env, "accept", user_hook_accept, NULL);
+		emu_env_w32_export_hook(env, "bind", user_hook_bind, NULL);
+		emu_env_w32_export_hook(env, "closesocket", user_hook_closesocket, NULL);
+		emu_env_w32_export_hook(env, "connect", user_hook_connect, NULL);
+
+		emu_env_w32_export_hook(env, "listen", user_hook_listen, NULL);
+		emu_env_w32_export_hook(env, "recv", user_hook_recv, NULL);
+		emu_env_w32_export_hook(env, "send", user_hook_send, NULL);
+		emu_env_w32_export_hook(env, "socket", user_hook_socket, NULL);
+		emu_env_w32_export_hook(env, "WSASocketA", user_hook_WSASocket, NULL);
+
+		emu_env_w32_load_dll(env->env.win,"urlmon.dll");
+		emu_env_w32_export_hook(env, "URLDownloadToFileA", user_hook_URLDownloadToFile, NULL);
+	} else {
+		// register hook functions for bind port lookups 
+		emu_env_w32_load_dll(env->env.win,"ws2_32.dll");
+		emu_env_w32_export_hook(env, "WSASocketA", user_hook_WSASocket, NULL);
+		emu_env_w32_export_hook(env, "socket", user_hook_socket, NULL);
+		emu_env_w32_export_hook(env, "bind", user_hook_bind_regport, NULL);
+	}
+
+
+	opts.steps = 1000000;
 
 	// run the code
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Running code...\n");
+	if (interactive)
+		logmsg(LOG_NOISY, 1, "CPU Emulation - Running code...\n");
 
 	for (j=0;j<opts.steps;j++) {
 		if ( cpu->repeat_current_instr == false ) eipsave = emu_cpu_eip_get(emu_cpu_get(e));
@@ -292,7 +394,7 @@ uint32_t user_hook_ExitProcess(struct emu_env *env, struct emu_env_hook *hook, .
 
 	va_end(vl);
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking ExitProcess() call.\n");
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking ExitProcess(%d)\n", exitcode);
 
 	opts.steps = 0;
 	return 0;
@@ -309,7 +411,7 @@ uint32_t user_hook_ExitThread(struct emu_env *env, struct emu_env_hook *hook, ..
 
 	va_end(vl);
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking ExitThread() call.\n");
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking ExitThread(%d)\n", exitcode);
 
 	opts.steps = 0;
 	return 0;
@@ -318,30 +420,26 @@ uint32_t user_hook_ExitThread(struct emu_env *env, struct emu_env_hook *hook, ..
 
 uint32_t user_hook_socket(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list		vl;
-	int		domain, type, protocol;
-
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking socket() call.\n");
+	int		af, type, protocol;
 
 	va_start(vl, hook);
 
-	domain		= va_arg(vl, int);
+	af		= va_arg(vl, int);
 	type		= va_arg(vl, int);
 	protocol	= va_arg(vl, int);
 
 	va_end(vl);
 
-	return socket(domain, type, protocol);
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking socket(%d, %d, %d) call.\n", af, type, protocol);
+
+	return socket(af, type, protocol);
 }
-
-
 
 uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list			vl;
-	int			s;
+	int			s, sockopt;
 	struct sockaddr		*saddr;
 	socklen_t		saddrlen;
-
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking bind() call.\n");
 
 	va_start(vl, hook);
 
@@ -350,6 +448,12 @@ uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	saddrlen	= va_arg(vl, socklen_t);
 
 	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking bind(%d, %p, %u)\n", s, saddr, saddrlen);
+
+	sockopt = 1;
+	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) < 0)
+		logmsg(LOG_WARN, 1, "CPU Emulation Warning - Unable to set SO_REUSEADDR for server socket.\n");
 
 	if (opts.override.bind.host != NULL)		// override listen address?
 		((struct sockaddr_in *)saddr)->sin_addr.s_addr = inet_addr(opts.override.connect.host);
@@ -360,15 +464,61 @@ uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	return bind(s, saddr, saddrlen);
 }
 
+uint32_t user_hook_bind_regport(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	va_list			vl;
+	int			s, type;
+	struct sockaddr		*saddr;
+	socklen_t		saddrlen, optsize;
+	portinfo		pinfo;
+
+	va_start(vl, hook);
+
+	s		= va_arg(vl, int);
+	saddr		= va_arg(vl, struct sockaddr *);
+	saddrlen	= va_arg(vl, socklen_t);
+
+	va_end(vl);
+
+	optsize = sizeof(type);
+	if (getsockopt(s, SOL_SOCKET, SO_TYPE, &type, &optsize) < 0) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to determine socket type: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	memset(&pinfo, 0, sizeof(portinfo));
+	pinfo.port	= ((struct sockaddr_in *)saddr)->sin_port;
+	pinfo.mode	= PORTCONF_IGNORE;
+
+	switch(type) {
+	case SOCK_STREAM:
+		pinfo.protocol	= TCP;
+		logmsg(LOG_NOISY, 1, "CPU Emulation - Registering port %u/tcp\n", ntohs(pinfo.port));
+		break;
+	case SOCK_DGRAM:
+		pinfo.protocol	= UDP;
+		logmsg(LOG_NOISY, 1, "CPU Emulation - Registering port %u/udp\n", ntohs(pinfo.port));
+		break;
+	default:
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to determine socket type.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (write(portinfopipe[1], (char *) &pinfo, sizeof(portinfo)) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to write to IPC pipe: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	return 0;
+}
 
 uint32_t user_hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list			vl;
-	int			s, sockfd;
+	int			s, rv;
 	struct sockaddr		*saddr, daddr;
 	socklen_t		saddrlen, daddrlen;
 	char			shost[16], dhost[16];
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking connect() call.\n");
+#define SOCKET_ERROR	-1
 
 	va_start(vl, hook);
 
@@ -378,68 +528,88 @@ uint32_t user_hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...) 
 
 	va_end(vl);
 
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking connect(%d, %p, %u)\n", s, saddr, saddrlen);
+
 	if (opts.override.connect.host != NULL)		// override dst address?
 		((struct sockaddr_in *)saddr)->sin_addr.s_addr = inet_addr(opts.override.connect.host);
 
 	if (opts.override.connect.port > 0)		// override dst port?
 		((struct sockaddr_in *)saddr)->sin_port = htons(opts.override.connect.port);
 
-	if ((sockfd = connect(s, saddr, saddrlen)) != -1) {
-		daddrlen = sizeof(struct sockaddr);
-		if (getsockname(sockfd, &daddr, &daddrlen) == -1) {
-			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		if (getpeername(sockfd, saddr, &saddrlen) == -1) {
-			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
+	if ((rv = connect(s, saddr, saddrlen)) == -1)
+		return SOCKET_ERROR;
 
-		if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
-		    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
-			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		} 
-
-		logmsg(LOG_NOISY, 1, "CPU Emulation - Connection established: %s:%u -> %s:%u.\n", 
-			   shost, ntohs(((struct sockaddr_in *)saddr)->sin_port), 
-			   dhost, ntohs(((struct sockaddr_in *)&daddr)->sin_port));
+	daddrlen = sizeof(struct sockaddr);
+	if (getsockname(s, &daddr, &daddrlen) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if (getpeername(s, saddr, &saddrlen) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
-	return sockfd;
+	if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
+	    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	} 
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Connection established: %s:%u -> %s:%u.\n", 
+		shost, ntohs(((struct sockaddr_in *)saddr)->sin_port), 
+		dhost, ntohs(((struct sockaddr_in *)&daddr)->sin_port));
+
+	return rv;
 }
 
 uint32_t user_hook_WaitForSingleObject(struct emu_env *env, struct emu_env_hook *hook, ...) {
-	va_list	vl;
-	int32_t	hHandle;
-	int	status;
+	va_list		vl;
+	int32_t		hHandle;
+	int32_t		dwMilliseconds;
+	int		status;
+	struct timeval	tv;
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking WaitForSingleObject() call.\n");
+#define WAIT_OBJECT_0	0x00000000
+#define WAIT_ABANDONED	0x00000080
+#define WAIT_TIMEOUT	0x00000102
+#define WAIT_FAILED	0xFFFFFFFF
 
 	va_start(vl, hook);
 
-	hHandle = va_arg(vl, int32_t);
-	(void) va_arg(vl, int32_t);
+	hHandle		= va_arg(vl, int32_t);
+	dwMilliseconds	= va_arg(vl, int32_t);
 
 	va_end(vl);
 
-	for(;;) {
-		if (waitpid(hHandle, &status, WNOHANG) != 0) break;
-		sleep(1);
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking WaitForSingleObject(%u)\n", dwMilliseconds);
+
+	switch (waitpid(hHandle, &status, WNOHANG)) {
+	case -1:
+		return WAIT_FAILED;
+	case 0:
+		tv.tv_sec	= 0;
+		tv.tv_usec	= dwMilliseconds / 1000;
+		if (sleep_sigaware(&tv) == -1)
+			return WAIT_FAILED;
+
+		switch (waitpid(hHandle, &status, WNOHANG)) {
+		case -1:
+			return WAIT_FAILED;
+		case 0:
+			return WAIT_TIMEOUT;
+		}
 	}
 
-	return 0;
+	return WAIT_OBJECT_0;	// never reached
 }
 
 uint32_t user_hook_WSASocket(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list	vl;
-	int	domain, type, protocol;
-
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking WSASocket() call.\n");
+	int	af, type, protocol;
 
 	va_start(vl, hook);
 
-	domain		= va_arg(vl,  int);
+	af		= va_arg(vl,  int);
 	type		= va_arg(vl,  int);
 	protocol	= va_arg(vl, int);
 	(void) va_arg(vl, int);
@@ -448,57 +618,196 @@ uint32_t user_hook_WSASocket(struct emu_env *env, struct emu_env_hook *hook, ...
 
 	va_end(vl);
 
-	return socket(domain, type, protocol);
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking WSASocket(%d, %d, %d, ...)\n", af, type, protocol);
+
+	return socket(af, type, protocol);
+}
+
+void append(struct emu_string *to, const char *dir, char *data, int size) {
+	data[size] = '\0';
+
+	char *saveptr = data;
+
+	while (size>0) {
+		if (*saveptr == '\r' ) *saveptr = ' ';
+		saveptr++;
+		size--;
+	}
+
+	saveptr = NULL;
+
+	char *tok = strtok_r(data, "\n", &saveptr);
+	emu_string_append_format(to, "%s %s\n", dir, tok);
+	while ( (tok = strtok_r(NULL, "\n", &saveptr)) != NULL)
+		emu_string_append_format(to, "%s %s\n", dir, tok);
+
+	return;
 }
 
 uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook, ...) {
-	va_list			vl;
-	char			*pszCmdLine;
-	STARTUPINFO		*psiStartInfo;
-	PROCESS_INFORMATION	*pProcInfo;
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking CreateProcess() call.\n");
-
+	va_list vl;
 	va_start(vl, hook);
 
-	(void) va_arg(vl, char *);	// pszImageName
-	pszCmdLine = va_arg(vl, char *);               
-	(void) va_arg(vl, void *);	// psaProcess
-	(void) va_arg(vl, void *);	// psaThread
-	(void) va_arg(vl, char *);	// fInheritHandles
-	(void) va_arg(vl, uint32_t);	// fdwCreate
-	(void) va_arg(vl, void *);	// pvEnvironment
-	(void) va_arg(vl, char *);	// pszCurDir
-	psiStartInfo	=  va_arg(vl, STARTUPINFO *);
-	pProcInfo	=  va_arg(vl, PROCESS_INFORMATION *); 
+	/* char *pszImageName				  = */ (void)va_arg(vl, char *);
+	char *pszCmdLine                      = va_arg(vl, char *);               
+	/* void *psaProcess, 				  = */ (void)va_arg(vl, void *);
+	/* void *psaThread,  				  = */ (void)va_arg(vl, void *);
+	/* bool fInheritHandles,              = */ (void)va_arg(vl, char *);
+	/* uint32_t fdwCreate,                = */ (void)va_arg(vl, uint32_t);
+	/* void *pvEnvironment             	  = */ (void)va_arg(vl, void *);
+	/* char *pszCurDir                 	  = */ (void)va_arg(vl, char *);
+	STARTUPINFO *psiStartInfo             = va_arg(vl, STARTUPINFO *);
+	PROCESS_INFORMATION *pProcInfo        = va_arg(vl, PROCESS_INFORMATION *); 
 
 	va_end(vl);
 
-	if (pszCmdLine && strncasecmp(pszCmdLine, "cmd", 3) == 0) {
-		pid_t pid;
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking CreateProcess(..., %s, ...)\n", pszCmdLine);
 
-		logmsg(LOG_NOISY, 1, "CPU Emulation - Forking connection handler.\n");
-		if ((pid = fork()) == 0) {
-			// child code
-			dup2(psiStartInfo->hStdInput,  fileno(stdin));
-			dup2(psiStartInfo->hStdOutput, fileno(stdout));
-			dup2(psiStartInfo->hStdError,  fileno(stderr));
+	if ( pszCmdLine != NULL && strncasecmp(pszCmdLine, "cmd", 3) == 0 ) {
+		pid_t child;
+		pid_t spy;
 
-//			system("/bin/sh -c \"cd ~/.wine/drive_c/; WINEDEBUG=-all wine 'c:\\windows\\system32\\cmd_orig.exe' \"");
-			system("/bin/sh -c \"cd .wine/drive_c; WINEDEBUG=-all wine 'c:\\windows\\system32\\cmd_orig.exe'\"");
-			
-			exit(EXIT_SUCCESS);
+
+		if ( (spy = fork()) == 0 ) {
+			// spy
+
+			int in[2];
+			int out[2];
+			int err[2];
+
+			if ((socketpair( AF_UNIX, SOCK_STREAM, 0, in ) == -1) ||
+			    (socketpair( AF_UNIX, SOCK_STREAM, 0, out ) == -1) ||
+			    (socketpair( AF_UNIX, SOCK_STREAM, 0, err ) == -1)) {
+				logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create spy socket pair: %s.\n", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+
+			if ( (child = fork()) == 0 ) {
+				// child
+
+				logmsg(LOG_DEBUG, 1, "CPU Emulation - Executing \"%s\"\n", createprocess_cmd);
+				close(in[0]);
+				close(out[1]);
+				close(err[1]);
+
+				if ((dup2(in[1], fileno(stdin)) == -1) ||
+				    (dup2(out[0], fileno(stdout)) == -1) ||
+				    (dup2(err[0], fileno(stderr)) == -1)) {
+					logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to duplicate file descriptors: %s.\n", strerror(errno));
+					exit(EXIT_FAILURE);
+				}
+
+/*
+				struct emu_hashtable_item *ehi = emu_hashtable_search(opts.override.commands.commands, "cmd");
+				if ( ehi != NULL )
+					system((char *)ehi->value);
+				else
+*/
+//					system("/bin/sh -c \"cd /opt/honeytrap-libemu/.wine/drive_c/; wine 'c:\\windows\\system32\\cmd.exe'\"");
+					system(createprocess_cmd);
+
+				close(in[1]);
+				close(out[0]);
+				close(err[0]);
+
+
+				exit(EXIT_SUCCESS);
+			} else {
+				// spy
+
+				struct emu_string *io = emu_string_new();
+				close(in[1]);
+				close(out[0]);
+				close(err[0]);
+
+				fd_set socks;
+
+				fcntl(psiStartInfo->hStdInput,F_SETFL,O_NONBLOCK);
+				fcntl(out[1],F_SETFL,O_NONBLOCK);
+				fcntl(err[1],F_SETFL,O_NONBLOCK);
+
+				char buf[1025];
+
+				for (;;) {
+					FD_ZERO(&socks);
+					FD_SET(psiStartInfo->hStdInput,&socks);
+					FD_SET(out[1],&socks);
+					FD_SET(err[1],&socks);
+
+					int		action;
+					int		highsock	= MAX(psiStartInfo->hStdInput, MAX(out[1], err[1]));
+					struct timeval	timeout		= {10,0};
+
+					switch (action = select(highsock+1, &socks, NULL, NULL, &timeout)) {
+					case -1:
+						break;
+					case 0:
+						logmsg(LOG_DEBUG, 1, "CPU Emulation - I/O spy timed out.\n");
+						kill(child, SIGKILL);
+exit_now:
+						close(in[0]);
+						close(out[1]);
+						close(err[1]);
+
+						logmsg(LOG_DEBUG, 1, "CPU Emulation - Creating virtual attack.\n");
+						Attack *session;
+						if ((session = new_virtattack(*(struct in_addr *) 0, *(struct in_addr *) 0, 0, 0, 0)) == NULL) {
+							logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create virtual attack.\n");
+							exit(EXIT_FAILURE);
+						}
+
+						session->a_conn.payload.data	= (u_char *) emu_string_char(io);
+						session->a_conn.payload.size	= io->size;
+
+						plughook_process_attack(funclist_attack_savedata, session);
+						plughook_process_attack(funclist_attack_postproc, session);
+
+						exit(EXIT_SUCCESS);
+					default:
+						if ( FD_ISSET(psiStartInfo->hStdInput, &socks) ) {
+							int size = read(psiStartInfo->hStdInput, buf, 1024);
+							if ( size > 0 ) write(in[0], buf, size);
+							else goto exit_now;
+							append(io, "in  >", buf, size);
+						}
+						if ( FD_ISSET(out[1], &socks) ) {
+							int size = read(out[1], buf, 1024);
+							if ( size > 0 ) write(psiStartInfo->hStdOutput, buf, size);
+							else goto exit_now;
+							append(io, "out <", buf, size);
+						}
+						if ( FD_ISSET(err[1], &socks) ) {
+							int size = read(err[1], buf, 1024);
+							if ( size > 0 ) write(psiStartInfo->hStdError, buf, size);
+							else goto exit_now;
+							append(io, "err <", buf, size);
+						}
+					}
+
+				}
+			}
 		} else {
-			// parent code 
-			pProcInfo->hProcess = pid;
+			// parent 
+			pProcInfo->hProcess = spy;
 		}
 	}
+
 	return 1;
 }
 
 
 uint32_t user_hook_WinExec(struct emu_env *env, struct emu_env_hook *hook, ...) {
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking WinExec() call.\n");
+	va_list 	vl;
+	char		*path;
+
+	va_start(vl, hook);
+
+	path = va_arg(vl,  char *);
+
+	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking WinExec(%s) (ignored).\n", path);
 
 	return 0;
 }
@@ -506,15 +815,16 @@ uint32_t user_hook_WinExec(struct emu_env *env, struct emu_env_hook *hook, ...) 
 
 uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list 	vl;
-	int		s, sockfd;
+	int		s, sockfd, flags;
 	struct sockaddr	*saddr, daddr;
 	socklen_t	*saddrlen, daddrlen;
 	char		shost[16], dhost[16];
+	fd_set		rfds;
+
+#define INVALID_SOCKET	-1
 
 	memset(shost, 0, 16);
 	memset(dhost, 0, 16);
-
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking accept() call.\n");
 
 	va_start(vl, hook);
 
@@ -524,27 +834,72 @@ uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 
 	va_end(vl);
 
-	if ((sockfd = accept(s, saddr, saddrlen)) != -1) {
-		daddrlen = sizeof(struct sockaddr);
-		if (getsockname(sockfd,&daddr, &daddrlen) == -1) {
-			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
-		if (getpeername(sockfd,saddr, saddrlen) == -1) {
-			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		}
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking accept(%d, %p, %p)\n", s, saddr, saddrlen);
 
-		if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
-		    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
-			logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
-			exit(EXIT_FAILURE);
-		} 
+	// set listening socket to non-blocking
+	flags		 = 0;
 
-		logmsg(LOG_NOISY, 1, "CPU Emulation - Connection accepted: %s:%u <- %s:%u.\n", 
-			   shost, ntohs(((struct sockaddr_in *)saddr)->sin_port), 
-			   dhost, ntohs(((struct sockaddr_in *)&daddr)->sin_port));
+	if ((flags = fcntl(s, F_GETFL, 0) < 0)) return(-1);
+	if (fcntl(s, F_SETFL, flags | O_NONBLOCK) < 0) return(-1);
+
+	// wait until listening socket is readable to make sure accept() does not block
+	FD_ZERO(&rfds);
+	FD_SET(sigpipe[0], &rfds);
+	FD_SET(s, &rfds);
+
+	switch (select(MAX(s, sigpipe[0])+1, &rfds, NULL, NULL, NULL)) {
+	case -1:
+		if (errno == EINTR) {
+			if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+			break;
+		}
+		logmsg(LOG_DEBUG, 1, "CPU Emulation Error - Signal-aware select() failed: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	default:
+		if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
 	}
+
+	if (!FD_ISSET(s, &rfds)) {
+		logmsg(LOG_DEBUG, 1, "CPU Emulation Error - Signal-aware select() returned, but socket is not readable.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	// accept() shouldn't block now
+	if ((sockfd = accept(s, saddr, saddrlen)) == -1) {
+		switch (errno) {
+		case EWOULDBLOCK:
+		case ECONNABORTED:
+		case EPROTO:
+			// ignore these for a non-blocking accept
+			break;
+		default:
+			logmsg(LOG_ERR, 1, "CPU Emulation Error - accept() failed: %s.\n", strerror(errno));
+			return INVALID_SOCKET;
+		}
+	}
+
+	daddrlen = sizeof(struct sockaddr);
+	if (getsockname(sockfd,&daddr, &daddrlen) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if (getpeername(sockfd,saddr, saddrlen) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
+	    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	} 
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Connection accepted: %s:%u <- %s:%u.\n", 
+		shost, ntohs(((struct sockaddr_in *)saddr)->sin_port), 
+		dhost, ntohs(((struct sockaddr_in *)&daddr)->sin_port));
+
+	// restore socket flags
+	if (fcntl(s, F_SETFL, flags) < 0) return(-1);
 
 	return sockfd;
 }
@@ -553,13 +908,13 @@ uint32_t user_hook_closesocket(struct emu_env *env, struct emu_env_hook *hook, .
 	va_list vl;
 	int s;
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking closesocket() call.\n");
-
 	va_start(vl, hook);
 
 	s = va_arg(vl,  int);
 
 	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking closesocket(%d)\n", s);
 
 	return close(s);
 }
@@ -568,14 +923,14 @@ uint32_t user_hook_listen(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list	vl;
 	int	s, backlog;
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking listen() call.\n");
-
 	va_start(vl, hook);
 
 	s	= va_arg(vl,  int);
 	backlog	= va_arg(vl,  int);
 
 	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking listen(%d, %d)\n", s, backlog);
 
 	return listen(s, backlog);
 }
@@ -585,8 +940,6 @@ uint32_t user_hook_recv(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	int	s, len, flags;
 	char	*buf;
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking recv() call.\n");
-
 	va_start(vl, hook);
 
 	s	= va_arg(vl,  int);
@@ -595,6 +948,8 @@ uint32_t user_hook_recv(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	flags	= va_arg(vl,  int);
 
 	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking recv(%d, %p, %d, %d)\n", s, buf, len, flags);
 
 	return recv(s, buf, len,  flags);
 }
@@ -604,8 +959,6 @@ uint32_t user_hook_send(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	int	s, len, flags;
 	char	*buf;
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking send() call.\n");
-
 	va_start(vl, hook);
 
 	s	= va_arg(vl,  int);
@@ -615,6 +968,8 @@ uint32_t user_hook_send(struct emu_env *env, struct emu_env_hook *hook, ...) {
 
 	va_end(vl);
 
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking send(%d, %p, %d, %d)\n", s, buf, len, flags);
+
 	return send(s, buf, len,  flags);
 }
 
@@ -622,15 +977,257 @@ uint32_t user_hook_exit(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	va_list	vl;
 	int	code;
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking exit() call.\n");
-
 	va_start(vl, hook);
 
 	code = va_arg(vl,  int);
 
 	va_end(vl);
 
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking exit(%d)\n", code);
+
 	opts.steps = 0;
 
 	return 0;
+}
+
+uint32_t user_hook_fclose(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	va_list vl;
+
+	va_start(vl, hook);
+
+	FILE *f = va_arg(vl, FILE *);
+
+	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking fclose(%p)\n", f);
+
+	struct nanny_file *nf = nanny_get_file(hook->hook.win->userdata, (uint32_t)(uintptr_t)f);
+
+	if (nf != NULL) {
+		FILE *f = nf->real_file;
+		nanny_del_file(hook->hook.win->userdata, (uint32_t)(uintptr_t)f);
+		return fclose(f);
+	}
+
+	return 0;
+}
+
+
+uint32_t user_hook_fopen(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	va_list 	vl;
+	int		fd;
+	char		*localfile;
+	FILE		*f;
+	uint32_t	file;
+
+	va_start(vl, hook);
+
+	char *filename			= va_arg(vl,  char *);
+	char *mode 			= va_arg(vl,  char *);
+
+	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking fopen(%s, %s)\n", filename, mode);
+
+	if (asprintf(&localfile, "/tmp/%s-XXXXXX",filename) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to allocate memory: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	if ((fd = mkstemp(localfile)) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create temporary file: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if ((f = fdopen(fd, "w")) == NULL) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to reopen file as stream: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	close(fd);
+
+	nanny_add_file(hook->hook.win->userdata, localfile, &file, f);
+
+	return file;
+}
+
+uint32_t user_hook_fwrite(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	va_list vl;
+
+	va_start(vl, hook);
+	void *data = va_arg(vl, void *);
+	size_t size = va_arg(vl, size_t);
+	size_t nmemb = va_arg(vl, size_t);
+	FILE *f = va_arg(vl, FILE *);
+
+	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking fwrite(%p, %lu, %lu, %p)\n",
+		data, (long unsigned int) size, (long unsigned int) nmemb, f);
+
+	struct nanny_file *nf = nanny_get_file(hook->hook.win->userdata, (uint32_t)(uintptr_t)f);
+
+	if (nf != NULL)
+		return fwrite(data, size, nmemb, nf->real_file);
+	else 
+		return size*nmemb;
+
+}
+
+uint32_t user_hook_CreateFile(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	va_list		vl;
+	char		*localfile;
+	uint32_t	handle;
+	int		fd;
+	FILE		*f;
+
+	va_start(vl, hook);
+
+	char *lpFileName			= va_arg(vl, char *);
+	/*int dwDesiredAccess		=*/(void)va_arg(vl, int);
+	/*int dwShareMode			=*/(void)va_arg(vl, int);
+	/*int lpSecurityAttributes	=*/(void)va_arg(vl, int);
+	/*int dwCreationDisposition	=*/(void)va_arg(vl, int);
+	/*int dwFlagsAndAttributes	=*/(void)va_arg(vl, int);
+	/*int hTemplateFile			=*/(void)va_arg(vl, int);
+
+	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking CreateFile(%s, ...)\n", lpFileName);
+
+	if (asprintf(&localfile, "/tmp/%s-XXXXXX", lpFileName) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to allocate memory: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	if ((fd = mkstemp(localfile)) == -1) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create temporary file: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	if ((f = fdopen(fd, "w")) == NULL) {
+		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to reopen file as stream: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+	close(fd);
+
+	nanny_add_file(hook->hook.win->userdata, localfile, &handle, f);
+
+	return handle;
+}
+
+uint32_t user_hook_WriteFile(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	va_list vl;
+
+	va_start(vl, hook);
+
+	FILE *hFile 					= va_arg(vl, FILE *);
+	void *lpBuffer 					= va_arg(vl, void *);
+	int   nNumberOfBytesToWrite 	= va_arg(vl, int);
+	/* int *lpNumberOfBytesWritten  =*/(void)va_arg(vl, int*);
+	/* int *lpOverlapped 		    =*/(void)va_arg(vl, int*);
+
+	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking WriteFile(%p, %p, %d, ...)\n", hFile, lpBuffer, nNumberOfBytesToWrite);
+
+	struct nanny_file *nf = nanny_get_file(hook->hook.win->userdata, (uint32_t)(uintptr_t)hFile);
+
+	if (nf != NULL)
+		fwrite(lpBuffer, nNumberOfBytesToWrite, 1, nf->real_file);
+	else
+		logmsg(LOG_NOISY, 1, "shellcode tried to write data to not existing handle\n");
+
+	return 1;
+
+}
+
+
+uint32_t user_hook_CloseHandle(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	va_list vl;
+
+	va_start(vl, hook);
+
+	FILE *hObject = va_arg(vl, FILE *);
+
+	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking CloseHandle(%p)\n", hObject);
+
+	struct nanny_file *nf = nanny_get_file(hook->hook.win->userdata, (uint32_t)(uintptr_t)hObject);
+
+	if (nf != NULL) {
+		FILE *f = nf->real_file;
+		nanny_del_file(hook->hook.win->userdata, (uint32_t)(uintptr_t)hObject);
+		fclose(f);
+	} else
+		logmsg(LOG_NOISY, 1, "shellcode tried to close not existing handle (maybe closed it already?)\n");
+
+	return 0;
+}
+
+uint32_t user_hook_URLDownloadToFile(struct emu_env *env, struct emu_env_hook *hook, ...) {
+	va_list vl;
+
+	va_start(vl, hook);
+
+	/*void * pCaller    = */(void)va_arg(vl, void *);
+	char * szURL      = va_arg(vl, char *);
+	char * szFileName = va_arg(vl, char *);
+	/*int    dwReserved = */(void)va_arg(vl, int   );
+	/*void * lpfnCB     = */(void)va_arg(vl, void *);
+
+	va_end(vl);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking URLDownloadToFile(..., %s, %s, ...)\n", szURL, szFileName);
+
+	return 0;
+}
+
+struct nanny *nanny_new()
+{
+	struct nanny *na = malloc(sizeof(struct nanny));
+	memset(na, 0, sizeof(struct nanny));
+
+	na->files = emu_hashtable_new(16, emu_hashtable_ptr_hash, emu_hashtable_ptr_cmp);
+
+	return na;
+}
+
+struct nanny_file *nanny_add_file(struct nanny *na, const char *path, uint32_t *emu_file, FILE *real_file)
+{
+	struct nanny_file *file = malloc(sizeof(struct nanny_file));
+	memset(file, 0, sizeof(struct nanny_file));
+
+	*emu_file = rand();
+
+	file->path = strdup(path);
+	file->emu_file = *emu_file;
+	file->real_file = real_file;
+
+	emu_hashtable_insert(na->files, (void *)(uintptr_t)file->emu_file, file);
+
+	return file;
+}
+
+struct nanny_file *nanny_get_file(struct nanny *na, uint32_t emu_file)
+{
+	 struct emu_hashtable_item *item = emu_hashtable_search(na->files, (void *)(uintptr_t)emu_file);
+	 if (item != NULL)
+	 {
+		 struct nanny_file *file = item->value;
+		 return file;
+	 }else
+		 return NULL;
+	 
+}
+
+bool nanny_del_file(struct nanny *na, uint32_t emu_file)
+{
+	struct emu_hashtable_item *item = emu_hashtable_search(na->files, (void *)(uintptr_t)emu_file);
+	if (item != NULL)
+	{
+		free(item->value);
+	}
+	return emu_hashtable_delete(na->files, (void *)(uintptr_t)emu_file);
+}
+
+void nanny_free(struct nanny *nanny) {
 }

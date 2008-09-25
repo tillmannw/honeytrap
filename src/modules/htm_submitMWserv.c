@@ -217,7 +217,6 @@ int check_response(const bstr *response) {
 int transfer_data(CURLM *mhandle, const bstr *response) {
 	int		max_fd, rv, handles;
 	fd_set		rfds, wfds, efds;
-	struct timeval	select_timeout;
 	CURLMcode	error;
 
 	rv	= 1;
@@ -234,12 +233,9 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 		FD_SET(sigpipe[0], &rfds);
 		max_fd = MAX(max_fd, sigpipe[0]);
 
-		select_timeout.tv_sec	= 1;
-		select_timeout.tv_usec	= 0;
-		
-		logmsg(LOG_DEBUG, 1, "SubmitMWserv - Submitting data to %s.\n", mwserv_url);
+		// logmsg(LOG_DEBUG, 1, "SubmitMWserv - Submitting data to %s.\n", mwserv_url);
 
-		switch (rv = select(max_fd+1, &rfds, &wfds, &efds, &select_timeout)) {
+		switch (rv = select(max_fd+1, &rfds, &wfds, &efds, NULL)) {
 		case -1:
 			if (errno != EINTR) {
 				logmsg(LOG_ERR, 1, "SubmitMWserv Error - Select failed: %s.\n", strerror(errno));
@@ -254,29 +250,19 @@ int transfer_data(CURLM *mhandle, const bstr *response) {
 			}
 
 			handles = 0;
-			logmsg(LOG_DEBUG, 1, "SubmitMWserv - Data to process.\n");
-			
+			//logmsg(LOG_DEBUG, 1, "SubmitMWserv - Data to process.\n");
 			
 			while(curl_multi_perform(mhandle, &handles) == CURLM_CALL_MULTI_PERFORM && handles);
 			
+			CURLMsg * message;
+			int messagesRemaining;
 			
-			
-			{
-				CURLMsg * message;
-				int messagesRemaining;
-				
-				while((message = curl_multi_info_read(mhandle, &messagesRemaining)))
-				{
-					if(message->msg == CURLMSG_DONE)
-					{
-						if(message->data.result)
-						{
-							logmsg(LOG_ERR, 1, "SubmitMWserv Error - HTTP failure: %s\n", curl_easy_strerror(message->data.result));
-							return TSS_ERROR;
-						}
-						else
-							return check_response(response);
-					}
+			while((message = curl_multi_info_read(mhandle, &messagesRemaining))) {
+				if(message->msg == CURLMSG_DONE) {
+					if(message->data.result) {
+						logmsg(LOG_ERR, 1, "SubmitMWserv Error - HTTP failure: %s\n", curl_easy_strerror(message->data.result));
+						return TSS_ERROR;
+					} else return check_response(response);
 				}
 			}
 		}

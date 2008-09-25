@@ -341,6 +341,9 @@ static enum lcfg_status lcfg_scanner_token_read(struct lcfg_scanner *s) {
 			case '"':
 				lcfg_string_cat_char(s->prepared_token.string, '"');
 				break;
+			case '\\':
+				lcfg_string_cat_char(s->prepared_token.string, '\\');
+				break;
 			case 'n':
 				lcfg_string_cat_char(s->prepared_token.string, '\n');
 				break;

@@ -7,6 +7,7 @@ honeytrap_SOURCES = 	honeytrap.c honeytrap.h \
 			logging.c logging.h \
 			event.c event.h \
 			ctrl.c ctrl.h \
+			queue.c queue.h \
 			signals.c signals.h \
 			readconf.c readconf.h \
 			parseconf.c parseconf.h \

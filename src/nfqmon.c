@@ -162,8 +162,14 @@ int start_nfq_mon(void) {
 		clean_exit(EXIT_FAILURE);
 	}
 
-	if (nfq_unbind_pf(h, AF_INET) < 0)
-		logmsg(LOG_WARN, 1, "Warning - Could not unbind existing NFQ handle: %m.\n");
+	if (nfq_unbind_pf(h, AF_INET) < 0) {
+		/* a quote from the netfilter mailinglist:
+		 * "The entire unregistration stuff is a horrible hack, the only reason
+		 *  why it (still) exists is because registration of the same handler
+		 *  returns EEXIST instead of silently ignoring it. The best fix for
+		 *  now is to ignore the return value of nfq_unbind_pf()." */
+		// logmsg(LOG_WARN, 1, "Warning - Could not unbind existing NFQ handle: %m.\n");
+	}
 
 	if (nfq_bind_pf(h, AF_INET) < 0) {
 		logmsg(LOG_ERR, 1, "Error - Could not bind existing NFQ handle: %m.\n");
@@ -199,9 +205,10 @@ int start_nfq_mon(void) {
 	for (;;) {
 		FD_ZERO(&rfds);
 		FD_SET(sigpipe[0], &rfds);
+		FD_SET(portinfopipe[0], &rfds);
 		FD_SET(nfq_fd, &rfds);
 
-		switch (select(MAX(nfq_fd, sigpipe[0]) + 1, &rfds, NULL, NULL, &mainloop_timeout)) {
+		switch (select(MAX(nfq_fd, MAX(sigpipe[0], portinfopipe[0])) + 1, &rfds, NULL, NULL, &mainloop_timeout)) {
 		case -1:
 			if (errno == EINTR) {
 				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
@@ -217,6 +224,8 @@ int start_nfq_mon(void) {
 			break;
 		default:
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
+				exit(EXIT_FAILURE);
+			if (FD_ISSET(portinfopipe[0], &rfds) && (check_portinfopipe() == -1))
 				exit(EXIT_FAILURE);
 			if (FD_ISSET(nfq_fd, &rfds)) {
 				/* incoming connection request */

@@ -17,10 +17,12 @@
 #include "attack.h"
 
 typedef enum {
-	PPRIO_PREPROC	= 0,	// attack preprocessing, e.g., decryption
-	PPRIO_ANALYZE	= 1,	// attack analysis, e.g., ftp command parsing
-	PPRIO_SAVEDATA	= 2,	// for data-saving plugins
-	PPRIO_POSTPROC	= 3,	// attack postprocessing, e.g., IDS signature generation or other time complex tasks
+	PPRIO_DYNSRV	= 0,	// functions of this prio get invoked before a dynamic server binds to a port
+	PPRIO_PERREAD	= 1,	// for plugin functions that shall get called for every read on an attack connection
+	PPRIO_PREPROC	= 2,	// attack preprocessing, e.g., decryption
+	PPRIO_ANALYZE	= 3,	// attack analysis, e.g., ftp command parsing
+	PPRIO_SAVEDATA	= 4,	// for data-saving plugins
+	PPRIO_POSTPROC	= 5,	// attack postprocessing, e.g., IDS signature generation or other time complex tasks
 } func_prio;
 
 typedef struct plugin_func_list {
@@ -36,6 +38,8 @@ typedef struct plugin_func_list {
 PlugFuncList *current_plugfunc;
 
 PlugFuncList *funclist_unload_plugins;
+PlugFuncList *funclist_attack_dynsrv;
+PlugFuncList *funclist_attack_perread;
 PlugFuncList *funclist_attack_preproc;
 PlugFuncList *funclist_attack_analyze;
 PlugFuncList *funclist_attack_savedata;

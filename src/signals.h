@@ -30,5 +30,6 @@ void handle_termsig(int sig);
 void install_signal_handlers(void);
 void create_sigpipe(void);
 int check_sigpipe(void);
+int sleep_sigaware(struct timeval *tv);
 
 #endif

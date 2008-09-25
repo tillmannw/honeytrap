@@ -77,10 +77,11 @@ struct tcp_header{
 #define FLAGS (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG|TH_ECE|TH_CWR)
 
 
+#define RAW		0
 #define ICMP		1
 #define TCP		6
 #define UDP		17
-#define PROTO(p)	(p == ICMP ? "icmp" : (p == TCP ? "tcp" : (p == UDP ? "udp" : "unknown")))
+#define PROTO(p)	(p == RAW ? "raw" : (p == ICMP ? "icmp" : (p == TCP ? "tcp" : (p == UDP ? "udp" : "unknown"))))
 
 
 const struct ip_header *ip;

@@ -26,6 +26,7 @@
 
 #include "attack.h"
 #include "ctrl.h"
+#include "dynsrv.h"
 #include "honeytrap.h"
 #include "readconf.h"
 #include "logging.h"
@@ -38,10 +39,10 @@
 #include "tcpip.h"
 #include "sock.h"
 #include "signals.h"
-#include "dynsrv.h"
 
 
 u_char          buffer[BUFSIZ], *attack_string;
+//#define attack_string	attack->a_conn.payload.data
 
 int drop_privileges(void) {
 	/* set gid first, it might not be permitted as unprivileged user */
@@ -74,6 +75,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	char			*ip_l_str, *ip_r_str;
 	Attack			*attack;
 	u_char			port_mode;
+	qelem			*elem;
+	portinfo		*pinfo;
 
 	proxy_addr	= NULL;
 	proxy_dst	= NULL;
@@ -92,6 +95,50 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 		logmsg(LOG_DEBUG, 1, "Unsupported protocol type.\n");
 		return;
 	}
+
+	for (elem = portinfoq->head; elem; elem = elem->next) {
+		pinfo = elem->data;
+		if ((pinfo->port == port_l) && (pinfo->protocol == proto)) {
+			if (pinfo->mode == PORTCONF_IGNORE) {
+				qelem	*tmp = elem->prev;
+
+				if (tmp) tmp->next	= elem->next;
+				elem->prev		= tmp;
+
+				free(elem->data);
+				free(elem);
+				
+
+				printf("-------> ignoring port.\n");
+#ifdef USE_IPQ_MON
+				/* hand packet processing back to the kernel */
+				if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+					logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+					logmsg(LOG_ERR, 1, "IPQ Error: %s.\n", ipq_errstr());
+					ipq_destroy_handle(h);
+					exit(EXIT_FAILURE);
+				}
+				logmsg(LOG_DEBUG, 1, "IPQ - Successfully set verdict on packet.\n");
+#endif
+#ifdef USE_NFQ_MON
+				/* hand packet processing back to the kernel
+				 * nfq_set_verdict()'s return value is undocumented,
+				 * but digging the source of libnetfilter_queue and libnfnetlink reveals
+				 * that it's just the passed-through value of a sendmsg() */
+				if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
+					logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %m.\n");
+					nfq_destroy_queue(qh);
+					exit(EXIT_FAILURE);
+				}
+				logmsg(LOG_DEBUG, 1, "NFQ - Successfully set verdict on packet.\n");
+#endif
+				return;
+			}
+		}
+	}
+
+	logmsg(LOG_DEBUG, 1, "Calling plugins before dynamic server setup.\n");
+	plughook_process_attack(funclist_attack_dynsrv, attack);
 
 	/* fork server process */
 	if ((pid = myfork()) == 0) {
@@ -444,6 +491,7 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 	struct timeval	r_timeout;
 	int		disconnect, bytes_read, total_bytes;
 
+//#define total_bytes	attack->a_conn.payload.size
 	total_bytes	= 0;
 	disconnect	= 0;
 
@@ -509,6 +557,10 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 						return(process_data
 							(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 					}
+					logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'process_attack'.\n");
+					attack->a_conn.payload.size = total_bytes;
+					attack->a_conn.payload.data = attack_string;
+					plughook_process_attack(funclist_attack_perread, attack);
 				} else if (bytes_read == 0) {
 					logmsg(LOG_INFO, 1, "   %s  Connection closed by foreign host.\n", portstr);
 
@@ -610,6 +662,10 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 							(attack_string, total_bytes, server_string,
 							 total_from_server, dport, attack));
 					}
+					logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'process_attack'.\n");
+					attack->a_conn.payload.size = total_bytes;
+					attack->a_conn.payload.data = attack_string;
+					plughook_process_attack(funclist_attack_perread, attack);
 				} else if (rv == 0) {
 					/* first UDP packet was rejected, fall back to normal mode */
 					if ((proto == UDP) && (total_bytes == bytes_sent))
@@ -680,4 +736,31 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 		} // switch
 	}
 	return(0);	// never reached
+}
+
+int check_portinfopipe(void) {
+	int		rv;
+	portinfo	*pinfo;
+	qelem		*elem;
+
+	if ((pinfo = calloc(1, sizeof(portinfo))) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %s.\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	switch(rv = read(portinfopipe[0], pinfo, sizeof(portinfo))) {
+	case sizeof(portinfo):
+		logmsg(LOG_INFO, 1, "Portinfo received - port %u, mode %d\n", ntohs(pinfo->port), pinfo->mode);
+		if ((elem = queue_append(portinfoq, &pinfo)) == NULL)
+			logmsg(LOG_WARN, 1, "Warning - Unable to register port information.\n");
+		pinfo = elem->data;
+		break;
+	case 0:
+		logmsg(LOG_WARN, 1, "Warning - IPC pipe ready to read but not enough data available.\n");
+		break;
+	case -1:
+		logmsg(LOG_ERR, 1, "Error - Unable to read from pipe: %s.\n", strerror(errno));
+		break;
+	}
+	return rv;
 }

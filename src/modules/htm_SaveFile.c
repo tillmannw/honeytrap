@@ -123,6 +123,7 @@ int save_to_file(Attack *attack) {
 	/* create filename */
 	if (attack->a_conn.protocol == TCP) proto_str = strdup("tcp");
 	else if (attack->a_conn.protocol == UDP) proto_str = strdup("udp");
+	else if (attack->a_conn.protocol == RAW) proto_str = strdup("raw");
 	else {
 		logmsg(LOG_ERR, 1, "SaveFile error - Protocol %u is not supported.\n", attack->a_conn.protocol);
 		return(-1);

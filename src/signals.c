@@ -248,3 +248,27 @@ int check_sigpipe(void) {
 	}
 	return(0);
 }
+
+
+int sleep_sigaware(struct timeval *tv) {
+	fd_set 	rfds;
+
+	FD_ZERO(&rfds);
+	FD_SET(sigpipe[0], &rfds);
+
+	for (;;) {
+		switch (select(sigpipe[0]+1, &rfds, NULL, NULL, tv)) {
+		case -1:
+			if (errno == EINTR) {
+				if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+				break;
+			}
+			logmsg(LOG_DEBUG, 1, "Error in signal-aware sleep - select() failed: %s.\n", strerror(errno));
+			return -1;
+		case 0:
+			return 0;
+		default:
+			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
+		}
+	}
+}
