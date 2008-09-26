@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include <emu/emu.h>
 #include <emu/emu_track.h>
@@ -186,11 +187,11 @@ void logmsg_emu(struct emu *e, enum emu_log_level level, const char *msg) {
 		loglevel	= LL_NOISY;
 		break;
 	case EMU_LOG_DEBUG:
-		loglevel	= LL_DEBUG;
-		break;
+//		loglevel	= LL_DEBUG;
+//		break;
 	case EMU_LOG_NONE:
 	default:
-		break;
+		return;
 	}
 	logmsg(loglevel, 1, "CPU Emulation - CPU reports: %s", msg);
 
@@ -623,25 +624,57 @@ uint32_t user_hook_WSASocket(struct emu_env *env, struct emu_env_hook *hook, ...
 	return socket(af, type, protocol);
 }
 
-void append(struct emu_string *to, const char *dir, char *data, int size) {
-	data[size] = '\0';
-
+void append(struct emu_string *to, const char *dir, char *data, int size)
+{
 	char *saveptr = data;
 
-	while (size>0) {
-		if (*saveptr == '\r' ) *saveptr = ' ';
-		saveptr++;
-		size--;
+	struct emu_string *sanestr = emu_string_new();
+
+
+	int i;
+	for (i=0;i<size;i++)
+	{
+		if (data[i] == '\r')
+		{
+
+		}else
+		if ( isprint(data[i]))// || isblank(data[i]))
+		{
+			emu_string_append_format(sanestr, "%c", data[i]);
+		}
+		else
+		if (data[i] == '\n')
+		{
+			emu_string_append_char(sanestr, "\n");
+		}
+		else
+		if (data[i] == '\t')
+		{
+			emu_string_append_char(sanestr, "\t");
+		} 
+		else
+		{
+			emu_string_append_format(sanestr, "\\x%02x", (unsigned char)data[i]);
+		}
 	}
 
 	saveptr = NULL;
 
-	char *tok = strtok_r(data, "\n", &saveptr);
-	emu_string_append_format(to, "%s %s\n", dir, tok);
-	while ( (tok = strtok_r(NULL, "\n", &saveptr)) != NULL)
-		emu_string_append_format(to, "%s %s\n", dir, tok);
 
-	return;
+	char *tok;
+	tok  = strtok_r(sanestr->data, "\n", &saveptr);
+//	printf("line %s:%s\n",dir, tok);
+	if (tok != NULL)
+	{
+		emu_string_append_format(to, "%s %s\n", dir, tok); 
+		while ( (tok = strtok_r(NULL,"\n",&saveptr)) != NULL )
+		{
+			emu_string_append_format(to, "%s %s\n", dir, tok);
+//		printf("line %s:%s\n",dir, tok);
+		}
+
+	}
+	emu_string_free(sanestr);
 }
 
 uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook, ...) {
