@@ -55,8 +55,8 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 		return(-1);
 	}
 
-	/* prevent loops - disallow connections to localhost */
-	if ((ntohl(ipaddr.s_addr) == 0x7F000001) && PORTCONF_MIRROR) {
+	/* prevent loops - disallow mirror connections to localhost */
+	if ((ntohl(ipaddr.s_addr) == 0x7F000001) && (mode == PORTCONF_MIRROR)) {
 		logmsg(LOG_WARN, 1, "%s %s  Warning - Connection to %s:%u suppressed for loop prevention.\n",
 			logpre, portstr, inet_ntoa(ipaddr), port);
 		return(-1);

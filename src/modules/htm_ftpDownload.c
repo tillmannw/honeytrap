@@ -1,5 +1,5 @@
 /* htm_ftpDownload.c
- * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -336,6 +336,8 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	timeout = 60;
 	data_sock_fd = -1;
 
+	// increase number of download tries
+	attack->dl_tries++;
 
 	/* replace private ip? */
 	if (replace_private_ips && (private_ipaddr(*rhost) || !(valid_ipaddr(*rhost)))) {

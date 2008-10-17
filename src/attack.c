@@ -1,5 +1,5 @@
 /* attack.c
- * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -59,6 +59,7 @@ Attack *new_attack(struct in_addr r_addr, struct in_addr l_addr, uint16_t r_port
 	a->a_conn.r_port	= r_port;
 	a->a_conn.protocol	= proto;
 	a->dl_count		= 0;
+	a->dl_tries		= 0;
 	a->download		= NULL;
 	if (time(&(a->start_time)) == ((time_t)-1)) 
 		logmsg(LOG_WARN, 1, "Warning - Could not set attack start time: %m.\n");

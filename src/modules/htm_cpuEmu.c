@@ -237,7 +237,7 @@ int find_shellcode(Attack *attack) {
 
 			if ((opts.scode = malloc(attack->a_conn.payload.size)) == NULL) {
 				logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to allocate memory: %s\n", strerror(errno));
-				exit(EXIT_FAILURE);
+				return -1;
 			}
 			memcpy(opts.scode, attack->a_conn.payload.data, attack->a_conn.payload.size);
 
@@ -450,7 +450,9 @@ uint32_t user_hook_bind(struct emu_env *env, struct emu_env_hook *hook, ...) {
 
 	va_end(vl);
 
-	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking bind(%d, %p, %u)\n", s, saddr, saddrlen);
+	((struct sockaddr_in *)saddr)->sin_port = htons(((struct sockaddr_in *)saddr)->sin_port);
+
+	logmsg(LOG_NOISY, 1, "CPU Emulation - Hooking bind(%d, %p [port %u], %u)\n", s, saddr, ntohs(((struct sockaddr_in *)saddr)->sin_port), saddrlen);
 
 	sockopt = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) < 0)
@@ -483,7 +485,7 @@ uint32_t user_hook_bind_regport(struct emu_env *env, struct emu_env_hook *hook, 
 	optsize = sizeof(type);
 	if (getsockopt(s, SOL_SOCKET, SO_TYPE, &type, &optsize) < 0) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to determine socket type: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	memset(&pinfo, 0, sizeof(portinfo));
@@ -501,12 +503,12 @@ uint32_t user_hook_bind_regport(struct emu_env *env, struct emu_env_hook *hook, 
 		break;
 	default:
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to determine socket type.\n");
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	if (write(portinfopipe[1], (char *) &pinfo, sizeof(portinfo)) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to write to IPC pipe: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	return 0;
@@ -543,17 +545,17 @@ uint32_t user_hook_connect(struct emu_env *env, struct emu_env_hook *hook, ...) 
 	daddrlen = sizeof(struct sockaddr);
 	if (getsockname(s, &daddr, &daddrlen) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 	if (getpeername(s, saddr, &saddrlen) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
 	    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return -1;
 	} 
 
 	logmsg(LOG_NOISY, 1, "CPU Emulation - Connection established: %s:%u -> %s:%u.\n", 
@@ -713,7 +715,7 @@ uint32_t user_hook_CreateProcess(struct emu_env *env, struct emu_env_hook *hook,
 			    (socketpair( AF_UNIX, SOCK_STREAM, 0, out ) == -1) ||
 			    (socketpair( AF_UNIX, SOCK_STREAM, 0, err ) == -1)) {
 				logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create spy socket pair: %s.\n", strerror(errno));
-				exit(EXIT_FAILURE);
+				return 0;
 			}
 
 			if ( (child = fork()) == 0 ) {
@@ -883,18 +885,18 @@ uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	switch (select(MAX(s, sigpipe[0])+1, &rfds, NULL, NULL, NULL)) {
 	case -1:
 		if (errno == EINTR) {
-			if (check_sigpipe() == -1) exit(EXIT_FAILURE);
+			if (check_sigpipe() == -1) return INVALID_SOCKET;
 			break;
 		}
 		logmsg(LOG_DEBUG, 1, "CPU Emulation Error - Signal-aware select() failed: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return INVALID_SOCKET;
 	default:
-		if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) exit(EXIT_FAILURE);
+		if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1)) return INVALID_SOCKET;
 	}
 
 	if (!FD_ISSET(s, &rfds)) {
 		logmsg(LOG_DEBUG, 1, "CPU Emulation Error - Signal-aware select() returned, but socket is not readable.\n");
-		exit(EXIT_FAILURE);
+		return INVALID_SOCKET;
 	}
 
 	// accept() shouldn't block now
@@ -914,17 +916,17 @@ uint32_t user_hook_accept(struct emu_env *env, struct emu_env_hook *hook, ...) {
 	daddrlen = sizeof(struct sockaddr);
 	if (getsockname(sockfd,&daddr, &daddrlen) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return INVALID_SOCKET;
 	}
 	if (getpeername(sockfd,saddr, saddrlen) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to get peer information: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return INVALID_SOCKET;
 	}
 
 	if ((inet_ntop(AF_INET, &((struct sockaddr_in *)saddr)->sin_addr, shost, 16) == NULL) ||
 	    (inet_ntop(AF_INET, &((struct sockaddr_in *)&daddr)->sin_addr, dhost, 16) == NULL)) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to convert IP address: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return INVALID_SOCKET;
 	} 
 
 	logmsg(LOG_NOISY, 1, "CPU Emulation - Connection accepted: %s:%u <- %s:%u.\n", 
@@ -1064,16 +1066,16 @@ uint32_t user_hook_fopen(struct emu_env *env, struct emu_env_hook *hook, ...) {
 
 	if (asprintf(&localfile, "/tmp/%s-XXXXXX",filename) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to allocate memory: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return 0;
 	}
 
 	if ((fd = mkstemp(localfile)) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create temporary file: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return 0;
 	}
 	if ((f = fdopen(fd, "w")) == NULL) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to reopen file as stream: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return 0;
 	}
 	close(fd);
 
@@ -1112,6 +1114,8 @@ uint32_t user_hook_CreateFile(struct emu_env *env, struct emu_env_hook *hook, ..
 	int		fd;
 	FILE		*f;
 
+#define INVALID_HANDLE_VALUE -1
+
 	va_start(vl, hook);
 
 	char *lpFileName			= va_arg(vl, char *);
@@ -1128,16 +1132,16 @@ uint32_t user_hook_CreateFile(struct emu_env *env, struct emu_env_hook *hook, ..
 
 	if (asprintf(&localfile, "/tmp/%s-XXXXXX", lpFileName) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to allocate memory: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return INVALID_HANDLE_VALUE;
 	}
 
 	if ((fd = mkstemp(localfile)) == -1) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create temporary file: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return INVALID_HANDLE_VALUE;
 	}
 	if ((f = fdopen(fd, "w")) == NULL) {
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to reopen file as stream: %s.\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		return INVALID_HANDLE_VALUE;
 	}
 	close(fd);
 

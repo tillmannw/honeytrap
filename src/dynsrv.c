@@ -107,8 +107,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 				free(elem->data);
 				free(elem);
 				
-
-				printf("-------> ignoring port.\n");
 #ifdef USE_IPQ_MON
 				/* hand packet processing back to the kernel */
 				if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
@@ -342,7 +340,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 						exit(EXIT_FAILURE);
 					}
 					attack->a_conn.r_port = ntohs(cliaddr.sin_port);
-
 
 					/* incoming connection accepted, select port mode */
 					if (port_mode & PORTCONF_NORMAL) {

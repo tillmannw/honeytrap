@@ -1,5 +1,5 @@
 /* htm_tftpDownload.c
- * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -171,6 +171,8 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 	max_blockcode = 0;
 	socklen = sizeof(struct sockaddr_in);
 	
+	// increase number of download tries
+	attack->dl_tries++;
 
 	/* replace private ip? */
 	if (replace_private_ips && (private_ipaddr(*host) || !(valid_ipaddr(*host)))) {

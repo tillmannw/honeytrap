@@ -1,5 +1,5 @@
 /* htm_httpDownload.c
- * Copyright (C) 2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2007-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -186,6 +186,9 @@ int cmd_parse_for_http_url(Attack *attack) {
 				logmsg(LOG_ERR, 1, "HTTP download error - Unable to change into download directory %s: %m.\n", download_dir);
 				return(-1);
 			}
+
+			// increase number of download tries
+			attack->dl_tries++;
 
 			/* assemble wget download command and execute it */
 			asprintf(&cmd, "%s %s %s", http_program, http_options, start);

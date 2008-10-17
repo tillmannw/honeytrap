@@ -165,6 +165,7 @@ int save_to_file(Attack *attack) {
 
 	/* save malware */
 	for (i=0; i<attack->dl_count; i++) {
+		logmsg(LOG_DEBUG, 1, "SaveFile - Saving %d attached malware samples.\n", attack->dl_count);
 		/* save file */
 		if (attack->download[i].filename) {
 			if (asprintf(&mwfilename, "%s/%s-%s", downloads_dir, mem_md5sum(attack->download[i].dl_payload.data,

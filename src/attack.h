@@ -1,5 +1,5 @@
 /* attack.h
- * Copyright (C) 2005-2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2008 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -52,6 +52,7 @@ typedef struct s_attack {
 	struct s_conn		p_conn;		/* proxy/mirror connection */
 	u_char			op_mode;	/* mode of operation (none, ignore, normal, proxy, mirror) */
 	uint16_t		dl_count;	/* number of downloads */
+	uint16_t		dl_tries;	/* number of download tries */
 	struct s_download	*download;	/* array of download structs */
 } Attack;
 
