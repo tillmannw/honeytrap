@@ -15,6 +15,8 @@
  *   for viruses using the signature-based libclamav.
  */
 
+#define _GNU_SOURCE
+
 #include <clamav.h>
 #include <errno.h>
 #include <fcntl.h>
