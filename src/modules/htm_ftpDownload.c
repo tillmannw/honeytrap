@@ -335,6 +335,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	select_return = -1;
 	timeout = 60;
 	data_sock_fd = -1;
+	memset(rline, 0, MAX_LINE);
 
 	// increase number of download tries
 	attack->dl_tries++;
