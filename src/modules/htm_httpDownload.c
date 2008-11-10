@@ -191,7 +191,11 @@ int cmd_parse_for_http_url(Attack *attack) {
 			attack->dl_tries++;
 
 			/* assemble wget download command and execute it */
-			asprintf(&cmd, "%s %s %s", http_program, http_options, start);
+			if (asprintf(&cmd, "%s %s %s", http_program, http_options, start) == -1) {
+				logmsg(LOG_ERR, 1, "HTTP download error - Unable to allocate memory: %s.\n", strerror(errno));
+				free(cmd);
+				return(-1);
+			}
 			logmsg(LOG_DEBUG, 1, "HTTP download - Calling '%s'.\n", cmd);
 			if ((f = popen(cmd, "r")) == NULL) {
 				logmsg(LOG_ERR, 1, "HTTP download error - Cannot call download command: %m.\n");
