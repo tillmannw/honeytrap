@@ -11,11 +11,10 @@ AM_INIT_AUTOMAKE(honeytrap,1.1.0)
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LEX
+AC_CHECK_PROGS(LEX,flex lex,none)
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
-#AC_PROG_YACC
-AC_CHECK_PROGS(YACC,bison yacc,none)
-# AC_PROG_YACC includes the -y arg if bison is found
+AC_PROG_YACC
 if test "$YACC" = "bison"; then
     YACC="$YACC -y"
 fi
