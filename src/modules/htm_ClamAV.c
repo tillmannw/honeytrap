@@ -133,8 +133,8 @@ void load_clamdb(void) {
 	limits.maxfiles		= 1000;		/* max files */
 	limits.maxfilesize	= 10 * 1048576;	/* maximum size of archived/compressed file */
 	limits.maxreclevel	= 5;		/* maximum recursion level for archives */
-	limits.maxmailrec	= 64;		/* maximum recursion level for mail files */
-	limits.maxratio		= 200;		/* maximum compression ratio */
+//	limits.maxmailrec	= 64;		/* maximum recursion level for mail files */
+//	limits.maxratio		= 200;		/* maximum compression ratio */
 
 	return;
 }

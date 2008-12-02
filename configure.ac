@@ -1,32 +1,70 @@
-# $Id$ 
-AC_PREREQ(02.50)
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ(2.61)
 AC_INIT([honeytrap], [1.1.0], [tillmann.werner@gmx.de])
-AM_CONFIG_HEADER(config.h)
+AC_CONFIG_SRCDIR([config.h.in])
+AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE(honeytrap,1.1.0)
 
-# Since we get -O2 from configure defaults, which doesn't work in 64bit
-# mode, let's make some changes here before calling _CC macros.
-AC_ARG_ENABLE(64bit-gcc,
-[  --enable-64bit-gcc	   try to compile 64bit (only tested on Sparc Solaris 9).],
-		[ CFLAGS="-O0 -g" CC="gcc -m64"; export CFLAGS CC ],)
-
-AC_CHECK_PROGS(LEX,flex lex,none)
+# Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_LEX
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+#AC_PROG_YACC
 AC_CHECK_PROGS(YACC,bison yacc,none)
+# AC_PROG_YACC includes the -y arg if bison is found
 if test "$YACC" = "bison"; then
     YACC="$YACC -y"
 fi
 
-AM_PROG_CC_STDC
+
 LT_INIT
 
-AC_PROG_CC
-AC_PROG_LIBTOOL
+AC_CONFIG_MACRO_DIR([m4])
 
-SHELL="/bin/sh"
+# Checks for header files.
+AC_FUNC_ALLOCA
+AC_HEADER_DIRENT
+AC_HEADER_STDC
+AC_HEADER_SYS_WAIT
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h libintl.h malloc.h memory.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h strings.h sys/file.h sys/socket.h sys/time.h unistd.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_HEADER_STDBOOL
+AC_C_CONST
+AC_TYPE_UID_T
+AC_C_INLINE
+AC_TYPE_INT32_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_HEADER_TIME
+AC_STRUCT_TM
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT8_T
+
+# Checks for library functions.
+AC_REPLACE_FNMATCH
+AC_FUNC_FORK
+AC_FUNC_GETPGRP
+AC_FUNC_MALLOC
+AC_FUNC_MEMCMP
+AC_FUNC_MMAP
+AC_FUNC_REALLOC
+AC_FUNC_SELECT_ARGTYPES
+AC_TYPE_SIGNAL
+AC_FUNC_STAT
+AC_FUNC_STRFTIME
+AC_CHECK_FUNCS([bzero dup2 getcwd gethostbyname inet_ntoa memmove memset munmap pow select socket sqrt strchr strdup strerror strncasecmp strndup strrchr strstr strtoul strtoull])
 
 
 
-## prepare fancy console output, taken from GNU shtools
+#----------------------- prepare fancy console output ---------------------------
+# taken from GNU shtools
 # determine terminal bold sequence
 term_bold=''
 term_norm=''
@@ -78,202 +116,23 @@ bold () {
 }
 
 
-if test -n "$GCC"; then
-      CFLAGS="$CFLAGS -Wall"
+
+#----------------------- dynamic plugin support ---------------------------
+AC_CHECK_LIB(dl, dlsym,, DLLIB="no")
+if test "$DLLIB" != "no"; then
+	LIBS="$LIBS -ldl"
+	LDFLAGS="$LDFLAGS -Wl,--export-dynamic"
+	else
+	AC_CHECK_LIB(c, dlsym,, DLCLIB="no")
+	if test "$DLCLIB" = "no"; then
+		echo
+		bold "   %BError%b - Programmatic interface to dynamic link loader not found."
+		echo "          Cannot use dynamic plugin libraries."
+		echo
+		exit 1
+	fi
 fi
 
-AC_ARG_ENABLE(debug,
-[  --enable-debug          enable debugging options (bugreports and developers only)],
-                [ if test -n "$GCC"; then
-                    CFLAGS="-O0 -DDEBUG -g"
-                  else
-                    CFLAGS="$CFLAGS -DDEBUG"
-                  fi      
-		  enable_debug="X"
-                ], enable_debug=" ")
-
-AC_ARG_ENABLE(profile,
-[  --enable-profile        enable profiling options (developers only)],
-        [ if test -n "$GCC"; then
-            CFLAGS="$CFLAGS -DPROFILE -pg"
-          else
-            CFLAGS="$CFLAGS -DPROFILE"
-          fi
-	  enable_profile="X"
-        ], enable_profile=" ")
-AC_ARG_ENABLE(devmodules,
-[  --enable-devmodules     enable unstable modules (not recommended for production setups)],
-                [ if test -n "$GCC"; then
-                    CFLAGS="-O0 -DDEBUG -g"
-                  else
-                    CFLAGS="$CFLAGS -DDEBUG"
-                  fi      
-		  enable_devmodules="X"
-                ], enable_devmodules=" ")
-
-
-#AC_CANONICAL_HOST
-linux=no
-sunos4=no
-
-AC_C_BIGENDIAN
-SHELL="/bin/sh"
-
-case "$host" in
-  *-openbsd2.6|*-openbsd2.5|*-openbsd2.4|*-openbsd2.3*)
-    AC_DEFINE(OPENBSD,,[Define if OPENBSD])
-    AC_DEFINE(BROKEN_SIOCGIFMTU,,[Define if BROKEN_SIOCGIFMTU])
-
-    ;;
-  *-openbsd*)
-    AC_DEFINE(OPENBSD)
-
-    ;;
-  *-sgi-irix5*)
-    AC_DEFINE(IRIX,,[Define if IRIX])
-    no_libsocket=yes
-    no_libnsl=yes
-    if test -z "$GCC"; then
-      sgi_cc=yes
-    fi
-    LDFLAGS=${LDFLAGS} -L/usr/local/lib
-    extra_incl=-I/usr/local/include
-    ;;
-  *-sgi-irix6*)
-    AC_DEFINE(IRIX)
-    no_libsocket=yes
-    no_libnsl=yes
-    if test -z "$GCC"; then
-      sgi_cc=yes
-    fi
-    LDFLAGS=${LDFLAGS} -L/usr/local/lib
-    extra_incl=-I/usr/local/include
-    ;;
-  *-solaris*)
-    AC_DEFINE(SOLARIS,,[Define if SOLARIS])
-    CPPFLAGS="${CPPFLAGS} -DBSD_COMP -D_REENTRANT"
-    ;;
-  *-sunos*)
-    AC_DEFINE(SUNOS,,[Define if SUNOS])
-    sunos4=yes
-    ;;
-  *-linux*)
-    linux=yes
-    AC_DEFINE(LINUX,,[Define if LINUX])
-    # libpcap doesn't even LOOK at the timeout you give it under Linux
-       AC_DEFINE(PCAP_TIMEOUT_IGNORED,,[Define if PCAP_TIMEOUT_IGNORED])
-    AC_SUBST(extra_incl)
-    extra_incl=-I/usr/include/pcap
-    ;;
-  *-hpux10*)
-    AC_DEFINE(HPUX,,[Define if HPUX])
-    AC_DEFINE(WORDS_BIGENDIAN)
-    AC_SUBST(extra_incl)
-    extra_incl=-I/usr/local/include
-    ;;
-
-  *-freebsd*)
-    AC_DEFINE(FREEBSD,,[Define if FREEBSD])
-    CFLAGS="$CFLAGS -fPIC -DPIC"
-
-    ;;
-  *-bsdi*)
-    AC_DEFINE(BSDI,,[Define if BSDI])
-    ;;
-  *-aix*)
-    AC_DEFINE(AIX,,[Define if AIX])
-     broken_types=yes
-    ;;
-  *-osf4*)
-    AC_DEFINE(OSF1,,[Define if OSF1])
-    tru64_types=yes
-    ;;
-  *-osf5.1*)
-    AC_DEFINE(OSF1)
-    ;;
-  *-tru64*)
-    AC_DEFINE(OSF1)
-    tru64_types=yes
-    ;;
-# it is actually <platform>-apple-darwin1.2 or <platform>-apple-rhapsody5.x but lets stick with this for the moment    
-  *-apple*)
-    AC_DEFINE(MACOS,,[Define if MACOS])
-    AC_DEFINE(BROKEN_SIOCGIFMTU)
-    LDFLAGS="${LDFLAGS} -L/sw/lib"
-    extra_incl=-I/sw/include
-esac
-
-# any sparc platform has to have this one defined.
-AC_MSG_CHECKING(for sparc alignment)
-if eval "echo $host_cpu|grep -i sparc >/dev/null"; then
-     AC_DEFINE(WORDS_MUSTALIGN,,[Define if WORDS_MUSTALIGN])
-     AC_MSG_RESULT(yes)
-else
-     AC_MSG_RESULT(no)
-fi
-
-dnl checking headers
-AC_CHECK_HEADERS(strings.h)
-AC_CHECK_HEADERS(string.h)
-AC_CHECK_HEADERS(stdlib.h)
-AC_CHECK_HEADERS(unistd.h)
-AC_CHECK_HEADERS(sys/sockio.h)
-AC_CHECK_HEADERS(pcap-bpf.h)
-AC_CHECK_HEADERS(net/bpf.h)
-
-dnl make sure we've got all our libraries
-if test -z "$no_libnsl"; then
-AC_CHECK_LIB(nsl, inet_ntoa)
-fi
-
-if test -z "$no_libsocket"; then
-AC_CHECK_LIB(socket, socket)
-fi
-
-
-LIBS="${LIBS}"
-
-# SunOS4 has several things `broken'
-if test  "$sunos4" != "no"; then
-AC_CHECK_FUNCS(vsnprintf,, LIBS=" $LIBS -ldb")
-AC_CHECK_FUNCS(strtoul,, LIBS=" $LIBS -l44bsd")
-fi
-
-
-AC_CHECK_FUNCS(snprintf)
-AC_CHECK_FUNCS(strerror)
-
-AC_TRY_COMPILE([
-#include <stdio.h>
-],[char *foo; foo = sys_errlist[0];], 
-AC_DEFINE(ERRLIST_PREDEFINED,,[Define if ERRLIST_PREDEFINED]))
-
-AC_MSG_CHECKING(for __FUNCTION__)
-AC_TRY_COMPILE([
-#include <stdio.h>
-],[printf ("%s", __FUNCTION__);],
-sn_cv_have___FUNCTION__=yes, sn_cv__have___FUNCTION__=no)
-if test "x$sn_cv_have___FUNCTION__" = "xyes"; then
-   AC_MSG_RESULT(yes)
-   AC_DEFINE(HAVE___FUNCTION__, 1,
-	     [Define if the compiler understands __FUNCTION__.])
-else
-   AC_MSG_RESULT(no)
-   AC_MSG_CHECKING(for __func__)
-   AC_TRY_COMPILE([
-#include <stdio.h>
-],[printf ("%s", __func__);],
-sn_cv_have___func__=yes, sn_cv__have___func__=no)
-   if test "x$sn_cv_have___func__" = "xyes"; then
-      AC_MSG_RESULT(yes)
-      AC_DEFINE(HAVE___func__, 1,
-		[Define if the compiler understands __func__.])
-      AC_DEFINE(__FUNCTION__, __func__, [Define __FUNCTION__ as required.])
-   else
-      AC_MSG_RESULT(no)
-      AC_DEFINE(__FUNCTION__, "mystery function")
-   fi
-fi
 
 
 #----------------------- network stream monitors ---------------------------
@@ -441,10 +300,27 @@ case "x$with_stream_mon" in
 		exit 1
 esac
 
+if test "$with_ipq_mon" != "X"; then with_ipq_mon=" "; fi
+if test "$with_nfq_mon" != "X"; then with_nfq_mon=" "; fi
+if test "$with_ipfw_mon" != "X"; then with_ipfw_mon=" "; fi
+if test "$with_pcap_mon" != "X"; then with_pcap_mon=" "; fi
+
 
 
 
 #----------------------- optional plugins ---------------------------
+
+AC_ARG_ENABLE(devmodules,
+[  --enable-devmodules     enable unstable modules (not recommended for production setups)],
+                [ if test -n "$GCC"; then
+                    CFLAGS="-O0 -DDEBUG -g"
+                  else
+                    CFLAGS="$CFLAGS -DDEBUG"
+                  fi      
+		  enable_devmodules="X"
+                ], enable_devmodules=" ")
+
+
 
 AC_ARG_WITH(spamsum,
 	[  --with-spamsum                  perform SpamSum similarity analysis for recorded attacks])
@@ -704,7 +580,8 @@ if test "$with_cspm" = "yes"; then
     echo
     bold "   %BError%b - libpcre headers not found. Install them or use the following options:"
     echo
-    bold "   %B--with-libpcre-includes=%b\133location of libpcre header files\135"
+    bold "   %B--with-libpcre-includes=%b"
+    echo -e "\x5blocation of libpcre header files\x5d"
     echo
     exit
   fi
@@ -718,7 +595,8 @@ if test "$with_cspm" = "yes"; then
     echo
     bold "   %BError%b - libpcre library not found. Install it or use the following options:"
     echo
-    bold "   %B--with-libpcre-libraries=%b\133location of libpcre shared library files\135"
+    bold "   %B--with-libpcre-libraries=%b"
+    echo -e "\x5blocation of libpcre shared library files\x5d"
     echo
     exit
   fi
@@ -832,42 +710,6 @@ fi
 
 #-------------------------------------------------------------
 
-
-
-default_directory="/usr /usr/local"
-
-AC_CHECK_LIB(dl, dlsym,, DLLIB="no")
-if test "$DLLIB" != "no"; then
-	LIBS="$LIBS -ldl"
-	LDFLAGS="$LDFLAGS -Wl,--export-dynamic"
-	else
-	AC_CHECK_LIB(c, dlsym,, DLCLIB="no")
-	if test "$DLCLIB" = "no"; then
-		echo
-		bold "   %BError%b - Programmatic interface to dynamic link loader not found."
-		echo "          Cannot use dynamic plugin libraries."
-		echo
-		exit 1
-	fi
-fi
-
-
-if test "$tru64_types" = "yes"; then
-        AC_CHECK_TYPE(u_int8_t, unsigned char)
-        AC_CHECK_TYPE(u_int16_t, unsigned short)
-        AC_CHECK_TYPE(u_int32_t, unsigned int)
-else
-	if test "$broken_types" = "yes" ; then
-		AC_CHECK_TYPE(u_int8_t, unsigned char)
-		AC_CHECK_TYPE(u_int16_t, unsigned short)
-		AC_CHECK_TYPE(u_int32_t, unsigned long int)
-	else
-		AC_CHECK_TYPE(u_int8_t, uint8_t)
-		AC_CHECK_TYPE(u_int16_t, uint16_t)
-		AC_CHECK_TYPE(u_int32_t, uint32_t)
-	fi
-fi
-
 # Check for electric fence malloc debugger
 AC_ARG_WITH(efence, [  --with-efence                   link with electric fence ])
 if test "$with_efence" = "yes"
@@ -877,8 +719,7 @@ then
 	AC_CHECK_LIB(efence, EF_ALIGNMENT, LIBS="${LIBS} -lefence", LEFENCE="no")
 	if test "$LEFENCE" = "no"; then
 		echo
-		bold "   %BError%b - Electric fence libraries not found."
-		bold "          Install them and re-run configure with %B--with-efence%b."
+		bold "   %BError%b - Electric fence libraries not found. Install them and re-run configure."
 		echo
 		exit 1
 	fi
@@ -887,29 +728,11 @@ else
 fi
 
 
-# let's make some fixes..
-
-CFLAGS=`echo $CFLAGS |sed -e 's/-I\/usr\/include //g'`
-CPPFLAGS=`echo $CPPFLAGS | sed -e 's/-I\/usr\/include //g'`
-
-INCLUDES='-I$(top_srcdir) -I$(top_srcdir)/src'
-
-AC_SUBST(INCLUDES)
-
-
-if test "$with_ipq_mon" != "X"; then with_ipq_mon=" "; fi
-if test "$with_nfq_mon" != "X"; then with_nfq_mon=" "; fi
-if test "$with_ipfw_mon" != "X"; then with_ipfw_mon=" "; fi
-if test "$with_pcap_mon" != "X"; then with_pcap_mon=" "; fi
-
-
-AC_PROG_INSTALL
 AC_CONFIG_FILES([Makefile
-		doc/Makefile
-		src/Makefile
-		src/modules/Makefile 
-		src/modules/htm_cspm/Makefile])
-
+                 doc/Makefile
+                 src/Makefile
+                 src/modules/Makefile
+                 src/modules/htm_cspm/Makefile])
 AC_OUTPUT
 
 

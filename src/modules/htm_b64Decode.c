@@ -85,18 +85,18 @@ struct dec *decode(const char* code, u_int32_t len) {
 		if (!ign) {
 			if (eot) {
 				if (bufctr == 0) return(NULL);
-				charctr = ((bufctr == 1) || (bufctr == 2)) ? 1 : 2;
-				bufctr = 3;
-			} else charctr = 3;
+				charctr = ((bufctr == 0) || (bufctr == 1)) ? 0 : 1;
+				bufctr = 2;
+			} else charctr = 2;
 
 			inbuf[bufctr++] = ch;
 
-			if (bufctr == 4) {
+			if (bufctr == 3) {
 				bufctr = 0;
 
-				ret->str[ret->len++] =  (inbuf[0] << 2) | ((inbuf[1] & 0x30) >> 4);
-				if (charctr > 0) ret->str[ret->len++] =  ((inbuf[1] & 0x0F) << 4) | ((inbuf[2] & 0x3C) >> 2);
-				if (charctr > 1) ret->str[ret->len++] =  ((inbuf[2] & 0x03) << 6) | (inbuf[3] & 0x3F);
+				ret->str[ret->len++] =  (inbuf[0] << 2) | ((inbuf[0] & 0x30) >> 4);
+				if (charctr > 0) ret->str[ret->len++] =  ((inbuf[0] & 0x0F) << 4) | ((inbuf[1] & 0x3C) >> 2);
+				if (charctr > 1) ret->str[ret->len++] =  ((inbuf[1] & 0x03) << 6) | (inbuf[2] & 0x3F);
 			}
 			if (eot) return(ret);
 		}

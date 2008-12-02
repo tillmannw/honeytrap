@@ -20,6 +20,9 @@
 	extern int yyleng;
 	extern FILE *yyin;
 
+	extern int yylex(void);
+	int yyerror(char* s);
+
 	static struct sc_shellcode *shellcodes = NULL;
 	extern int line_number;
 

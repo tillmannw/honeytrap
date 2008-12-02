@@ -34,9 +34,9 @@
 void get_signal(int sig) {
 	if (signal(sig, SIG_IGN) == SIG_IGN) return;
 	if (write(sigpipe[1], (char *) &sig, sizeof(int)) == -1) {
-		write(logfile_fd, "Error - Unable to write signal to pipe.\n", 40);
+		if (write(logfile_fd, "Error - Unable to write signal to pipe.\n", 40)) { };
 		if ((STDOUT_FILENO != logfile_fd) && (daemonize != 1))
-			write(STDOUT_FILENO, "Error - Unable to write signal to pipe.\n", 40);
+			if (write(STDOUT_FILENO, "Error - Unable to write signal to pipe.\n", 40)) { };
 		exit(EXIT_FAILURE);
 	}
 	return;

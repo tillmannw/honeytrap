@@ -1,6 +1,6 @@
 AUTOMAKE_OPTIONS = foreign no-dependencies
 
-AM_CFLAGS=-Wall
+AM_CFLAGS=-Wall -Werror
 
 #AM_LDFLAGS = -lpcre -ly -lfl
 AM_LDFLAGS = -lpcre

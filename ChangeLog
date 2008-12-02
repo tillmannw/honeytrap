@@ -1,4 +1,5 @@
 Version 1.1.0
+- reworked build process to be gcc 4.3 compatible
 - store download tries in attack record
 - magicPE plugin for identifying PE files that are submitted as attack strings
 - submitMWserv plugin for submissions to the mwcollect alliance

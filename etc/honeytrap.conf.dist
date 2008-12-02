@@ -50,8 +50,8 @@ plugin-vncDownload = ""
 
 // store attacks on disk
 plugin-SaveFile = {
-	attacks_dir	= "/opt/honeytrap/attacks"
-	downloads_dir	= "/opt/honeytrap/downloads"
+	attacks_dir	= "/opt/honeytrap/var/honeytrap/attacks"
+	downloads_dir	= "/opt/honeytrap/var/honeytrap/downloads"
 }
 
 
