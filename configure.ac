@@ -767,7 +767,7 @@ bold "    (%B$with_cpuemu%b)  cpuEmu"
 echo
 bold "    (%B$with_cspm%b)  CSPM"
 echo
-bold "    (%B$with_submit_postgres%b)  PostgeSQL"
+bold "    (%B$with_submit_postgres%b)  PostgreSQL"
 echo
 bold "    (%B$with_spamsum%b)  SpamSum"
 echo
