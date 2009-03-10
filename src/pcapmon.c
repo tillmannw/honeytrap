@@ -112,6 +112,10 @@ void server_wrapper(u_char *args, const struct pcap_pkthdr *pheader, const u_cha
 	switch (port_mode) {
 	case PORTCONF_NONE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n", sport, PROTO(ip->ip_p));
+		if (portconf_default == PORTCONF_IGNORE) {
+			logmsg(LOG_DEBUG, 1, "Ignoring connection request per default.\n");
+			return;
+		}
 		break;
 	case PORTCONF_IGNORE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n", sport, PROTO(ip->ip_p));

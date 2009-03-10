@@ -153,6 +153,15 @@ int start_ipq_mon(void) {
 					case PORTCONF_NONE:
 						logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n",
 								dport, PROTO(ip->ip_p));
+						if (portconf_default == PORTCONF_IGNORE) {
+							logmsg(LOG_DEBUG, 1, "Ignoring connection request per default.\n");
+							if ((status = ipq_set_verdict(h, packet->packet_id, NF_ACCEPT, 0, NULL)) < 0) {
+								logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet: %s.\n", ipq_errstr());
+								ipq_destroy_handle(h);
+								clean_exit(EXIT_FAILURE);
+							}
+							process = 0;
+						}
 						break;
 					case PORTCONF_IGNORE:
 						logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n",

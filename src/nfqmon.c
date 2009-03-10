@@ -100,6 +100,18 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 	switch (port_mode) {
 	case PORTCONF_NONE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s has no explicit configuration.\n", dport, PROTO(ip->ip_p));
+		if (portconf_default == PORTCONF_IGNORE) {
+			logmsg(LOG_DEBUG, 1, "Ignoring connection request per default.\n");
+			/* nfq_set_verdict()'s return value is undocumented,
+			 * but digging the source of libnetfilter_queue and libnfnetlink reveals
+			 * that it's just the passed-through value of a sendmsg() */
+			if (nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL) == -1) {
+				logmsg(LOG_ERR, 1, "Error - Could not set verdict on packet.\n");
+				nfq_destroy_queue(qh);
+				exit(EXIT_FAILURE);
+			}
+			return 0;
+		}
 		break;
 	case PORTCONF_IGNORE:
 		logmsg(LOG_DEBUG, 1, "Port %u/%s is configured to be ignored.\n", dport, PROTO(ip->ip_p));

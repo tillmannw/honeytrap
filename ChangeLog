@@ -1,4 +1,5 @@
 Version 1.1.0
+- Fix: Default port mode 'ignore' was ignored (call it irony...)
 - reworked build process to be gcc 4.3 compatible
 - store download tries in attack record
 - magicPE plugin for identifying PE files that are submitted as attack strings
