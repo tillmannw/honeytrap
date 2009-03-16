@@ -291,6 +291,16 @@ int start_pcap_mon(void) {
 			mainloop_timeout.tv_sec = event_execute();
 			mainloop_timeout.tv_usec = 0;
 
+			/*
+			 * We have to call the dispatcher here because pcap_get_selectable_fd() on OpenBSD requires special treatment:
+			 * pcap_get_selectable_fd() returns a valid fd, but select() does not necessarily return in case of events on it.
+			 * Calling the dispatcher on timeouts works around this
+			 */
+                        if (pcap_dispatch(packet_sniffer, -1, (void *) server_wrapper, NULL) < 0) {
+                                logmsg(LOG_ERR, 1, "Pcap error - Unable to process packet: %s.\n", pcap_geterr(packet_sniffer));
+                                exit(EXIT_FAILURE);
+                        }
+
 			break;
 		default:
 			if (FD_ISSET(sigpipe[0], &rfds) && (check_sigpipe() == -1))
