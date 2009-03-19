@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.61)
+AC_PREREQ(2.59)
 AC_INIT([honeytrap], [1.1.0], [tillmann.werner@gmx.de])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADER([config.h])
