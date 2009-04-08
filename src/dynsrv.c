@@ -150,14 +150,10 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 			logmsg(LOG_DEBUG, 1, "Requesting tcp socket.\n");
 			if ((listen_fd = get_boundsock(&srvaddr, port_l, SOCK_STREAM)) == -1)
 				exit(EXIT_SUCCESS);
-			if (port_flags_tcp[htons(port_l)])
-				port_mode = port_flags_tcp[htons(port_l)]->mode;
 		} else if (proto == UDP) {
 			logmsg(LOG_DEBUG, 1, "Requesting udp socket.\n");
 			if ((listen_fd = get_boundsock(&srvaddr, port_l, SOCK_DGRAM)) == -1)
 				exit(EXIT_SUCCESS);
-			if (port_flags_udp[htons(port_l)])
-				port_mode = port_flags_udp[htons(port_l)]->mode;
 		}
 
 #ifndef USE_IPQ_MON
@@ -342,6 +338,14 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					attack->a_conn.r_port = ntohs(cliaddr.sin_port);
 
 					/* incoming connection accepted, select port mode */
+					if (proto == TCP) {
+						if (port_flags_tcp[htons(port_l)])
+							port_mode = port_flags_tcp[htons(port_l)]->mode;
+					} else if (proto == UDP) {
+						if (port_flags_udp[htons(port_l)])
+							port_mode = port_flags_udp[htons(port_l)]->mode;
+					}
+
 					if (port_mode & PORTCONF_NORMAL) {
 						/* handle connection in normal mode if this port configured to be handled 'normal' */
 						logmsg(LOG_DEBUG, 1,
@@ -471,7 +475,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					close(mirror_sock_fd);
 					close(connection_fd);
 					free(attack);
-					port_mode = portconf_default;
 				} // FD_ISSET - incoming connection
 			} // select return for listen_fd
 		} // for - incoming connections
@@ -634,6 +637,7 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 			       "%s %s  %s connection timed out, closing connections.\n", logpre, portstr, Logstr);
 			shutdown(server_sock_fd, SHUT_RDWR);
 			shutdown(connection_fd, SHUT_RDWR);
+printf("--> shutdowns completed\n");
 			return(process_data
 				(attack_string, total_bytes, server_string, total_from_server, dport, attack));
 		default:
