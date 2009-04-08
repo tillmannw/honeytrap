@@ -637,7 +637,6 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 			       "%s %s  %s connection timed out, closing connections.\n", logpre, portstr, Logstr);
 			shutdown(server_sock_fd, SHUT_RDWR);
 			shutdown(connection_fd, SHUT_RDWR);
-printf("--> shutdowns completed\n");
 			return(process_data
 				(attack_string, total_bytes, server_string, total_from_server, dport, attack));
 		default:
