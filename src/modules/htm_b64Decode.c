@@ -147,7 +147,6 @@ int b64_decode(Attack *attack) {
 			plughook_process_attack(funclist_attack_savedata, &dec_attack);
 			plughook_process_attack(funclist_attack_postproc, &dec_attack);
 
-
 			free(decoded->str);
 		}
 	} else {

@@ -100,7 +100,7 @@ plugin-SavePostgres = {
 /*
 plugin-httpDownload = {
 	http_program = "/usr/bin/wget"
-	http_options = "-q -O-"
+	http_options = "-q -t1 -T1 -O-"
 }
 */
 

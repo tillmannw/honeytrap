@@ -787,7 +787,9 @@ exit_now:
 
 						logmsg(LOG_DEBUG, 1, "CPU Emulation - Creating virtual attack.\n");
 						Attack *session;
-						if ((session = new_virtattack(*(struct in_addr *) 0, *(struct in_addr *) 0, 0, 0, 0)) == NULL) {
+						struct in_addr nulladdr;
+						memset(&nulladdr, 0, sizeof(struct in_addr));
+						if ((session = new_virtattack(nulladdr, nulladdr, 0, 0, 0)) == NULL) {
 							logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to create virtual attack.\n");
 							exit(EXIT_FAILURE);
 						}

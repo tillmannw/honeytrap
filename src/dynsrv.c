@@ -472,7 +472,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 
 					} else if (pid == -1)
 						logmsg(LOG_ERR, 1, "Error - forking connection handler failed.\n");
-					close(mirror_sock_fd);
+					if (mirror_sock_fd >= 0) close(mirror_sock_fd);
 					close(connection_fd);
 					free(attack);
 				} // FD_ISSET - incoming connection
@@ -561,10 +561,10 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 					attack->a_conn.payload.data = attack_string;
 					plughook_process_attack(funclist_attack_perread, attack);
 				} else if (bytes_read == 0) {
+					shutdown(connection_fd, SHUT_RDWR);
 					logmsg(LOG_INFO, 1, "   %s  Connection closed by foreign host.\n", portstr);
 
 					/* process attack string */
-					close(connection_fd);
 					return(process_data
 						(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 				} else {

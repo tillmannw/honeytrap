@@ -15,10 +15,11 @@
  *   decodes them into a new attack string and calls other plugins for it.
  */
 
+#include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #include <honeytrap.h>
 #include <logging.h>
@@ -35,7 +36,7 @@ void plugin_init(void) {
 }
 
 void plugin_unload(void) {
-	unhook(PPRIO_PREPROC, module_name, "deuniocde");
+	unhook(PPRIO_PREPROC, module_name, "deunicode");
 	return;
 }
 
@@ -66,25 +67,31 @@ int deunicode(Attack *attack) {
 	}
 
 	if (bytecnt[0] * 3 > attack->a_conn.payload.size) {
-		logmsg(LOG_NOISY, 1, "deUnicode - Attack string seems to be unicoded.\n");
+		logmsg(LOG_NOISY, 1, "deUnicode - Attack string seems to contain unicode encoded data, decoding it.\n");
 
+		// half the size of the original attack string is sufficient as we skip every second byte
 		if (((dec_attack = calloc(1, sizeof(Attack))) == NULL) ||
-		    ((dec_attack->a_conn.payload.data = calloc(1, attack->a_conn.payload.size/2)) == NULL)) {
+		    ((dec_attack->a_conn.payload.data = calloc(1, attack->a_conn.payload.size>>1)) == NULL)) {
 			logmsg(LOG_ERR, 1, "deUnicode error - Unable to allocate memory: %s.\n", strerror(errno));
 			return -1;
 		}
 		dec_attack->virtual = 1;
-		dec_attack->a_conn.payload.size = attack->a_conn.payload.size/2;
+		dec_attack->a_conn.payload.size = attack->a_conn.payload.size>>1;
 
+		// if the array for every second byte, starting with 1, contains at least half of all 0-bytes,
+		// we're correctly aligned, otherwise we have to use an offset of 1
 		offset = offcheck[0] * 2 > bytecnt[0] ? 0 : 1;
 
-		for (i = 0; i+1 < attack->a_conn.payload.size; i+=2)
-			dec_attack->a_conn.payload.data[i/2] = attack->a_conn.payload.data[i+offset];
+		for (i=0; i+offset < attack->a_conn.payload.size; i+=2)
+			dec_attack->a_conn.payload.data[i>>1] = attack->a_conn.payload.data[i+offset];
+
+		logmsg(LOG_INFO, 1, "deUnicode - Processing decoded attack.\n");
 
 		plughook_process_attack(funclist_attack_analyze, dec_attack);
 		plughook_process_attack(funclist_attack_savedata, dec_attack);
 		plughook_process_attack(funclist_attack_postproc, dec_attack);
 
+		del_attack(dec_attack);
 	} else {
 		logmsg(LOG_DEBUG, 1, "deUnicode - Attack string does not seem to be in unicode.\n");
 		return 0;

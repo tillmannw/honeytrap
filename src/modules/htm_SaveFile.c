@@ -122,9 +122,9 @@ int save_to_file(Attack *attack) {
 		logmsg(LOG_DEBUG, 1, "SaveFile - Dumping attack string into file.\n");
 
 		/* create filename */
-		if (attack->a_conn.protocol == TCP) proto_str = strdup("tcp");
-		else if (attack->a_conn.protocol == UDP) proto_str = strdup("udp");
-		else if (attack->a_conn.protocol == RAW) proto_str = strdup("raw");
+		if (attack->a_conn.protocol == TCP) proto_str = "tcp";
+		else if (attack->a_conn.protocol == UDP) proto_str = "udp";
+		else if (attack->a_conn.protocol == RAW) proto_str = "raw";
 		else {
 			logmsg(LOG_ERR, 1, "SaveFile error - Protocol %u is not supported.\n", attack->a_conn.protocol);
 			return(-1);
@@ -163,7 +163,7 @@ int save_to_file(Attack *attack) {
 		}
 		close(dumpfile_fd);
 		logmsg(LOG_DEBUG, 1, "SaveFile - Attack string saved as %s.\n", filename);
-	}
+	} else logmsg(LOG_DEBUG, 1, "SaveFile - Skipping attack string for virtual attack\n");
 
 	/* save malware */
 	for (i=0; i<attack->dl_count; i++) {

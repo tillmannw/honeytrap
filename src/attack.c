@@ -38,7 +38,7 @@
 Attack *new_virtattack(struct in_addr r_addr, struct in_addr l_addr, uint16_t r_port, uint16_t l_port, uint16_t proto) {
 	Attack *a;
 
-	if ((a = new_attack(r_addr, l_addr, r_port, l_port, proto)) == NULL) return(NULL);
+	if ((a = new_attack(r_addr, l_addr, r_port, l_port, proto)) == NULL) return NULL;
 
 	a->virtual = 1;
 
@@ -50,7 +50,7 @@ Attack *new_attack(struct in_addr r_addr, struct in_addr l_addr, uint16_t r_port
 	Attack *a;
 
 	/* mem for attack record */
-	if ((a = (Attack *) calloc(1, sizeof(Attack))) == NULL) return(NULL);
+	if ((a = (Attack *) calloc(1, sizeof(Attack))) == NULL) return NULL;
 
 	/* store attack connection data in attack record */
 	memcpy(&(a->a_conn.l_addr), &l_addr, sizeof(uint32_t));
@@ -65,6 +65,28 @@ Attack *new_attack(struct in_addr r_addr, struct in_addr l_addr, uint16_t r_port
 		logmsg(LOG_WARN, 1, "Warning - Could not set attack start time: %m.\n");
 
 	return(a);
+}
+
+
+void del_attack(Attack *a) {
+	int i;
+
+	if (!a) return;
+
+	for (i=0; i<a->dl_count; ++i) {
+		free(a->download[i].dl_type);
+		free(a->download[i].user);
+		free(a->download[i].pass);
+		free(a->download[i].filename);
+		free(a->download[i].dl_payload.data);
+	}
+
+	free(a->a_conn.payload.data);
+	free(a->p_conn.payload.data);
+
+	free(a);
+
+	return;
 }
 
 
@@ -115,10 +137,13 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 
 	/* call plugins */
 	/* do calls even if no data received, i.e. to update connection statistics */
-	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'process_attack'.\n");
+	logmsg(LOG_DEBUG, 1, "Calling preprocessor plugins for hook 'process_attack'.\n");
 	plughook_process_attack(funclist_attack_preproc, a);
+	logmsg(LOG_DEBUG, 1, "Calling analyzer plugins for hook 'process_attack'.\n");
 	plughook_process_attack(funclist_attack_analyze, a);
+	logmsg(LOG_DEBUG, 1, "Calling savedata plugins for hook 'process_attack'.\n");
 	plughook_process_attack(funclist_attack_savedata, a);
+	logmsg(LOG_DEBUG, 1, "Calling postprocessor plugins for hook 'process_attack'.\n");
 	plughook_process_attack(funclist_attack_postproc, a);
 
 	logmsg(LOG_DEBUG, 1, "Attack data processed.\n");

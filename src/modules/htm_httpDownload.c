@@ -64,7 +64,7 @@ void plugin_init(void) {
 
 
 void plugin_unload(void) {
-	unhook(PPRIO_POSTPROC, module_name, "cmd_parse_for_http_url");
+	unhook(PPRIO_ANALYZE, module_name, "cmd_parse_for_http_url");
 	return;
 }
 
@@ -179,7 +179,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 			}
 			if (isspace(end[0])) end[0] = 0;
 
-			logmsg(LOG_DEBUG, 1, "HTP download - URL found: '%s'\n", start);
+			logmsg(LOG_DEBUG, 1, "HTTP download - URL found: '%s'\n", start);
 
 			// increase number of download tries
 			attack->dl_tries++;
@@ -221,17 +221,16 @@ int cmd_parse_for_http_url(Attack *attack) {
 			if (total_bytes) {
 				logmsg(LOG_DEBUG, 1, "HTTP download - Adding download to attack record.\n");
 
-				add_download("http", UDP, 0, 0, NULL, NULL, NULL, binary_stream, total_bytes, attack);
+				add_download("http", UDP, 0, 0, NULL, NULL, strrchr(start, '/')+1, binary_stream, total_bytes, attack);
 
-				logmsg(LOG_NOTICE, 1, "HTTP download - File attached to attack record.\n");
-			} else logmsg(LOG_NOISY, 1, "HTTP download - No data received.\n");
+				logmsg(LOG_INFO, 1, "HTTP download - %s successfully downloaded and attached to attack record.\n", start);
+			} else logmsg(LOG_INFO, 1, "HTTP download - No data received.\n");
 
 			pclose(f);
 			free(cmd);
 			free(binary_stream);
 
 			i += strlen(start);
-			logmsg(LOG_INFO, 1, "HTTP download - %s successfully downloaded and attached to attack record.\n", start);
 		}
 	}
 	if (!start) logmsg(LOG_DEBUG, 1, "HTTP download - No URLs found.\n");

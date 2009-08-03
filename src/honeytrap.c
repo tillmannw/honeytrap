@@ -77,8 +77,6 @@ int main(int argc, char **argv) {
 	response_dir		= strdup("/etc/honeytrap/responses");
 	plugin_dir		= strdup("/etc/honeytrap/plugins");
 
-	current_plugfunc	= NULL;
-
 #ifdef USE_PCAP_MON
 	dev			= NULL;		// network device pointer
 	packet_sniffer		= NULL;		// pcap device pointer

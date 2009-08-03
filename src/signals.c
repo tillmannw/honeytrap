@@ -57,11 +57,7 @@ void handle_termsig(int sig) {
 #ifdef HAVE_SIGBUS
 	case SIGBUS:
 #endif
-		if (current_plugfunc)
-			logmsg(LOG_ERR, 1, "Error - Terminating signal (%d) received by process %u while processing %s::%s().\n",
-				sig, getpid(), current_plugfunc->plugnam, current_plugfunc->funcnam);
-		else
-			logmsg(LOG_ERR, 1, "Error - Terminating signal (%d) received by process %u.\n", sig, getpid());
+		logmsg(LOG_ERR, 1, "Error - Terminating signal (%d) received by process %u.\n", sig, getpid());
 		break;
 	default:
 		logmsg(LOG_DEBUG, 1, "Terminating signal (%d) received.\n", sig);
