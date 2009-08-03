@@ -41,17 +41,15 @@
 #include "htm_httpDownload.h"
 
 const char module_name[]="httpDownload";
-const char module_version[]="0.0.2";
+const char module_version[]="0.1.0";
 
 static const char *config_keywords[] = {
 	"http_program",
 	"http_options",
-	"download_dir"
 };
 
 const char *http_program;
 const char *http_options;
-const char *download_dir;
 
 
 void plugin_init(void) {
@@ -72,7 +70,7 @@ void plugin_unload(void) {
 
 void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
-	add_attack_func_to_list(PPRIO_POSTPROC, module_name, "cmd_parse_for_http_url", (void *) cmd_parse_for_http_url);
+	add_attack_func_to_list(PPRIO_ANALYZE, module_name, "cmd_parse_for_http_url", (void *) cmd_parse_for_http_url);
 
 	return;
 }
@@ -134,8 +132,6 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 			http_program = value;
 		} else if OPT_IS("http_options") {
 			http_options = value;
-		} else if OPT_IS("download_dir") {
-			download_dir = value;
 		} else {
 			fprintf(stderr, "  Error - Invalid configuration option for plugin %s: %s\n", module_name, node->keyword);
 			exit(EXIT_FAILURE);
@@ -148,11 +144,15 @@ int cmd_parse_for_http_url(Attack *attack) {
 	int i = 0, j = 0;
 	FILE *f = NULL;
 	char *string_for_processing, *start, *end, *cmd;
+	u_char *binary_stream;
+	size_t new_bytes, total_bytes;
 
+	binary_stream		= NULL;
 	string_for_processing	= NULL;
 	start			= NULL;
 	end			= NULL;
 	cmd			= NULL;
+	total_bytes		= 0;
 
 	/* no data - nothing todo */
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
@@ -181,12 +181,6 @@ int cmd_parse_for_http_url(Attack *attack) {
 
 			logmsg(LOG_DEBUG, 1, "HTP download - URL found: '%s'\n", start);
 
-			/* change into download directory */
-			if (chdir(download_dir) == -1) {
-				logmsg(LOG_ERR, 1, "HTTP download error - Unable to change into download directory %s: %m.\n", download_dir);
-				return(-1);
-			}
-
 			// increase number of download tries
 			attack->dl_tries++;
 
@@ -201,11 +195,43 @@ int cmd_parse_for_http_url(Attack *attack) {
 				logmsg(LOG_ERR, 1, "HTTP download error - Cannot call download command: %m.\n");
 				return(0);
 			}
+
+			total_bytes = 0;
+			do {
+				if ((binary_stream = realloc(binary_stream, total_bytes + BUFSIZ)) == NULL) {
+					logmsg(LOG_ERR, 1, "HTTP download error - Unable to allocate memory: %s.\n", strerror(errno));
+					pclose(f);
+					free(cmd);
+					free(binary_stream);
+					return(-1);
+				}
+				new_bytes = fread(binary_stream + total_bytes, 1, BUFSIZ, f);
+				total_bytes += new_bytes;
+			} while (!feof(f));
+
+			if (ferror(f)) {
+				logmsg(LOG_ERR, 1, "HTTP download error - Unable to allocate memory: %s.\n", strerror(errno));
+				pclose(f);
+				free(cmd);
+				free(binary_stream);
+				return(-1);
+			}
+
+			// add download to attack record
+			if (total_bytes) {
+				logmsg(LOG_DEBUG, 1, "HTTP download - Adding download to attack record.\n");
+
+				add_download("http", UDP, 0, 0, NULL, NULL, NULL, binary_stream, total_bytes, attack);
+
+				logmsg(LOG_NOTICE, 1, "HTTP download - File attached to attack record.\n");
+			} else logmsg(LOG_NOISY, 1, "HTTP download - No data received.\n");
+
 			pclose(f);
 			free(cmd);
+			free(binary_stream);
 
 			i += strlen(start);
-			logmsg(LOG_INFO, 1, "HTTP download - %s successfully downloaded to %s.\n", start, download_dir);
+			logmsg(LOG_INFO, 1, "HTTP download - %s successfully downloaded and attached to attack record.\n", start);
 		}
 	}
 	if (!start) logmsg(LOG_DEBUG, 1, "HTTP download - No URLs found.\n");

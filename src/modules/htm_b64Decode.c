@@ -141,7 +141,8 @@ int b64_decode(Attack *attack) {
 			bzero(&dec_attack, sizeof(Attack));
 			dec_attack.a_conn.payload.data = decoded->str;
 			dec_attack.a_conn.payload.size = decoded->len;
-//			plughook_process_attack(funclist_attack_preproc, &dec_attack);
+
+			plughook_process_attack(funclist_attack_preproc, &dec_attack);
 			plughook_process_attack(funclist_attack_analyze, &dec_attack);
 			plughook_process_attack(funclist_attack_savedata, &dec_attack);
 			plughook_process_attack(funclist_attack_postproc, &dec_attack);

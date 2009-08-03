@@ -45,6 +45,7 @@ plugin_dir	= "/opt/honeytrap/etc/honeytrap/plugins"
 plugin-ftpDownload = ""
 plugin-tftpDownload = ""
 plugin-b64Decode = ""
+plugin-deUnicode = ""
 plugin-vncDownload = ""
 
 
@@ -99,9 +100,7 @@ plugin-SavePostgres = {
 /*
 plugin-httpDownload = {
 	http_program = "/usr/bin/wget"
-//      http_options = "-nv"
-	http_options = "-q"
-	download_dir = "/opt/honeytrap/downloads/"
+	http_options = "-q -O-"
 }
 */
 

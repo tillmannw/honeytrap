@@ -14,6 +14,7 @@ lib_LTLIBRARIES = \
 	htm_httpDownload.la \
 	htm_tftpDownload.la \
 	htm_vncDownload.la \
+	htm_deUnicode.la \
 	htm_b64Decode.la
 
 if BUILD_SPAMSUM_PLUGIN
@@ -54,6 +55,9 @@ htm_tftpDownload_la_LDFLAGS = -module -no-undefined -avoid-version
 
 htm_vncDownload_la_SOURCES = htm_vncDownload.c htm_vncDownload.h
 htm_vncDownload_la_LDFLAGS = -module -no-undefined -avoid-version
+
+htm_deUnicode_la_SOURCES = htm_deUnicode.c htm_deUnicode.h
+htm_deUnicode_la_LDFLAGS = -module -no-undefined -avoid-version
 
 htm_b64Decode_la_SOURCES = htm_b64Decode.c htm_b64Decode.h
 htm_b64Decode_la_LDFLAGS = -module -no-undefined -avoid-version
