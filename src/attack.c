@@ -195,3 +195,27 @@ int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, co
 
 	return(0);
 }
+
+
+int reassign_downloads(Attack *dst, Attack *src) {
+	if (!dst || !src) {
+		logmsg(LOG_ERR, 1, "Error - Could not reassign downloads: Attack record(s) missing.\n");
+		return -1;
+	}
+
+	// reassign all downloads from src to dst
+	if ((dst->download = realloc(dst->download, sizeof(struct s_download) * (dst->dl_count + src->dl_count))) == NULL) {
+		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
+		return -1;
+	}
+	memcpy(&dst->download[dst->dl_count],
+		src->download,
+		sizeof(struct s_download) * src->dl_count);
+	dst->dl_count += src->dl_count;
+
+	free(src->download);
+	src->download = NULL;
+	src->dl_count = 0;
+
+	return 0;
+}

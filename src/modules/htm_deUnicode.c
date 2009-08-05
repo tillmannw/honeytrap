@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <attack.h>
 #include <honeytrap.h>
 #include <logging.h>
 #include <plughook.h>
@@ -87,8 +88,14 @@ int deunicode(Attack *attack) {
 
 		logmsg(LOG_INFO, 1, "deUnicode - Processing decoded attack.\n");
 
+		plughook_process_attack(funclist_attack_preproc, dec_attack);
 		plughook_process_attack(funclist_attack_analyze, dec_attack);
-		plughook_process_attack(funclist_attack_savedata, dec_attack);
+
+		// assign possible downloads to the original attack,
+		// this must happen before PPRIO_SAVE plugins are called
+		reassign_downloads(attack, dec_attack);
+
+//		plughook_process_attack(funclist_attack_savedata, dec_attack);
 		plughook_process_attack(funclist_attack_postproc, dec_attack);
 
 		del_attack(dec_attack);

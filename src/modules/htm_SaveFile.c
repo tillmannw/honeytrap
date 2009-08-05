@@ -118,52 +118,50 @@ int save_to_file(Attack *attack) {
 		return(0);
 	}
 
-	if (!attack->virtual) {
-		logmsg(LOG_DEBUG, 1, "SaveFile - Dumping attack string into file.\n");
+	logmsg(LOG_DEBUG, 1, "SaveFile - Dumping attack string into file.\n");
 
-		/* create filename */
-		if (attack->a_conn.protocol == TCP) proto_str = "tcp";
-		else if (attack->a_conn.protocol == UDP) proto_str = "udp";
-		else if (attack->a_conn.protocol == RAW) proto_str = "raw";
-		else {
-			logmsg(LOG_ERR, 1, "SaveFile error - Protocol %u is not supported.\n", attack->a_conn.protocol);
+	/* create filename */
+	if (attack->a_conn.protocol == TCP) proto_str = "tcp";
+	else if (attack->a_conn.protocol == UDP) proto_str = "udp";
+	else if (attack->a_conn.protocol == RAW) proto_str = "raw";
+	else {
+		logmsg(LOG_ERR, 1, "SaveFile error - Protocol %u is not supported.\n", attack->a_conn.protocol);
+		return(-1);
+	}
+
+	/* assemble filename */
+	loc_time = time(NULL);
+	if((file_time = localtime(&loc_time)) == NULL) {
+		logmsg(LOG_WARN, 1, "SaveFile warning - Unable to get local time for filename.\n");
+		if (asprintf(&filename, "%s/from_port_%u-%s_%u", attacks_dir, attack->a_conn.l_port, proto_str, getpid()) == -1) {
+			logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %m.\n");
 			return(-1);
 		}
-
-		/* assemble filename */
-		loc_time = time(NULL);
-		if((file_time = localtime(&loc_time)) == NULL) {
-			logmsg(LOG_WARN, 1, "SaveFile warning - Unable to get local time for filename.\n");
-			if (asprintf(&filename, "%s/from_port_%u-%s_%u", attacks_dir, attack->a_conn.l_port, proto_str, getpid()) == -1) {
-				logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %m.\n");
-				return(-1);
-			}
-		} else {
-			if (asprintf(&filename, "%s/from_port_%u-%s_%u_%04d-%02d-%02d", attacks_dir, attack->a_conn.l_port, proto_str,
-				getpid(), file_time->tm_year+1900, file_time->tm_mon+1, file_time->tm_mday) == -1) {
-				logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %m.\n");
-				return(-1);
-			}
-		}
-
-		/* open file and set access rights */
-		if ((dumpfile_fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 644)) < 0) {
-			logmsg(LOG_ERR, 1, "SaveFile error - Unable to save attack string in attacks directory: %s\n", strerror(errno));
+	} else {
+		if (asprintf(&filename, "%s/from_port_%u-%s_%u_%04d-%02d-%02d", attacks_dir, attack->a_conn.l_port, proto_str,
+			getpid(), file_time->tm_year+1900, file_time->tm_mon+1, file_time->tm_mday) == -1) {
+			logmsg(LOG_ERR, 1, "SaveFile error - Unable to create filename: %m.\n");
 			return(-1);
 		}
-		if (chmod(filename, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)
-			logmsg(LOG_WARN, 1, "SaveFile warning - Unable to set proper acces rights\n");
+	}
+
+	/* open file and set access rights */
+	if ((dumpfile_fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 644)) < 0) {
+		logmsg(LOG_ERR, 1, "SaveFile error - Unable to save attack string in attacks directory: %s\n", strerror(errno));
+		return(-1);
+	}
+	if (chmod(filename, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0)
+		logmsg(LOG_WARN, 1, "SaveFile warning - Unable to set proper acces rights\n");
 
 
-		/* write data to file */
-		if (write(dumpfile_fd, attack->a_conn.payload.data, attack->a_conn.payload.size) != attack->a_conn.payload.size) {
-			logmsg(LOG_ERR, 1, "SaveFile error - Unable to write attack string into file: %s\n", strerror(errno));
-			close(dumpfile_fd);
-			return(-1);
-		}
+	/* write data to file */
+	if (write(dumpfile_fd, attack->a_conn.payload.data, attack->a_conn.payload.size) != attack->a_conn.payload.size) {
+		logmsg(LOG_ERR, 1, "SaveFile error - Unable to write attack string into file: %s\n", strerror(errno));
 		close(dumpfile_fd);
-		logmsg(LOG_DEBUG, 1, "SaveFile - Attack string saved as %s.\n", filename);
-	} else logmsg(LOG_DEBUG, 1, "SaveFile - Skipping attack string for virtual attack\n");
+		return(-1);
+	}
+	close(dumpfile_fd);
+	logmsg(LOG_DEBUG, 1, "SaveFile - Attack string saved as %s.\n", filename);
 
 	/* save malware */
 	for (i=0; i<attack->dl_count; i++) {
