@@ -317,10 +317,10 @@ int ftp_quit(int control_sock_fd, int data_sock_fd) {
 
 
 int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, struct in_addr *rhost, const int port, const char *save_file, Attack *attack) {
-	struct sockaddr_in control_socket, local_data_socket, remote_data_socket;
+	struct sockaddr_in local_control_socket, remote_control_socket, local_data_socket, remote_data_socket;
 	int control_sock_fd, data_sock_listen_fd, data_sock_fd,
 	    local_data_port, bytes_read, total_bytes, addr_len, select_return, timeout, retval;
-	uint8_t ip_octet[4], *binary_stream;
+	uint8_t *ip_octet, *binary_stream;
 	struct hostent *data_host = NULL;
 	struct ftp_port_t {
 		uint16_t first_half:8, second_half:8;
@@ -341,9 +341,9 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 	attack->dl_tries++;
 
 	/* replace private ip? */
-	if (replace_private_ips && (private_ipaddr(*rhost) || !(valid_ipaddr(*rhost)))) {
+	if (replace_private_ips && (private_ipaddr(*lhost) || !(valid_ipaddr(*lhost)))) {
 		logmsg(LOG_NOISY, 1, "FTP download - Replacing private/invalid server address with attacking IP address.\n");
-		rhost = (struct in_addr *) &attack->a_conn.r_addr;
+		lhost = (struct in_addr *) &attack->a_conn.r_addr;
 	}
 	
 	logmsg(LOG_NOTICE, 1, "FTP download - Requesting '%s' from %s:%u.\n", save_file, inet_ntoa(*rhost), port);
@@ -354,12 +354,25 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		logmsg(LOG_ERR, 1, "FTP download error - Unable to initialize FTP control channel: %s.\n", strerror(errno));
 		return(-1);
 	}
+
+	// bind ftp control socket to attacked local IP address
+	logmsg(LOG_DEBUG, 1, "FTP download - Binding download socket to attacked address.\n");
+	memset(&local_control_socket, 0, sizeof(local_control_socket));
+	local_control_socket.sin_family          = AF_INET;
+	local_control_socket.sin_addr.s_addr     = *(in_addr_t *)lhost;
+	if (bind(control_sock_fd, &local_control_socket, sizeof(local_control_socket)) == -1) {
+		logmsg(LOG_ERR, 1, "FTP download error - Unable to initialize FTP control channel: %s.\n", strerror(errno));
+		return(-1);
+	}
+
+
 	logmsg(LOG_DEBUG, 1, "FTP download - FTP control channel initialized.\n");
-	memset(&control_socket, 0, sizeof(control_socket));
-	control_socket.sin_family          = AF_INET;
-	control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
-	control_socket.sin_port            = htons(port);
-	if (nb_connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket), CONNTIMEOUT) == -1) {
+
+	memset(&remote_control_socket, 0, sizeof(remote_control_socket));
+	remote_control_socket.sin_family          = AF_INET;
+	remote_control_socket.sin_addr.s_addr     = *(in_addr_t *)rhost;
+	remote_control_socket.sin_port            = htons(port);
+	if (nb_connect(control_sock_fd, (struct sockaddr *) &remote_control_socket, sizeof(remote_control_socket), CONNTIMEOUT) == -1) {
 		/* if network or host is unreachable try attacking address instead */
 		switch(errno) {
 		case ECONNREFUSED:
@@ -368,10 +381,10 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		case EHOSTUNREACH:
 			if (rhost != (struct in_addr *) &attack->a_conn.r_addr) {
 				rhost = (struct in_addr *) &attack->a_conn.r_addr;
-				control_socket.sin_addr.s_addr     = inet_addr(inet_ntoa(*rhost));
+				remote_control_socket.sin_addr.s_addr     = *(in_addr_t *)rhost;
 				logmsg(LOG_NOISY, 1, "FTP download - FTP server could not be reached, trying the attacking address (%s) instead.\n",
 					inet_ntoa(*rhost));
-				if (nb_connect(control_sock_fd, (struct sockaddr *) &control_socket, sizeof(control_socket), CONNTIMEOUT) == -1) {
+				if (nb_connect(control_sock_fd, (struct sockaddr *) &remote_control_socket, sizeof(remote_control_socket), CONNTIMEOUT) == -1) {
 					logmsg(LOG_ERR, 1, "FTP download error - Unable to connect to %s:%d: %s\n",
 						inet_ntoa(*rhost), port, strerror(errno));
 					close(control_sock_fd);
@@ -506,22 +519,21 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 			return(-1);
 		}
 		lhost = (struct in_addr*)data_host->h_addr_list[0];
-		memcpy(ip_octet, lhost, 4);
 	} else {
 		/* determine local IP address of control connection socket */
 		addr_len = sizeof(struct sockaddr_in);
-		if (getsockname(control_sock_fd, (struct sockaddr *) &control_socket, (socklen_t *) &addr_len) != 0) {
+		if (getsockname(control_sock_fd, (struct sockaddr *) &remote_control_socket, (socklen_t *) &addr_len) != 0) {
 			logmsg(LOG_ERR, 1, "FTP download error - Unable to get local address from FTP control connection socket: %s\n", strerror(errno));
 			return(-1);
 		}
-		memcpy(ip_octet, &control_socket.sin_addr.s_addr, 4);
 	}
+	ip_octet = (u_int8_t *) lhost;
 
 	/* listen on data channel socket */
 	memset(&local_data_socket, 0, sizeof(local_data_socket));
-	local_data_socket.sin_family = AF_INET;
-	local_data_socket.sin_addr.s_addr = control_socket.sin_addr.s_addr;
-	local_data_socket.sin_port = htons(local_data_port);
+	local_data_socket.sin_family		= AF_INET;
+	local_data_socket.sin_addr.s_addr	= remote_control_socket.sin_addr.s_addr;
+	local_data_socket.sin_port		= htons(local_data_port);
 
 	/* TODO: Check if errno == EINVAL (socket in use) */
 	while(((bind(data_sock_listen_fd, (struct sockaddr *) &local_data_socket,
@@ -633,7 +645,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 				ftp_quit(control_sock_fd, data_sock_fd);
 				return(-1);
 			} else logmsg(LOG_DEBUG, 1, "FTP download - Incoming data connection from %s:%u.\n",
-				inet_ntoa(control_socket.sin_addr), ntohs(remote_data_socket.sin_port));
+				inet_ntoa(remote_control_socket.sin_addr), ntohs(remote_data_socket.sin_port));
 			close(data_sock_listen_fd);
 		} else logmsg(LOG_DEBUG, 1, "FTP download - Select on FTP data channel returned but socket is not set.\n");
 	}
@@ -676,7 +688,7 @@ int get_ftp_resource(const char *user, const char* pass, struct in_addr *lhost, 
 		/* add download to attack record */
 		if (total_bytes) {
 			logmsg(LOG_DEBUG, 1, "FTP download - Adding download to attack record.\n");
-			add_download("ftp", TCP, rhost->s_addr, port, user, pass, (const char *) save_file, binary_stream, total_bytes, attack);
+			add_download("ftp", TCP, rhost->s_addr, port, user, pass, (const char *) save_file, NULL, binary_stream, total_bytes, attack);
 
 			logmsg(LOG_NOTICE, 1, "FTP download - %s attached to attack record.\n", save_file);
 		} else logmsg(LOG_NOISY, 1, "FTP download - No data received.\n");

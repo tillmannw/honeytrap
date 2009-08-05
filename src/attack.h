@@ -41,6 +41,7 @@ struct s_download {
 	char			*user;		/* username for download connection */
 	char			*pass;		/* user's password */
 	char			*filename;	/* filename of download */
+	char			*uri;		/* unified resource identifier */
 	struct s_payload	dl_payload;	/* downloaded data */
 };
 
@@ -61,7 +62,7 @@ Attack *new_virtattack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_
 Attack *new_attack(struct in_addr l_addr, struct in_addr r_addr, uint16_t l_port, uint16_t r_port, uint16_t proto);
 void del_attack(Attack *a);
 int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_size, uint16_t port, Attack *a);
-int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, const uint16_t r_port, const char *user, const char *pass, const char *filename, const u_char *data, const u_int32_t size, Attack *a);
+int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, const uint16_t r_port, const char *user, const char *pass, const char *filename, const char *uri, const u_char *data, const u_int32_t size, Attack *a);
 int reassign_downloads(Attack *dst, Attack *src);
 
 #endif

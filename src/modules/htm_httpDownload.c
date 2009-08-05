@@ -221,7 +221,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 			if (total_bytes) {
 				logmsg(LOG_DEBUG, 1, "HTTP download - Adding download to attack record.\n");
 
-				add_download("http", UDP, 0, 0, NULL, NULL, strrchr(start, '/')+1, binary_stream, total_bytes, attack);
+				add_download("http", TCP, 0, 0, NULL, NULL, strrchr(start, '/')+1, start, binary_stream, total_bytes, attack);
 
 				logmsg(LOG_INFO, 1, "HTTP download - %s successfully downloaded and attached to attack record.\n", start);
 			} else logmsg(LOG_INFO, 1, "HTTP download - No data received.\n");

@@ -86,7 +86,7 @@ int deunicode(Attack *attack) {
 		for (i=0; i+offset < attack->a_conn.payload.size; i+=2)
 			dec_attack->a_conn.payload.data[i>>1] = attack->a_conn.payload.data[i+offset];
 
-		logmsg(LOG_INFO, 1, "deUnicode - Processing decoded attack.\n");
+		logmsg(LOG_NOISY, 1, "deUnicode - Processing decoded attack.\n");
 
 		plughook_process_attack(funclist_attack_preproc, dec_attack);
 		plughook_process_attack(funclist_attack_analyze, dec_attack);

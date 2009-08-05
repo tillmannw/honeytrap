@@ -1,5 +1,5 @@
 /* readconf.c
- * Copyright (C) 2006-2008 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2009 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -382,7 +382,7 @@ int configure(int my_argc, char *my_argv[]) {
 
 
 	fprintf(stdout, "  Initialization complete.\n");
-	logmsg(LOG_ERR, 0, "\nhoneytrap v%s Copyright (C) 2005-2008 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
+	logmsg(LOG_ERR, 0, "\nhoneytrap v%s Copyright (C) 2005-2009 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
 
 	first_init = 0;
 	return(1);

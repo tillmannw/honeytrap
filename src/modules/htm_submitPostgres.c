@@ -193,6 +193,8 @@ char *build_uri(struct s_download *download) {
 
 	logmsg(LOG_DEBUG, 1, "SubmitPostgres - Assembling generic malware URI.\n");
 
+	if (download->uri) return strdup(download->uri);
+
 	if (download->dl_type == NULL) {
 		logmsg(LOG_WARN, 1, "SubmitPostgres Warning - Could not build URI: Unknown protocol type.\n");
 		return NULL;
@@ -207,6 +209,7 @@ char *build_uri(struct s_download *download) {
 		PROTO(download->protocol),
 		download->filename) == -1) {
 		logmsg(LOG_ERR, 1, "SubmitPostgres Error - Unable to allocate memory: %s.\n", strerror(errno));
+		return NULL;
 	}
 
 	return uri;

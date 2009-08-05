@@ -401,7 +401,7 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 	/* add download to attack record */
 	if (total_bytes) {
 		logmsg(LOG_DEBUG, 1, "TFTP download - Adding download to attack record.\n");
-		add_download("tftp", UDP, host->s_addr, 69, NULL, NULL, (const char *) save_file, binary_stream, total_bytes, attack);
+		add_download("tftp", UDP, host->s_addr, 69, NULL, NULL, (const char *) save_file, NULL, binary_stream, total_bytes, attack);
 
 		logmsg(LOG_NOTICE, 1, "TFTP download - %s attached to attack record.\n", save_file);
 	} else logmsg(LOG_NOISY, 1, "TFTP download - No data received.\n");

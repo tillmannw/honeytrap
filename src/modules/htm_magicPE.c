@@ -72,7 +72,7 @@ int check_magic_string(Attack *attack) {
 			attack->a_conn.protocol,
 			attack->a_conn.r_addr,
 			attack->a_conn.r_port,
-			NULL, NULL, NULL,
+			NULL, NULL, NULL, NULL,
 			attack->a_conn.payload.data,
 			attack->a_conn.payload.size,
 			attack);

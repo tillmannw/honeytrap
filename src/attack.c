@@ -78,6 +78,7 @@ void del_attack(Attack *a) {
 		free(a->download[i].user);
 		free(a->download[i].pass);
 		free(a->download[i].filename);
+		free(a->download[i].uri);
 		free(a->download[i].dl_payload.data);
 	}
 
@@ -151,7 +152,7 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 }
 
 /* add a downloaded file to the attack instance */
-int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, const uint16_t r_port, const char *user, const char *pass, const char *filename, const u_char *data, const u_int32_t size, Attack *a) {
+int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, const uint16_t r_port, const char *user, const char *pass, const char *filename, const char *uri, const u_char *data, const u_int32_t size, Attack *a) {
 	if ((data == NULL) || (!size))  return(0);
 
 	if (a == NULL) {
@@ -170,9 +171,11 @@ int add_download(const char *dl_type, u_int16_t proto, const uint32_t r_addr, co
 	    (filename && ((a->download[a->dl_count].filename = strdup(filename)) == NULL)) ||
 	    (user && ((a->download[a->dl_count].user = strdup(user)) == NULL)) ||
 	    (pass && ((a->download[a->dl_count].pass = strdup(pass)) == NULL)) ||
+	    (uri && ((a->download[a->dl_count].uri = strdup(uri)) == NULL)) ||
 	    ((a->download[a->dl_count].dl_payload.data = (u_char *) malloc(size)) == NULL)) { 
 		logmsg(LOG_ERR, 1, "Error - Unable to allocate memory: %m.\n");
 		free(a->download[a->dl_count].dl_type);
+		free(a->download[a->dl_count].uri);
 		free(a->download[a->dl_count].user);
 		free(a->download[a->dl_count].pass);
 		free(a->download[a->dl_count].filename);
