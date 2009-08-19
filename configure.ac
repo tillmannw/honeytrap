@@ -502,44 +502,42 @@ AM_CONDITIONAL(BUILD_SUBMIT_NEBULA_PLUGIN, test x$with_submit_nebula = xyes)
 if test "$with_submit_nebula" = "yes"; then
 	with_submit_nebula="X"
 
-	AC_CHECK_FUNC(gethostbyname, , AC_CHECK_LIB(nsl, gethostbyname))
+	AC_ARG_WITH(nebula_includes,
+	[  --with-nebula-includes=DIR      nebula include directory],
+	[with_nebula_includes="$withval"],[with_nebula_includes=no])
 
-	AC_ARG_WITH(zlib_includes,
-	[  --with-zlib-includes=DIR        zlib include directory],
-	[with_zlib_includes="$withval"],[with_zlib_includes=no])
+	AC_ARG_WITH(nebula_libraries,
+	[  --with-nebula-libraries=DIR     nebula library directory],
+	[with_nebula_libraries="$withval"],[with_nebula_libraries=no])
 
-	AC_ARG_WITH(zlib_libraries,
-	[  --with-zlib-libraries=DIR       zlib library directory],
-	[with_zlib_libraries="$withval"],[with_zlib_libraries=no])
-
-	if test "$with_zlib_includes" != "no"; then
-		CFLAGS="${CFLAGS} -I${with_zlib_includes}"
+	if test "$with_nebula_includes" != "no"; then
+		CFLAGS="${CFLAGS} -I${with_nebula_includes}"
 	fi
-	HZ="yes"
-	AC_CHECK_HEADER(zlib.h,, HZ="no")
-	if test "$HZ" = "no"; then
+	HNEBULA="yes"
+	AC_CHECK_HEADER(nebula.h,, HNEBULA="no")
+	if test "$HNEBULA" = "no"; then
 		echo
-		bold "   %BError%b - zlib headers not found. Install them or use the following options:"
+		bold "   %BError%b - nebula headers not found. Install them or use the following options:"
 		echo
 		echo
-		bold "   %B--with-zlib-includes=%b"
-		echo -e "\x5blocation of zlib header files\x5d"
+		bold "   %B--with-nebula-includes=%b"
+		echo -e "\x5blocation of nebula header files\x5d"
 		echo
 		exit
 	fi
 
-	if test "$with_zlib_libraries" != "no"; then
-		LDFLAGS="${LDFLAGS}  -L${with_zlib_libraries}"
+	if test "$with_nebula_libraries" != "no"; then
+		LDFLAGS="${LDFLAGS}  -L${with_nebula_libraries}"
 	fi
-	LZ="yes"
-	AC_CHECK_LIB(z, compress, LZ="yes", LZ="no")
-	if test "$LZ" = "no"; then
+	LNEBULA="yes"
+	AC_CHECK_LIB(nebula, compress, LNEBULA="yes", LNEBULA="no")
+	if test "$LNEBULA" = "no"; then
 		echo
-		bold "   %BError%b - zlib library not found. Install it or use the following options:"
+		bold "   %BError%b - nebula library not found. Install it or use the following options:"
 		echo
 		echo
-		bold "   %B--with-zlib-libraries=%b"
-		echo -e "\x5blocation of zlib shared library files\x5d"
+		bold "   %B--with-nebula-libraries=%b"
+		echo -e "\x5blocation of nebula shared library files\x5d"
 		echo
 		exit
 	fi

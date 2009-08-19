@@ -89,7 +89,7 @@ endif
 
 if BUILD_SUBMIT_NEBULA_PLUGIN
 htm_submitNebula_la = htm_submitNebula.c htm_submitNebula.h
-htm_submitNebula_la_LDFLAGS = -module -no-undefined -avoid-version -lz
+htm_submitNebula_la_LDFLAGS = -module -no-undefined -avoid-version -lnebula
 endif
 
 if BUILD_SUBMIT_POSTGRES_PLUGIN
