@@ -79,13 +79,13 @@ void plugin_init(void) {
 
 void plugin_unload(void) {
 	nebula_cleanup(n);
-	unhook(PPRIO_POSTPROC, module_name, "submit_nebula");
+	unhook(PPRIO_SAVEDATA, module_name, "submit_nebula");
 	return;
 }
 
 void plugin_register_hooks(void) {
 	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
-	add_attack_func_to_list(PPRIO_POSTPROC, module_name, "submit_nebula", (void *) submit_nebula);
+	add_attack_func_to_list(PPRIO_SAVEDATA, module_name, "submit_nebula", (void *) submit_nebula);
 
 	return;
 }
@@ -115,7 +115,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 			}
 			n->server.sin_addr = *(struct in_addr*)host->h_addr;
 		} else if OPT_IS("port") {
-			if (value) n->server.sin_port = (u_int16_t) strtoull(value, NULL, 10);
+			if (value) n->server.sin_port = htons((u_int16_t) strtoull(value, NULL, 10));
 		} else if OPT_IS("secret") {
 			if ((n->secret = strdup(value)) == NULL) {
 				fprintf(stderr, "  Error - Unable to allocate memory: %s.\n", nebula_strerr(n));
@@ -141,7 +141,7 @@ int submit_nebula(Attack *attack) {
 	logmsg(LOG_INFO, 1, "SubmitNebula - Submittint attack to nebula server.\n");
 
 	// connect to nebula server and submit attack
-	if (nebula_connect(n, n->server.sin_addr, n->server.sin_port, 0) == 0) {
+	if (nebula_connect(n, n->server.sin_addr, ntohs(n->server.sin_port), 0) == 0) {
 		logmsg(LOG_ERR, 1, "SubmitNebula Error - Could not connect to nebula server: %s.\n", nebula_strerr(n));
 		exit(EXIT_FAILURE);
 	}

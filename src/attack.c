@@ -74,16 +74,16 @@ void del_attack(Attack *a) {
 	if (!a) return;
 
 	for (i=0; i<a->dl_count; ++i) {
-		free(a->download[i].dl_type);
-		free(a->download[i].user);
-		free(a->download[i].pass);
-		free(a->download[i].filename);
-		free(a->download[i].uri);
-		free(a->download[i].dl_payload.data);
+		if (a->download[i].dl_type) free(a->download[i].dl_type);
+		if (a->download[i].user) free(a->download[i].user);
+		if (a->download[i].pass) free(a->download[i].pass);
+		if (a->download[i].filename) free(a->download[i].filename);
+		if (a->download[i].uri) free(a->download[i].uri);
+		if (a->download[i].dl_payload.data) free(a->download[i].dl_payload.data);
 	}
 
-	free(a->a_conn.payload.data);
-	free(a->p_conn.payload.data);
+	if (a->a_conn.payload.data) free(a->a_conn.payload.data);
+	if (a->p_conn.payload.data) free(a->p_conn.payload.data);
 
 	free(a);
 
