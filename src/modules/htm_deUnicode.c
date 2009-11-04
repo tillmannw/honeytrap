@@ -51,8 +51,8 @@ void plugin_register_hooks(void) {
 int deunicode(Attack *attack) {
 	Attack *dec_attack;
 	u_char offset;
-	size_t i, bytecnt[256], offcheck[256];
-	
+	size_t i, bytecnt[256], offcheck[256], data_len;
+
 
 	// no data - nothing todo
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
@@ -61,6 +61,7 @@ int deunicode(Attack *attack) {
 	}
 
 	memset(bytecnt, 0, 256 * sizeof(size_t));
+	memset(offcheck, 0, 256 * sizeof(size_t));
 
 	for (i = 0; i < attack->a_conn.payload.size; ++i) {
 		bytecnt[attack->a_conn.payload.data[i]]++;
@@ -70,18 +71,21 @@ int deunicode(Attack *attack) {
 	if (bytecnt[0] * 3 > attack->a_conn.payload.size) {
 		logmsg(LOG_NOISY, 1, "deUnicode - Attack string seems to contain unicode encoded data, decoding it.\n");
 
-		// half the size of the original attack string is sufficient as we skip every second byte
+		// if the array for every second byte, starting with 1, contains at least half of all 0-bytes,
+		// we're correctly aligned, otherwise we have to use an offset of 1
+		offset = offcheck[0] * 2 > bytecnt[0] ? 0 : 1;
+
+		// half the size (+1) of the original attack string is sufficient as we skip every second byte
+		data_len = attack->a_conn.payload.size >> 1;
+		if ((attack->a_conn.payload.size % 2 == 1) && (offset == 0)) data_len++;
+
 		if (((dec_attack = calloc(1, sizeof(Attack))) == NULL) ||
-		    ((dec_attack->a_conn.payload.data = calloc(1, attack->a_conn.payload.size>>1)) == NULL)) {
+		    ((dec_attack->a_conn.payload.data = calloc(1, data_len)) == NULL)) {
 			logmsg(LOG_ERR, 1, "deUnicode error - Unable to allocate memory: %s.\n", strerror(errno));
 			return -1;
 		}
 		dec_attack->virtual = 1;
-		dec_attack->a_conn.payload.size = attack->a_conn.payload.size>>1;
-
-		// if the array for every second byte, starting with 1, contains at least half of all 0-bytes,
-		// we're correctly aligned, otherwise we have to use an offset of 1
-		offset = offcheck[0] * 2 > bytecnt[0] ? 0 : 1;
+		dec_attack->a_conn.payload.size = data_len;
 
 		for (i=0; i+offset < attack->a_conn.payload.size; i+=2)
 			dec_attack->a_conn.payload.data[i>>1] = attack->a_conn.payload.data[i+offset];
