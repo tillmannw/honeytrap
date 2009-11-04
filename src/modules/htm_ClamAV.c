@@ -36,8 +36,14 @@
 
 #include "htm_ClamAV.h"
 
+
+#ifdef CL_INIT_DEFAULT
+#define NEW_CLAM_API 1	// CL_INIT_DEFAULT is only defined in libclamav >= 0.95
+#endif
+
+
 const char module_name[]="ClamAV";
-const char module_version[]="0.1.0";
+const char module_version[]="0.1.1";
 
 static const char *config_keywords[] = {
 	"clamdb_path",
@@ -48,7 +54,10 @@ const char *clamdb_path;
 const char *temp_dir;
 
 struct cl_engine *engine;
+
+#ifndef NEW_CLAM_API
 struct cl_limits limits;
+#endif
 
 
 void plugin_init(void) {
@@ -64,7 +73,11 @@ void plugin_init(void) {
 
 void plugin_unload(void) {
 	/* free memory */
+#ifdef NEW_CLAM_API
+	cl_engine_free(engine);
+#else
 	cl_free(engine);
+#endif
 	unhook(PPRIO_POSTPROC, module_name, "clamscan");
 	return;
 }
@@ -114,27 +127,53 @@ void load_clamdb(void) {
 
 	/* load databases */
 	DEBUG_FPRINTF(stdout, "    ClamAV - Loading signature database, be patient.\n");
-	if ((ret = cl_load(cl_retdbdir(), &engine, &sigs, CL_DB_STDOPT)) > 0) {
+#ifdef NEW_CLAM_API
+	if (cl_init(CL_INIT_DEFAULT) != CL_SUCCESS) {
+		fprintf(stderr, "  ClamAV error - Unable to initialize scanning engine: %s.\n", cl_strerror(ret));
+		exit(EXIT_FAILURE);
+	}
+
+	if ((engine = cl_engine_new()) == NULL) {
+		fprintf(stderr, "  ClamAV error - Unable to create new scanning engine: %s.\n", cl_strerror(ret));
+		exit(EXIT_FAILURE);
+	}
+
+	if ((ret = cl_load(clamdb_path ? clamdb_path : cl_retdbdir(), engine, &sigs, CL_DB_STDOPT)) != CL_SUCCESS) {
+#else
+	if ((ret = cl_load(clamdb_path ? clamdb_path : cl_retdbdir(), &engine, &sigs, CL_DB_STDOPT)) > 0) {
+#endif
 		fprintf(stderr, "  ClamAV error - Unable to load databases: %s.\n", cl_strerror(ret));
 		exit(EXIT_FAILURE);
 	}
 	DEBUG_FPRINTF(stdout, "    ClamAV - Loaded %u signatures.\n", sigs);
 
 	/* build engine */
-	if((ret = cl_build(engine)) > 0) {
+#ifdef NEW_CLAM_API
+	if ((ret = cl_engine_compile(engine)) != CL_SUCCESS) {
+#else
+	if (ret = cl_build(engine)) > 0) {
+#endif
 		fprintf(stderr, "    ClamAV error - Unable to initialize database: %s\n", cl_strerror(ret));;
+#ifdef NEW_CLAM_API
+		cl_engine_free(engine);
+#else
 		cl_free(engine);
+#endif
 		exit(EXIT_FAILURE);
 	}
 	DEBUG_FPRINTF(stdout, "    ClamAV - Signature database initialized.\n");
 
 	/* set up archive limits */
+#ifdef NEW_CLAM_API
+	cl_engine_set_num(engine, CL_ENGINE_MAX_FILES, 1000);
+	cl_engine_set_num(engine, CL_ENGINE_MAX_FILESIZE, 10 * 1048576);
+	cl_engine_set_num(engine, CL_ENGINE_MAX_RECURSION, 5);
+#else
 	memset(&limits, 0, sizeof(struct cl_limits));
 	limits.maxfiles		= 1000;		/* max files */
 	limits.maxfilesize	= 10 * 1048576;	/* maximum size of archived/compressed file */
 	limits.maxreclevel	= 5;		/* maximum recursion level for archives */
-//	limits.maxmailrec	= 64;		/* maximum recursion level for mail files */
-//	limits.maxratio		= 200;		/* maximum compression ratio */
+#endif
 
 	return;
 }
@@ -183,7 +222,11 @@ int clamscan(Attack *attack) {
 		}
 
 		/* scan temp file */
+#ifdef NEW_CLAM_API
+		switch (ret = cl_scandesc(tmpfd, &virusname, &size, engine, CL_SCAN_STDOPT)) {
+#else
 		switch (ret = cl_scandesc(tmpfd, &virusname, &size, engine, &limits, CL_SCAN_STDOPT)) {
+#endif
 		case CL_CLEAN:
 			logmsg(LOG_NOISY, 1, "ClamAV - Sample %u considered to be clean.\n", num_scanned+1);
 			break;
@@ -203,4 +246,3 @@ int clamscan(Attack *attack) {
 
 	return(num_scanned);
 }
-
