@@ -79,6 +79,11 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 	} else {
 		logmsg(LOG_DEBUG, 1, "%s %s  Client socket for %s connection created.\n", logpre, portstr, logact);
 
+		// set keepalive option on connected socket
+		int sockopt = 1;
+		if (setsockopt(proxy_sock_fd, SOL_SOCKET, SO_KEEPALIVE, &sockopt, sizeof(sockopt)) < 0)
+			logmsg(LOG_WARN, 1, "Warning - Unable to set SO_KEEPALIVE for socket.\n");
+
 		/* establish proxy connection */
 		logmsg(LOG_DEBUG, 1, "%s %s  Establishing %s connection to %s:%u.\n",
 			logpre, portstr, logact, inet_ntoa(ipaddr), port);

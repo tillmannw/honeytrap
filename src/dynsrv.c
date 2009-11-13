@@ -141,7 +141,7 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 	if ((pid = myfork()) == 0) {
 		/* use this port string as log prefix */
 		memset(portstr, 0, 16);
-		if (snprintf(portstr, 16, "%u/%s\t", ntohs(port_l), PROTO(proto)) > 15) {
+		if (snprintf(portstr, 16, "%5u/%s", ntohs(port_l), PROTO(proto)) > 15) {
 			logmsg(LOG_ERR, 1, "Error - Port string is too long.\n");
 			exit(EXIT_FAILURE);
 		}
@@ -254,6 +254,12 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 								exit(EXIT_FAILURE);
 							}
 						}
+
+						// set keepalive option on connected socket
+						int sockopt = 1;
+						if (setsockopt(connection_fd, SOL_SOCKET, SO_KEEPALIVE, &sockopt, sizeof(sockopt)) < 0)
+							logmsg(LOG_WARN, 1, "Warning - Unable to set SO_KEEPALIVE for socket.\n");
+
 						established = 1;
 						break;
 					case UDP:

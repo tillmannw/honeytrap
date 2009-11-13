@@ -11,6 +11,7 @@
  */
 
 #include <errno.h>
+#include <execinfo.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,8 +45,10 @@ void get_signal(int sig) {
 
 
 void handle_termsig(int sig) {
+	int			nptrs;
 	pid_t			pid;
 	struct sigaction	s_action;
+	void			*buffer[BUFSIZ];
 
 	sigemptyset(&s_action.sa_mask);
 	s_action.sa_flags	= 0;
@@ -58,6 +61,12 @@ void handle_termsig(int sig) {
 	case SIGBUS:
 #endif
 		logmsg(LOG_ERR, 1, "Error - Terminating signal (%d) received by process %u.\n", sig, getpid());
+
+		logmsg(LOG_ERR, 1, "-- Begin process backtrace --\n");
+		nptrs = backtrace(buffer, BUFSIZ);
+		backtrace_symbols_fd(buffer, nptrs, logfile_fd);
+		logmsg(LOG_ERR, 1, "-- End of process backtrace --\n");
+
 		break;
 	default:
 		logmsg(LOG_DEBUG, 1, "Terminating signal (%d) received.\n", sig);
