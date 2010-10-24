@@ -706,6 +706,54 @@ else
   with_magicpe=" "
 fi
 
+
+AC_ARG_WITH(xmatch,
+	[  --with-xmatch                   automatic pattern-based decoding of xored attacks])
+AM_CONDITIONAL(BUILD_XMATCH_PLUGIN, test x$with_xmatch = xyes)
+if test "$with_xmatch" = "yes"; then
+  with_xmatch="X"
+  AC_ARG_WITH(libxmatch_includes,
+    [  --with-libxmatch-includes=DIR     libxmatch include directory],
+    [with_libxmatch_includes="$withval"],[with_libxmatch_includes=no])
+
+  AC_ARG_WITH(libxmatch_libraries,
+    [  --with-libxmatch-libraries=DIR    libxmatch library directory],
+    [with_libxmatch_libraries="$withval"],[with_libxmatch_libraries=no])
+
+  if test "$with_libxmatch_includes" != "no"; then
+    CPPFLAGS="${CPPFLAGS} -I${with_libxmatch_includes}"
+  fi
+  HMAGIC="yes"
+  AC_CHECK_HEADER(xmatch.h,, HMAGIC="no")
+  if test "$HMAGIC" = "no"; then
+    echo
+    bold "   %BError%b - libxmatch headers not found. Install them or use the following options:"
+    echo
+    bold "   %B--with-libxmatch-includes=%b\x5blocation of libxmatch header files\x5d"
+    echo
+    exit
+  fi
+
+  if test "$with_libxmatch_libraries" != "no"; then
+    LDFLAGS="${LDFLAGS}  -L${with_libxmatch_libraries}"
+  fi
+  LMAGIC="yes"
+  AC_CHECK_LIB(xmatch, xm_match,, LMAGIC="no")
+  if test "$LMAGIC" = "no"; then
+    echo
+    bold "   %BError%b - libxmatch library not found. Install it or use the following options:"
+    echo
+    bold "   %B--with-libxmatch-libraries=%b\x5blocation of libxmatch shared library files\x5d"
+    echo
+    exit
+  fi
+
+  AC_DEFINE([USE_XMATCH], [], [Define to automatically xor-encoded attacks that contain certain patterns])
+else
+  with_xmatch=" "
+fi
+
+
 #-------------------------------------------------------------
 
 # Check for electric fence malloc debugger
@@ -770,6 +818,8 @@ echo
 bold "    (%B$with_spamsum%b)  SpamSum"
 echo
 bold "    (%B$with_magicpe%b)  magicPE"
+echo
+bold "    (%B$with_xmatch%b)  xmatch"
 echo
 bold "    (%B$with_submit_mwserv%b)  submitMwserv"
 echo

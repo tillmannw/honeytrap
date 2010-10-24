@@ -41,6 +41,11 @@ if BUILD_SUBMIT_POSTGRES_PLUGIN
 lib_LTLIBRARIES += htm_submitPostgres.la
 endif
 
+if BUILD_XMATCH_PLUGIN
+lib_LTLIBRARIES += htm_xmatch.la
+endif
+
+
 htm_SaveFile_la_SOURCES = htm_SaveFile.c htm_SaveFile.h
 htm_SaveFile_la_LDFLAGS = -module -no-undefined -avoid-version
 
@@ -95,6 +100,11 @@ endif
 if BUILD_SUBMIT_POSTGRES_PLUGIN
 htm_submitPostgres_la = htm_submitPostgres.c htm_submitPostgres.h
 htm_submitPostgres_la_LDFLAGS = -module -no-undefined -avoid-version -lpq
+endif
+
+if BUILD_XMATCH_PLUGIN
+htm_xmatch_la = htm_xmatch.c
+htm_xmatch_la_LDFLAGS = -module -no-undefined -avoid-version -lxmatch
 endif
 
 
