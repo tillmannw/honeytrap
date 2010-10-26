@@ -187,12 +187,15 @@ int cmd_parse_for_http_url(Attack *attack) {
 			/* assemble wget download command and execute it */
 			if (asprintf(&cmd, "%s %s %s", http_program, http_options, start) == -1) {
 				logmsg(LOG_ERR, 1, "HTTP download error - Unable to allocate memory: %s.\n", strerror(errno));
+				free(string_for_processing);
 				free(cmd);
 				return(-1);
 			}
 			logmsg(LOG_DEBUG, 1, "HTTP download - Calling '%s'.\n", cmd);
 			if ((f = popen(cmd, "r")) == NULL) {
 				logmsg(LOG_ERR, 1, "HTTP download error - Cannot call download command: %m.\n");
+				free(string_for_processing);
+				free(cmd);
 				return(0);
 			}
 
@@ -201,6 +204,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 				if ((binary_stream = realloc(binary_stream, total_bytes + BUFSIZ)) == NULL) {
 					logmsg(LOG_ERR, 1, "HTTP download error - Unable to allocate memory: %s.\n", strerror(errno));
 					pclose(f);
+					free(string_for_processing);
 					free(cmd);
 					free(binary_stream);
 					return(-1);
@@ -212,6 +216,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 			if (ferror(f)) {
 				logmsg(LOG_ERR, 1, "HTTP download error - Unable to allocate memory: %s.\n", strerror(errno));
 				pclose(f);
+				free(string_for_processing);
 				free(cmd);
 				free(binary_stream);
 				return(-1);
@@ -227,6 +232,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 			} else logmsg(LOG_INFO, 1, "HTTP download - No data received.\n");
 
 			pclose(f);
+			free(string_for_processing);
 			free(cmd);
 			free(binary_stream);
 
@@ -234,5 +240,6 @@ int cmd_parse_for_http_url(Attack *attack) {
 		}
 	}
 	if (!start) logmsg(LOG_DEBUG, 1, "HTTP download - No URLs found.\n");
+	free(string_for_processing);
 	return(0);
 }

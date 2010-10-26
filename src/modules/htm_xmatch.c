@@ -37,7 +37,7 @@
 
 
 const char module_name[]="xmatch";
-const char module_version[]="0.0.1";
+const char module_version[]="0.1.0";
 
 static const char *config_keywords[] = {
 	"xpattern_file",
@@ -50,8 +50,10 @@ typedef struct {
 	size_t	len;
 } xorkey_t;
 
-xm_string_t **p; // array of patterns
-size_t num_patterns;
+xm_fsm_t *fsm;		// finite state machine
+xm_string_t **p;	// array of patterns
+size_t num_patterns;	// size of the above array
+size_t maxlen;
 
 
 // calculates the period of a string
@@ -148,7 +150,9 @@ int xmatch(Attack *a) {
 	xorkey_t key;
 	key.data = NULL;
 	key.len = 0;
-	switch ((matches = xm_match(va->a_conn.payload.data, va->a_conn.payload.size, p, num_patterns, handle_match, &key, BREAK_ON_FIRST_MATCH))) {
+
+	// match input against the bfa of transformed patterns
+	switch ((matches = xm_match(va->a_conn.payload.data, va->a_conn.payload.size, fsm, maxlen, handle_match, &key, BREAK_ON_FIRST_MATCH))) {
 	case -1:
 		fprintf(stderr, "Error during pattern matching. Terminating.\n");
 		exit(EXIT_FAILURE);
@@ -280,6 +284,9 @@ void plugin_init(void) {
 				++num_patterns;
 			}
 
+			// determine maximum pattern length, keys up to the length of the longest pattern -1 can be found
+			if (maxlen < len) maxlen = len;
+
 			break;
 		default:
 			fprintf(stderr, "Error while reading patterns from file.\n");
@@ -288,13 +295,22 @@ void plugin_init(void) {
 	}
 	fclose(pfile);
 
+	// create an fsm for the pattern list
+	if ((fsm = xm_fsm_new(p, num_patterns)) == NULL) {
+		fprintf(stderr, "Error while building the pattern matching state machine.\n");
+		exit(EXIT_FAILURE);
+	}
+
 	return;
 }
 
 void plugin_unload(void) {
 	unhook(PPRIO_PREPROC, module_name, "xmatch");
 
-	// free pattern matching fsm
+	// delete the fsm
+	xm_fsm_free(fsm);
+
+	// free pattern list
 	while (num_patterns) {
 		--num_patterns;
 		if (p[num_patterns]) {

@@ -1,4 +1,6 @@
 Version 1.1.0
+- Fixed a memory leak in the httpDownload plugin
+- New xmatch plugin for automatic pattern-based decoding of XOR encoded data (requires libxmatch)
 - Fix: Don't reset port mode to default, keep configured mode
 - Fix: Default port mode 'ignore' was ignored (call it irony...)
 - reworked build process to be gcc 4.3 compatible
