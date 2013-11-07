@@ -27,11 +27,10 @@
 #include "tcpip.h"
 
 int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t port, uint16_t proto, Attack *attack) {
-	int proxy_sock_fd, local_addr_len, error, sock_type, timeout;
+	int proxy_sock_fd, local_addr_len, sock_type, timeout;
 	struct sockaddr_in proxy_socket, local_socket;
-	char *logstr=NULL, *Logstr=NULL, *logact=NULL, *logpre=NULL;
+	char *logact=NULL, *logpre=NULL;
 
-	error = 0;
 	sock_type = 0;
 
 	if (attack == NULL) {
@@ -41,13 +40,9 @@ int proxy_connect(u_char mode, struct in_addr ipaddr, uint16_t l_port, u_int16_t
 
 	if (mode == PORTCONF_PROXY) {
 		logact = strdup("proxy");
-		logstr = strdup("server");
-		Logstr = strdup("Server");
 		logpre = strdup("==");
 	} else if (mode == PORTCONF_MIRROR) {
 		logact = strdup("mirror");
-		logstr = strdup("mirror");
-		Logstr = strdup("Mirror");
 		logpre = strdup("<>");
 	} else {
 		logmsg(LOG_ERR, 1, "%s %s  Error - Mode %u for connection handling is not supported.\n",

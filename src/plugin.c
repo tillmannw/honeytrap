@@ -92,7 +92,6 @@ int load_plugin(const char *dir, const char* plugname) {
 int init_plugin(char *plugin_name) {
 	int (*init_plugin)();
 	void (*unload_plugin)();
-	int retval;
 	Plugin *last_plugin, *new_plugin;
 
 	/* allocate memory for new plugin and attach it to the plugin list */
@@ -169,7 +168,6 @@ int init_plugin(char *plugin_name) {
 		fprintf(stderr, "\n    Unable to resolve symbol 'plugin_init': %s\n", plugin_error_str);
 		return(-1);
 	}
-	retval = -1;
 	init_plugin();
 
 	/* attach plugin to plugin_list */

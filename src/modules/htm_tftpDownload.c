@@ -155,7 +155,7 @@ int tftp_quit(int data_sock_fd) {
 
 int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attack) {
 	struct sockaddr_in data_socket, from;
-	int data_sock_fd, fromlen, bytes_sent, data_arrived, sv,
+	int data_sock_fd, fromlen, bytes_sent, data_arrived,
 	    tftp_command_size, socklen, retransmissions, received_last_packet, last_ack_packet;
 	uint8_t *binary_stream;
 	uint16_t tftp_opcode, tftp_errcode, tftp_blockcode, max_blockcode;
@@ -286,7 +286,6 @@ int get_tftp_resource(struct in_addr* host, const char *save_file, Attack *attac
 		}
 		
 		memcpy(&tftp_opcode, rbuf, 2);
-		sv = ntohs(tftp_opcode);
 
 		switch(ntohs(tftp_opcode)) {
 		case 3:

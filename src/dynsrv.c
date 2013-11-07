@@ -59,8 +59,8 @@ int drop_privileges(void) {
 
 void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr ip_l, uint16_t port_l, uint16_t proto) {
 	pid_t			pid;
-	int			listen_fd, mirror_sock_fd, proxy_sock_fd, connection_fd, disconnect,
-				total_bytes, established;
+	int			listen_fd, mirror_sock_fd, proxy_sock_fd, connection_fd,
+				established;
 #ifdef USE_IPQ_MON
 	int			status;
 #endif
@@ -430,8 +430,6 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 					if ((pid = myfork()) == 0) {
 						/* close listening socket in child */
 						close(listen_fd);
-						disconnect = 0;
-						total_bytes = 0;
 
 						if (port_mode & PORTCONF_PROXY) {
 							logmsg(LOG_DEBUG, 1,
@@ -592,11 +590,10 @@ int handle_connection_proxied(int connection_fd, u_char mode, int server_sock_fd
 			  struct in_addr ipaddr, uint16_t proto, u_char timeout, u_char fb_timeout, Attack * attack) {
 	fd_set		rfds;
 	struct timeval	r_timeout;
-	int		disconnect, bytes_read, bytes_sent, total_bytes, total_from_server, rv;
+	int		bytes_read, bytes_sent, total_bytes, total_from_server, rv;
 	u_char		*server_string;
 	char		*logstr, *Logstr, *logact, *logpre;
 
-	disconnect		= 0;
 	bytes_read		= 0;
 	bytes_sent		= 0;
 	total_bytes		= 0;

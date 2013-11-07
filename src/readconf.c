@@ -110,11 +110,8 @@ conf_node *process_conftree(conf_node *conftree, conf_node *tree, process_confop
 
 enum lcfg_status check_conffile(const char *key, void *data, size_t len, void *tree) {
 	conf_node	*new_node;
-	char		*list_item;
-	
 
 	new_node	= NULL;
-	list_item	= NULL;
 
 	if ((new_node = add_keyword(&config_tree, key, data, len)) == NULL) {
 		fprintf(stderr, "Error - Unable to add configuration option to tree.\n");
@@ -130,7 +127,7 @@ int configure(int my_argc, char *my_argv[]) {
 	char			*bpf_cmd_ext, errbuf[PCAP_ERRBUF_SIZE];
 	struct hostent		*ip_cmd_opt;
 #endif
-	char			option;
+	int			option;
 	struct passwd		*pwd_entry;
 	struct group		*grp_entry;
 	int			i;

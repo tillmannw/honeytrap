@@ -168,13 +168,12 @@ conf_node *check_keyword(conf_node *tree, const char *keyword) {
  * if *tree is NULL, it will be set to point to the root node */
 conf_node *add_keyword(conf_node **tree, const char *keyword, const void *data, ssize_t size) {
 	conf_node	*new_node, *cur_node;
-	char		*key, *subkey, *list_item;
+	char		*key, *subkey;
 
 	cur_node	= *tree;
 	new_node	= NULL;
 	key		= NULL;
 	subkey		= NULL;
-	list_item	= NULL;
 
 
 	if (!keyword) {
