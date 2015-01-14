@@ -1,5 +1,5 @@
 /* htm_ftpDownload.c
- * Copyright (C) 2006-2008 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -41,7 +41,7 @@
 #include "htm_ftpDownload.h"
 
 const char module_name[]="ftpDownload";
-const char module_version[]="0.5.3";
+const char module_version[]="1.0.0";
 
 char *ftp_host = NULL;
 
@@ -50,12 +50,15 @@ static const char *plugin_config_keywords[] = {
 };
 
 
-void plugin_init(void) {
-	plugin_register_hooks();
+void plugin_config(void) {
 	plugin_register_confopts();
 	return;
 }
 
+void plugin_init(void) {
+	plugin_register_hooks();
+	return;
+}
 
 void plugin_unload(void) {
 	unhook(PPRIO_ANALYZE, module_name, "cmd_parse_for_ftp");

@@ -1,5 +1,5 @@
 /* htm_SpamSum.c
- * Copyright (C) 2006-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -66,13 +66,18 @@ static struct {
 	u_int32_t n;
 } roll_state;
 
-void plugin_init(void) {
-	plugin_register_hooks();
+
+void plugin_config(void) {
 	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
 	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
 		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
 		exit(EXIT_FAILURE);
 	}
+	return;
+}
+
+void plugin_init(void) {
+	plugin_register_hooks();
 	return;
 }
 

@@ -1,5 +1,5 @@
 /* htm_httpDownload.c
- * Copyright (C) 2007-2008 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2007-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -41,7 +41,7 @@
 #include "htm_httpDownload.h"
 
 const char module_name[]="httpDownload";
-const char module_version[]="0.1.0";
+const char module_version[]="1.0.0";
 
 static const char *config_keywords[] = {
 	"http_program",
@@ -52,8 +52,7 @@ const char *http_program;
 const char *http_options;
 
 
-void plugin_init(void) {
-	plugin_register_hooks();
+void plugin_config(void) {
 	plugin_register_confopts();
 	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
 		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
@@ -62,6 +61,10 @@ void plugin_init(void) {
 	return;
 }
 
+void plugin_init(void) {
+	plugin_register_hooks();
+	return;
+}
 
 void plugin_unload(void) {
 	unhook(PPRIO_ANALYZE, module_name, "cmd_parse_for_http_url");

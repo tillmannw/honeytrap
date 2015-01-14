@@ -1,5 +1,5 @@
 /* htm_b64Decode.c
- * Copyright (C) 2006 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -35,8 +35,12 @@
 #include "htm_b64Decode.h"
 
 const char module_name[]="b64Decode";
-const char module_version[]="0.3.1";
+const char module_version[]="1.0.0";
 
+
+void plugin_config(void) {
+	return;
+}
 
 void plugin_init(void) {
 	plugin_register_hooks();

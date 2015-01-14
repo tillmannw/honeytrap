@@ -1,5 +1,5 @@
 /* htm_tftpDownload.c
- * Copyright (C) 2006-2008 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -39,8 +39,12 @@
 #define MAX_TRANSMISSION_TRIES  10      /* retransmit 9 times */
 
 const char module_name[]="tftpDownload";
-const char module_version[]="0.4.1";
+const char module_version[]="1.0.0";
 
+
+void plugin_config(void) {
+	return;
+}
 
 void plugin_init(void) {
 	plugin_register_hooks();

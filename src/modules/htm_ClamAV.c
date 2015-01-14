@@ -1,5 +1,5 @@
 /* htm_ClamAV.c
- * Copyright (C) 2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2007-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -43,7 +43,7 @@
 
 
 const char module_name[]="ClamAV";
-const char module_version[]="0.1.1";
+const char module_version[]="1.0.0";
 
 static const char *config_keywords[] = {
 	"clamdb_path",
@@ -59,15 +59,18 @@ struct cl_engine *engine;
 struct cl_limits limits;
 #endif
 
-
-void plugin_init(void) {
-	plugin_register_hooks();
+void plugin_config(void) {
 	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
 	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
 		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
 		exit(EXIT_FAILURE);
 	}
+	return;
+}
+
+void plugin_init(void) {
 	load_clamdb();
+	plugin_register_hooks();
 	return;
 }
 

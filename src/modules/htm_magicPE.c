@@ -1,5 +1,5 @@
 /* htm_magicPE.c
- * Copyright (C) 2008 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2008-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -30,12 +30,16 @@
 #include "htm_magicPE.h"
 
 const char module_name[]="magicPE";
-const char module_version[]="0.0.1";
+const char module_version[]="1.0.0";
 
 magic_t		magicdb;
 
+
+void plugin_config(void) {
+	return;
+}
+
 void plugin_init(void) {
-	plugin_register_hooks();
 	if (((magicdb = magic_open( MAGIC_NO_CHECK_APPTYPE |
 				    MAGIC_NO_CHECK_ASCII |
 				    MAGIC_NO_CHECK_ELF |
@@ -45,6 +49,8 @@ void plugin_init(void) {
 		fprintf(stderr, "  Error - Unable to open magic database: %s.\n", magic_error(magicdb));
 		exit(EXIT_FAILURE);
 	}
+
+	plugin_register_hooks();
 
 	return;
 }

@@ -200,7 +200,7 @@ int config_plugin(char *plugin_name) {
 
 void init_plugins(void) {
 	/* call init functions from plugins */
-	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'init_plugins'.\n");
+	DEBUG_FPRINTF(stdout, "  Calling plugins for hook 'init_plugins'.\n");
 	plughook_init_plugins();
 	
 	return;

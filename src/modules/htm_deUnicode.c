@@ -1,5 +1,5 @@
 /* htm_deUnicode.c
- * Copyright (C) 2009 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2009-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -29,7 +29,11 @@
 #include "htm_deUnicode.h"
 
 const char module_name[]="deUnicode";
-const char module_version[]="0.1";
+const char module_version[]="1.0.0";
+
+void plugin_config(void) {
+	return;
+}
 
 void plugin_init(void) {
 	plugin_register_hooks();

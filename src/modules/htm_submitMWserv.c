@@ -1,5 +1,5 @@
 /* htm_submitMWserv.c
- * Copyright (C) 2007-2008 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2007-2015 Tillmann Werner <tillmann.werner@gmx.de>
  * Copyright (C) 2008 Georg Wicherski <gw@mwcollect.org>
  *
  * This file is free software; as a special exception the author gives
@@ -62,7 +62,7 @@
 #define HEARTBEAT_INTERVAL 180	// send a heartbeat every 180 seconds
 
 const char module_name[]="submitMwserv";
-const char module_version[]="0.1.1";
+const char module_version[]="1.0.0";
 
 static const char *config_keywords[] = {
 	"mwserv_url",
@@ -81,14 +81,18 @@ const char	*secret;
 u_int16_t	timeout;
 
 
-void plugin_init(void) {
-	plugin_register_hooks();
+void plugin_config(void) {
 	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
 	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
 		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
 		exit(EXIT_FAILURE);
 	}
 	send_heartbeat();
+	return;
+}
+
+void plugin_init(void) {
+	plugin_register_hooks();
 	return;
 }
 

@@ -1,5 +1,5 @@
 /* htm_submitPostgres.c
- * Copyright (C) 2007 Tillmann Werner <tillmann.werner@gmx.de>,
+ * Copyright (C) 2007-2015 Tillmann Werner <tillmann.werner@gmx.de>,
  *                    Christoph Fuchs <christoph.fuchs@gmx.de>
  *
  * This file is free software; as a special exception the author gives
@@ -42,7 +42,7 @@
 #include "htm_submitPostgres.h"
 
 const char	module_name[]		= "submitPostgres";
-const char	module_version[]	= "0.1.1";
+const char	module_version[]	= "1.0.0";
 
 static const char *config_keywords[] = {
 	"sensor_id",
@@ -63,14 +63,16 @@ char		*sensor_id = NULL,
 		*db_info = NULL;
 
 
-void plugin_init(void) {
-	plugin_register_hooks();
+void plugin_config(void) {
 	register_plugin_confopts(module_name, config_keywords, sizeof(config_keywords)/sizeof(char *));
 	if (process_conftree(config_tree, config_tree, plugin_process_confopts, NULL) == NULL) {
 		fprintf(stderr, "  Error - Unable to process configuration tree for plugin %s.\n", module_name);
 		exit(EXIT_FAILURE);
 	}
+	return;
+}
 
+void plugin_init(void) {
 	// check if all needed options are given
 	if (db_host == NULL) {
 		fprintf(stderr, "  SubmitPostgres Error - Incomplete configuration: Database host missing.\n");
@@ -92,6 +94,8 @@ void plugin_init(void) {
 		fprintf(stderr, "  SubmitPostgres Error - Incomplete configuration: Sensor ID missing.\n");
 		exit(EXIT_FAILURE);
 	}
+
+	plugin_register_hooks();
 
 	return;
 }

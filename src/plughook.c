@@ -199,13 +199,13 @@ void plughook_init_plugins(void) {
 	func_tmp = funclist_init_plugins;
 	while(func_tmp) {
 		if (func_tmp->func) {
-			logmsg(LOG_DEBUG, 1, "Calling %s::%s().\n", func_tmp->plugnam, func_tmp->funcnam);
+			DEBUG_FPRINTF(stdout, "  Calling %s::%s().\n", func_tmp->plugnam, func_tmp->funcnam);
 			func_tmp->func(NULL);
-		} else logmsg(LOG_ERR, 1, "Error - Function %s::%s is not registered.\n",
+		} else DEBUG_FPRINTF(stderr, "  Error - Function %s::%s is not registered.\n",
 			func_tmp->plugnam, func_tmp->funcnam);
 		func_del = func_tmp;
 		func_tmp = func_tmp->next;
-		logmsg(LOG_DEBUG, 1, "Unhooking %s::%s().\n", func_del->plugnam, func_del->funcnam);
+		DEBUG_FPRINTF(stdout, "  Unhooking %s::%s().\n", func_del->plugnam, func_del->funcnam);
 		free(func_del);
 	}
 	return;

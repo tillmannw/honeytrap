@@ -1,5 +1,5 @@
 /* htm_cpuEmu.c
- * Copyright (C) 2007-2008 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2007-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -157,9 +157,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 	return(node);
 }
 
-void plugin_init(void) {
-	plugin_register_hooks();
-
+void plugin_config(void) {
 	execute_shellcode	= 0;
 	createprocess_cmd	= NULL;
 
@@ -169,11 +167,17 @@ void plugin_init(void) {
 		exit(EXIT_FAILURE);
 	}
 
+	return;
+}
+
+void plugin_init(void) {
 	if ((elog = emu_log_new()) == NULL){
 		logmsg(LOG_ERR, 1, "CPU Emulation Error - Unable to initialize logging.\n");
 		exit(EXIT_FAILURE);
 	}
 	emu_log_set_logcb(elog, logmsg_emu);
+
+	plugin_register_hooks();
 
 	return;
 }
@@ -289,7 +293,6 @@ int find_shellcode(Attack *attack) {
 // run detected asm code on emulated CPU
 int run(struct emu *e, int interactive) {
 	int 			j, ret;
-	uint32_t		eipsave = 0;
 	struct emu_cpu		*cpu = emu_cpu_get(e);
 	struct emu_env		*env = emu_env_new(e);
 	struct emu_hashtable	*eh = NULL;
@@ -347,8 +350,6 @@ int run(struct emu *e, int interactive) {
 		logmsg(LOG_NOISY, 1, "CPU Emulation - Running code...\n");
 
 	for (j=0;j<opts.steps;j++) {
-		if ( cpu->repeat_current_instr == false ) eipsave = emu_cpu_eip_get(emu_cpu_get(e));
-
 		struct emu_env_hook *hook	= NULL;
 		ret				= 0;
 
@@ -471,14 +472,13 @@ uint32_t user_hook_bind_regport(struct emu_env *env, struct emu_env_hook *hook, 
 	va_list			vl;
 	int			s, type;
 	struct sockaddr		*saddr;
-	socklen_t		saddrlen, optsize;
+	socklen_t		optsize;
 	portinfo		pinfo;
 
 	va_start(vl, hook);
 
 	s		= va_arg(vl, int);
 	saddr		= va_arg(vl, struct sockaddr *);
-	saddrlen	= va_arg(vl, socklen_t);
 
 	va_end(vl);
 

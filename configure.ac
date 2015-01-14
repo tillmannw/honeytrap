@@ -569,7 +569,7 @@ if test "$with_submit_nebula" = "yes"; then
 		LDFLAGS="${LDFLAGS}  -L${with_nebula_libraries}"
 	fi
 	LNEBULA="yes"
-	AC_CHECK_LIB(nebula, compress, LNEBULA="yes", LNEBULA="no")
+	AC_CHECK_LIB(nebula, nebula_new, LNEBULA="yes", LNEBULA="no")
 	if test "$LNEBULA" = "no"; then
 		echo
 		bold "   %BError%b - nebula library not found. Install it or use the following options:"
