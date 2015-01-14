@@ -82,8 +82,8 @@ int logattacker(Attack *a) {
 		return -1;
 	}
 
-	if (fprintf(f, "[%s:%lu GMT] %s %s:%d -> %s:%d (%u bytes)\n",
-		tstr, tv.tv_usec, pent->p_name, shost, a->a_conn.r_port, dhost, a->a_conn.l_port, a->a_conn.payload.size) < 0) {
+	if (fprintf(f, "[%s:%lu GMT] %s %s:%d -> %s:%d %s %s (%u bytes)\n",
+		tstr, tv.tv_usec, pent->p_name, shost, a->a_conn.r_port, dhost, a->a_conn.l_port, a->a_conn.payload.md5sum, a->a_conn.payload.sha512sum, a->a_conn.payload.size) < 0) {
 		logmsg(LOG_ERR, 1, "logAttacker error - Could not write to log file: %s.\n", strerror(errno));
 		return -1;
 	}
