@@ -38,7 +38,7 @@
 
 
 const char module_name[]="logattacker";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 static const char *config_keywords[] = {
 	"logfile",
