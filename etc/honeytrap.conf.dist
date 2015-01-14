@@ -116,6 +116,13 @@ plugin-submitMWserv = {
 }
 */
 
+// log attacker connection information to a separate file, one entry per line
+/*
+plugin-logAttacker = {
+	logfile = "/opt/honeytrap/attackers.log"
+}
+*/
+
 /* ----- port mode configuration below ----- */
 
 // default port configuration (ignore, normal or mirror)
