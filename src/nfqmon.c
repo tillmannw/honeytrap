@@ -62,7 +62,13 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 
 	id = ntohl(ph->packet_id);
 
-	if ((ret = nfq_get_payload(nfa, &payload)) >= 0) {
+	/*
+	   The nfq_get_payload() API has changed and requires unsigned char *
+	   for the second argument now. We are casting the palyoad pointer tor
+	   void * to prevent compiler warnings to support both the old and the
+	   new API.
+	*/
+	if ((ret = nfq_get_payload(nfa, (void *) &payload)) >= 0) {
 		ip = (struct ip_header*) payload;
 		if (ip->ip_p == TCP) {
 			tcp		= (struct tcp_header*) (payload + (4 * ip->ip_hlen));
