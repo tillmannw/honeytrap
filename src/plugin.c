@@ -73,13 +73,14 @@ int load_plugin(const char *dir, const char* plugname) {
 			}
 			snprintf(full_path, strlen(dir)+strlen(namelist[n]->d_name)+2, "%s/%s", dir, namelist[n]->d_name);
 			DEBUG_FPRINTF(stdout, "  Plugin found: %s\n", full_path);
-			init_plugin(full_path);
+			config_plugin(full_path);
 			free(full_path);
 			free(namelist[n]);
 			break;
 		}
 		free(namelist[n]);
 	}
+	closedir(plugindir);
 	if (ret != 0) {
 		fprintf(stderr, "  Error - Unable to load plugin %s: %m.\n", full_name);
 		exit(EXIT_FAILURE);
@@ -89,9 +90,10 @@ int load_plugin(const char *dir, const char* plugname) {
 	return(1);
 }
 
-int init_plugin(char *plugin_name) {
-	int (*init_plugin)();
-	void (*unload_plugin)();
+int config_plugin(char *plugin_name) {
+	int (*plugin_config)();
+	void (*plugin_init)();
+	void (*plugin_unload)();
 	Plugin *last_plugin, *new_plugin;
 
 	/* allocate memory for new plugin and attach it to the plugin list */
@@ -144,9 +146,9 @@ int init_plugin(char *plugin_name) {
 	}
 	fprintf(stdout, "  Loading plugin %s v%s\n", new_plugin->name, new_plugin->version);
 
-	DEBUG_FPRINTF(stdout, "  Initializing plugin %s.\n", new_plugin->name);
+	DEBUG_FPRINTF(stdout, "  Configuring plugin %s.\n", new_plugin->name);
 	/* resolve module's unload function and add it to unload hook */
-	if (((unload_plugin = dlsym(new_plugin->handle, "plugin_unload")) == NULL) && 
+	if (((plugin_unload = dlsym(new_plugin->handle, "plugin_unload")) == NULL) && 
 	    ((plugin_error_str = (char *) dlerror()) != NULL)) {
 		/* handle error, the symbol wasn't found */
 		fprintf(stderr, "    Unable to initialize plugin %s: %s\n", new_plugin->name, plugin_error_str);
@@ -154,21 +156,35 @@ int init_plugin(char *plugin_name) {
 		unload_on_err(new_plugin);
 		return(-1);
 	}
-	if (!add_unload_func_to_list(new_plugin->name, "plugin_unload", unload_plugin)) {
+	if (!add_unload_func_to_list(new_plugin->name, "plugin_unload", plugin_unload)) {
 		fprintf(stderr, "    Unable to register module for hook 'unload_plugins': %s\n", plugin_error_str);
 		unload_on_err(new_plugin);
 		return(-1);
 	}
 
-
-	/* resolve and call module's init function */
-	if (((init_plugin = dlsym(new_plugin->handle, "plugin_init")) == NULL) && 
+	/* resolve and call module's config function */
+	if (((plugin_config = dlsym(new_plugin->handle, "plugin_config")) == NULL) && 
 	    ((plugin_error_str = (char *) dlerror()) != NULL)) {
 		/* handle error, the symbol wasn't found */
-		fprintf(stderr, "\n    Unable to resolve symbol 'plugin_init': %s\n", plugin_error_str);
+		fprintf(stderr, "\n    Unable to resolve symbol 'plugin_config': %s\n", plugin_error_str);
 		return(-1);
 	}
-	init_plugin();
+	plugin_config();
+
+	// resolve module's init function and add it to init hook 
+	if (((plugin_init = dlsym(new_plugin->handle, "plugin_init")) == NULL) && 
+	    ((plugin_error_str = (char *) dlerror()) != NULL)) {
+		/* handle error, the symbol wasn't found */
+		fprintf(stderr, "    Unable to initialize plugin %s: %s\n", new_plugin->name, plugin_error_str);
+		fprintf(stderr, "    %s seems not to be a honeytrap plugin.\n", new_plugin->filename);
+		unload_on_err(new_plugin);
+		return(-1);
+	}
+	if (!add_init_func_to_list(new_plugin->name, "plugin_init", plugin_init)) {
+		fprintf(stderr, "    Unable to register module for hook 'init_plugins': %s\n", plugin_error_str);
+		unload_on_err(new_plugin);
+		return(-1);
+	}
 
 	/* attach plugin to plugin_list */
 	if (!plugin_list) plugin_list = new_plugin;
@@ -179,6 +195,15 @@ int init_plugin(char *plugin_name) {
 	}
 	
 	return(1);
+}
+
+
+void init_plugins(void) {
+	/* call init functions from plugins */
+	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'init_plugins'.\n");
+	plughook_init_plugins();
+	
+	return;
 }
 
 

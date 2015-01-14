@@ -237,6 +237,10 @@ int configure(int my_argc, char *my_argv[]) {
 	}
 
 
+	/* initialize plugins */
+	init_plugins();
+
+
 	/* install signal handlers */
 	install_signal_handlers();
 

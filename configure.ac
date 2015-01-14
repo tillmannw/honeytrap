@@ -234,6 +234,45 @@ case "x$with_stream_mon" in
 			exit
 		fi
 
+		AC_ARG_WITH(libnfnetlink_includes,
+			[  --with-libnfnetlink-includes=DIR      libnfnetlink include directory],
+			[with_libnfnetlink_includes="$withval"],[with_libnfnetlink_includes=no])
+
+		AC_ARG_WITH(libnfnetlink_libraries,
+			[  --with-libnfnetlink-libraries=DIR     libnfnetlink library directory],
+			[with_libnfnetlink_libraries="$withval"],[with_libnfnetlink_libraries=no])
+
+		if test "$with_libnfnetlink_includes" != "no"; then
+			CPPFLAGS="${CPPFLAGS} -I${with_libnfnetlink_includes}"
+		fi
+		HNFNL=""
+		AC_CHECK_HEADER(libnfnetlink/libnfnetlink.h,, HNFNL="no")
+		if test "$HNFNL" = "no"; then
+			echo
+			bold "   %BError%b - libnfnetlink headers not found. Install them or use the following options:"
+			echo
+			echo
+			bold "   %B--with-libnfnetlink-includes=%b"
+			echo -e "\x5blocation of libnfnetlink header files\x5d"
+			echo
+			exit
+		fi
+
+		if test "$with_libnfnetlink_libraries" != "no"; then
+			LDFLAGS="${LDFLAGS}  -L${with_libnfnetlink_libraries}"
+		fi
+		LNFNL=""
+		AC_CHECK_LIB(nfnetlink, nfnl_fd,, LNFNL="no")
+		if test "$LNFNL" = "no"; then
+			echo
+			bold "   %BError%b - libnfnetlink library not found. Install it or use the following options:"
+			echo
+			echo
+			bold "   %B--with-libnfnetlink-libraries=%b"
+			echo -e "\x5blocation of libnfnetlink shared library files\x5d"
+			echo
+			exit
+		fi
 		AC_DEFINE([USE_NFQ_MON], [], [Define if netfilter_queue connection monitor is used])
 		;;
 	"xipq")
@@ -754,6 +793,18 @@ else
 fi
 
 
+AC_ARG_WITH(logattacker,
+        [  --with-logattacker             log attacking IP addresses in a separate file])
+AM_CONDITIONAL(BUILD_LOGATTACKER_PLUGIN, test x$with_logattacker = xyes)
+if test "$with_logattacker" = "yes"; then
+  with_logattacker="X"
+
+  AC_DEFINE([USE_LOGATTACK], [], [Define to log attacking IP addresses in a separate file])
+else
+  with_logattacker=" "
+fi
+
+
 #-------------------------------------------------------------
 
 # Check for electric fence malloc debugger
@@ -820,6 +871,8 @@ echo
 bold "    (%B$with_magicpe%b)  magicPE"
 echo
 bold "    (%B$with_xmatch%b)  xmatch"
+echo
+bold "    (%B$with_logattacker%b)  logattacker"
 echo
 bold "    (%B$with_submit_mwserv%b)  submitMwserv"
 echo

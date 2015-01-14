@@ -39,7 +39,8 @@ static int server_wrapper(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struc
 	struct ip_header *ip;
 	struct udp_header *udp;
 	struct tcp_header *tcp;
-	char *payload, *srcip, *dstip;
+	char *payload;
+	char *srcip, *dstip;
 	uint16_t sport, dport;
 	u_int8_t port_mode;
 	struct nfqnl_msg_packet_hdr *ph;

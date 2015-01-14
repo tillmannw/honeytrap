@@ -13,8 +13,9 @@
 #ifndef __HONEYTRAP_PLUGHOOK_H
 #define __HONEYTRAP_PLUGHOOK_H 1
 
-#include "plugin.h"
 #include "attack.h"
+#include "conftree.h"
+#include "plugin.h"
 
 typedef enum {
 	PPRIO_DYNSRV	= 0,	// functions of this prio get invoked before a dynamic server binds to a port
@@ -33,6 +34,7 @@ typedef struct plugin_func_list {
 	struct plugin_func_list *next;
 } PlugFuncList;
 
+PlugFuncList *funclist_init_plugins;
 PlugFuncList *funclist_unload_plugins;
 PlugFuncList *funclist_attack_dynsrv;
 PlugFuncList *funclist_attack_perread;
@@ -44,11 +46,14 @@ PlugFuncList *funclist_attack_postproc;
 PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plugname, const char *funcname, int (*func)(struct s_attack));
 void plughook_process_attack(PlugFuncList *func_list, Attack *attack);
 
+PlugFuncList *add_init_func_to_list(const char *plugname, const char *funcname, void (*func)(void));
+void plughook_init_plugins(void);
+
 PlugFuncList *add_unload_func_to_list(const char *plugname, const char *funcname, void (*func)(void));
 void plughook_unload_plugins(void);
 
 void init_plugin_hooks(void);
-void register_plugin_confopts(const char *plugname, const char **keywords, int num);
+conf_node *register_plugin_confopts(const char *plugname, const char **keywords, int num);
 void unhook(const func_prio priority, const char *plugname, const char *funcname);
 void unhook_from_list(PlugFuncList **hook_func_list, const char *plugname, const char *funcname);
 

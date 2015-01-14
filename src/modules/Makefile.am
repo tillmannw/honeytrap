@@ -107,6 +107,12 @@ htm_xmatch_la = htm_xmatch.c
 htm_xmatch_la_LDFLAGS = -module -no-undefined -avoid-version -lxmatch
 endif
 
+if BUILD_LOGATTACKER_PLUGIN
+lib_LTLIBRARIES += htm_logAttacker.la
+htm_logAttacker_la = htm_logAttacker.c
+htm_logAttacker_la_LDFLAGS = -module -no-undefined -avoid-version
+endif
+
 
 if BUILD_CSPM_PLUGIN
 SUBDIRS += htm_cspm

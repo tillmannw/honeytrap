@@ -33,9 +33,12 @@ void init_plugin_hooks(void) {
 }
 
 
-void register_plugin_confopts(const char *plugname, const char **keywords, int num) {
+conf_node *register_plugin_confopts(const char *plugname, const char **keywords, int num) {
 	int	i;
 	char	full_name[264], *confopt;
+	conf_node *subtree, *new;
+
+	subtree = NULL;
 
 	/* assemble plugin config key */
 	memset(full_name, 0, 264);
@@ -47,7 +50,7 @@ void register_plugin_confopts(const char *plugname, const char **keywords, int n
 		exit(EXIT_FAILURE);
 	}	
 
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", plugname);
+	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering configuration keywords.\n", plugname);
 	/* build tree of allowed configuration keywords */
 	for (i=0; i<num; i++) {
 
@@ -62,13 +65,15 @@ void register_plugin_confopts(const char *plugname, const char **keywords, int n
 		strcat(confopt, keywords[i]);
 
 		/* add config option to tree */
-		if (add_keyword(&config_keywords_tree, confopt, NULL, 0) == NULL) {
+		if ((new = add_keyword(&config_keywords_tree, confopt, NULL, 0)) == NULL) {
 			fprintf(stderr, "  Error - Unable to add configuration keyword to tree.\n");
 			exit(EXIT_FAILURE);
 		}	
 		free(confopt);
+
+		if (!subtree) subtree = new;
 	}
-	return;
+	return subtree;
 }
 
 
@@ -162,6 +167,51 @@ void plughook_process_attack(PlugFuncList *func_list, Attack *attack) {
 }
 
 
+PlugFuncList *add_init_func_to_list(const char *plugname, const char *funcname, void (*func)(void)) {
+	PlugFuncList *func_tmp, *func_new;
+
+	DEBUG_FPRINTF(stdout, "    Hooking plugin %s to 'init_plugins'.\n", plugname);
+	if ((func_new = (PlugFuncList *) malloc(sizeof(PlugFuncList))) == NULL) {
+		logmsg(LOG_ERR, 1, "    Error - Unable to allocate memory: %m.\n");
+		return(NULL);
+	}
+	func_new->next = NULL;
+
+	/* attach new function to list */
+	func_tmp = funclist_init_plugins;
+	if (func_tmp) {
+		while(func_tmp->next) func_tmp = func_tmp->next;
+		func_tmp->next = func_new;
+	} else funclist_init_plugins = func_new;
+
+	func_new->func		= (void *)func;
+	func_new->plugnam	= (char *)plugname;
+	func_new->funcnam	= (char *)funcname;
+
+	DEBUG_FPRINTF(stdout, "    %s::%s() hooked to 'init_plugins'.\n", func_new->plugnam, func_new->funcnam);
+	return(func_new);
+}
+
+
+void plughook_init_plugins(void) {
+	PlugFuncList *func_del, *func_tmp = NULL;
+
+	func_tmp = funclist_init_plugins;
+	while(func_tmp) {
+		if (func_tmp->func) {
+			logmsg(LOG_DEBUG, 1, "Calling %s::%s().\n", func_tmp->plugnam, func_tmp->funcnam);
+			func_tmp->func(NULL);
+		} else logmsg(LOG_ERR, 1, "Error - Function %s::%s is not registered.\n",
+			func_tmp->plugnam, func_tmp->funcnam);
+		func_del = func_tmp;
+		func_tmp = func_tmp->next;
+		logmsg(LOG_DEBUG, 1, "Unhooking %s::%s().\n", func_del->plugnam, func_del->funcnam);
+		free(func_del);
+	}
+	return;
+}
+
+
 PlugFuncList *add_unload_func_to_list(const char *plugname, const char *funcname, void (*func)(void)) {
 	PlugFuncList *func_tmp, *func_new;
 
@@ -200,7 +250,7 @@ void plughook_unload_plugins(void) {
 			func_tmp->plugnam, func_tmp->funcnam);
 		func_del = func_tmp;
 		func_tmp = func_tmp->next;
-		logmsg(LOG_DEBUG, 1, "Unhooking %s::plugin_unload().\n", func_del->plugnam);
+		logmsg(LOG_DEBUG, 1, "Unhooking %s::%s().\n", func_del->plugnam, func_del->funcnam);
 		free(func_del);
 	}
 	return;
