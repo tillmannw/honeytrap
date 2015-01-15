@@ -18,7 +18,7 @@
 #endif
 
 const char module_name[]="htm_cpuEmu";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 static const char *config_keywords[] = {
 	"execute_shellcode",

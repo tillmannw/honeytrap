@@ -1,5 +1,5 @@
 /* honeytrap.h
- * Copyright (C) 2005-2008 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -82,6 +82,7 @@
 #endif
 
 
+#define COPYRIGHT_STRING "Copyright (C) 2005-2015 Tillmann Werner <tillmann.werner@gmx.de>"
 
 #ifndef MAX
 #  define MAX(a, b)	((a)>(b)?(a):(b))

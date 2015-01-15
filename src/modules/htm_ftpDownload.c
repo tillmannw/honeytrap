@@ -41,7 +41,7 @@
 #include "htm_ftpDownload.h"
 
 const char module_name[]="ftpDownload";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 char *ftp_host = NULL;
 
@@ -66,7 +66,7 @@ void plugin_unload(void) {
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_ANALYZE, module_name, "cmd_parse_for_ftp", (void *) cmd_parse_for_ftp);
 
 	return;
@@ -85,7 +85,6 @@ void plugin_register_confopts(void) {
 		exit(EXIT_FAILURE);
 	}	
 
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
 	/* build tree of allowed configuration keywords */
 	for (i=0; i<sizeof(plugin_config_keywords)/sizeof(char *); i++) {
 

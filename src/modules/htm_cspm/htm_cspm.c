@@ -35,7 +35,7 @@
 #include "signature_parser.h"
 
 const char module_name[]="cspm";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 char *sc_sigfile = NULL;
 
@@ -68,7 +68,7 @@ void plugin_unload(void) {
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_POSTPROC, module_name, "sc_match", (void *) sc_match);
 
 	return;

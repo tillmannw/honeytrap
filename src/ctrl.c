@@ -1,5 +1,5 @@
 /* ctrl.c
- * Copyright (C) 2006-2009 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2006-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -141,7 +141,7 @@ int do_daemonize(void) {
 		exit(EXIT_FAILURE);
 	} else if (pid != 0) {
 		DEBUG_FPRINTF(stdout, "  Successfully changed into daemon environment.\n");
-		fprintf(stdout, "\nhoneytrap v%s Copyright (C) 2005-2009 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
+		fprintf(stdout, "\nhoneytrap v%s %s\n", VERSION, COPYRIGHT_STRING);
 		fflush(NULL);
 		exit(EXIT_SUCCESS);
 	}

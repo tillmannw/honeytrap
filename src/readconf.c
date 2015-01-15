@@ -238,7 +238,7 @@ int configure(int my_argc, char *my_argv[]) {
 
 
 	/* initialize plugins */
-	init_plugins();
+//	init_plugins();
 
 
 	/* install signal handlers */
@@ -382,8 +382,8 @@ int configure(int my_argc, char *my_argv[]) {
 	fprintf(stdout, "  Logging to %s.\n", logfile_name);
 
 
-	fprintf(stdout, "  Initialization complete.\n");
-	logmsg(LOG_ERR, 0, "\nhoneytrap v%s Copyright (C) 2005-2009 Tillmann Werner <tillmann.werner@gmx.de>\n", VERSION);
+	fprintf(stdout, "  Core module initialized.\n");
+	logmsg(LOG_ERR, 0, "\nhoneytrap v%s %s\n", VERSION, COPYRIGHT_STRING);
 
 	first_init = 0;
 	return(1);

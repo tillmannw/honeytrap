@@ -41,7 +41,7 @@
 #include "htm_httpDownload.h"
 
 const char module_name[]="httpDownload";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 static const char *config_keywords[] = {
 	"http_program",
@@ -72,7 +72,7 @@ void plugin_unload(void) {
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_ANALYZE, module_name, "cmd_parse_for_http_url", (void *) cmd_parse_for_http_url);
 
 	return;
@@ -91,7 +91,6 @@ void plugin_register_confopts(void) {
 		exit(EXIT_FAILURE);
 	}	
 
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
 	/* build tree of allowed configuration keywords */
 	for (i=0; i<sizeof(config_keywords)/sizeof(char *); i++) {
 

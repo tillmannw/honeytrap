@@ -35,7 +35,7 @@
 #include "htm_b64Decode.h"
 
 const char module_name[]="b64Decode";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 
 void plugin_config(void) {
@@ -53,7 +53,7 @@ void plugin_unload(void) {
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_PREPROC, module_name, "b64_decode", (void *) b64_decode);
 
 	return;

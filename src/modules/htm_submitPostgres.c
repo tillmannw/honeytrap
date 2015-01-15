@@ -42,7 +42,7 @@
 #include "htm_submitPostgres.h"
 
 const char	module_name[]		= "submitPostgres";
-const char	module_version[]	= "1.0.0";
+const char	module_version[]	= "1.0.1";
 
 static const char *config_keywords[] = {
 	"sensor_id",
@@ -108,7 +108,7 @@ void plugin_unload(void) {
 
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_SAVEDATA, module_name, "db_submit", (void *) db_submit);
 
 	return;

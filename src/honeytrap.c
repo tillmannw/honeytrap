@@ -1,5 +1,5 @@
 /* honeytrap.c
- * Copyright (C) 2005-2007 Tillmann Werner <tillmann.werner@gmx.de>
+ * Copyright (C) 2005-2015 Tillmann Werner <tillmann.werner@gmx.de>
  *
  * This file is free software; as a special exception the author gives
  * unlimited permission to copy and/or distribute it, with or without
@@ -93,6 +93,10 @@ int main(int argc, char **argv) {
 	
 	/* daemonize (detach from console) */
 	if (daemonize) do_daemonize();
+
+
+	/* now initialize plugins */
+	init_plugins();
 
 
 	/* create pid file */

@@ -29,7 +29,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
 
 #include <honeytrap.h>
 #include <logging.h>
@@ -38,7 +40,7 @@
 
 
 const char module_name[]="logattacker";
-const char module_version[]="1.0.1";
+const char module_version[]="1.0.2";
 
 static const char *config_keywords[] = {
 	"logfile",
@@ -118,7 +120,7 @@ conf_node *plugin_process_confopts(conf_node *tree, conf_node *node, void *opt_d
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_PREPROC, module_name, "logattacker", (void *) logattacker);
 
 	return;
@@ -134,13 +136,17 @@ void plugin_config(void) {
 }
 
 void plugin_init(void) {
-	// open log file
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Opening log file %s.\n", module_name, logfile);
+	mode_t prevmode;
 
+	// open log file
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Opening log file %s.\n", module_name, logfile);
+
+	prevmode = umask(S_IWGRP | S_IWOTH);
 	if ((f = fopen(logfile, "a")) == NULL) {
 		fprintf(stderr, "  Error - Unable to open attacker log file: %s.\n", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+	umask(prevmode);
 
 	plugin_register_hooks();
 

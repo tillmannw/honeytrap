@@ -32,7 +32,7 @@
 #include "htm_SpamSum.h"
 
 const char module_name[]="SpamSum";
-const char module_version[]="0.4.0";
+const char module_version[]="1.0.1";
 
 static const char *config_keywords[] = {
 	"md5sum_sigfile",
@@ -87,7 +87,7 @@ void plugin_unload(void) {
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_POSTPROC, module_name, "calc_spamsum", (void *) calc_spamsum);
 
 	return;

@@ -30,7 +30,7 @@
 #include "htm_magicPE.h"
 
 const char module_name[]="magicPE";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 magic_t		magicdb;
 
@@ -62,7 +62,7 @@ void plugin_unload(void) {
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_ANALYZE, module_name, "check_magic_string", (void *) check_magic_string);
 
 	return;

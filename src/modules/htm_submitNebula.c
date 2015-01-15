@@ -44,7 +44,7 @@
 
 
 const char module_name[]="submitNebula";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 static const char *config_keywords[] = {
 	"host",
@@ -87,7 +87,7 @@ void plugin_unload(void) {
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_SAVEDATA, module_name, "submit_nebula", (void *) submit_nebula);
 
 	return;

@@ -200,7 +200,7 @@ int config_plugin(char *plugin_name) {
 
 void init_plugins(void) {
 	/* call init functions from plugins */
-	DEBUG_FPRINTF(stdout, "  Calling plugins for hook 'init_plugins'.\n");
+	logmsg(LOG_NOTICE, 1, "Initializing plugins.\n");
 	plughook_init_plugins();
 	
 	return;
@@ -211,7 +211,7 @@ void unload_plugins(void) {
 	Plugin *cur_plugin;
 	
 	/* call unload functions from plugins */
-	logmsg(LOG_DEBUG, 1, "Calling plugins for hook 'unload_plugins'.\n");
+	logmsg(LOG_DEBUG, 1, "Calling plugin callbacks for hook 'unload_plugins'.\n");
 	plughook_unload_plugins();
 	
 	/* unload plugin and free mem for filename and plugin 

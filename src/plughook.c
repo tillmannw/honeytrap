@@ -83,7 +83,7 @@ PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plug
 	func_tmp	= NULL;
 	func_new	= NULL;
 
-	DEBUG_FPRINTF(stdout, "    Hooking %s::%s() to 'process_attack' (priority: %d).\n", plugname, funcname, priority);
+	logmsg(LOG_DEBUG, 1, "    Hooking %s::%s() to 'process_attack' (priority: %d).\n", plugname, funcname, priority);
 	if ((func_new = (PlugFuncList *) malloc(sizeof(PlugFuncList))) == NULL) {
 		logmsg(LOG_ERR, 1, "    Error - Unable to allocate memory: %m.\n");
 		return(NULL);
@@ -145,7 +145,7 @@ PlugFuncList *add_attack_func_to_list(const func_prio priority, const char *plug
 	func_new->plugnam	= (char *)plugname;
 	func_new->funcnam	= (char *)funcname;
 
-	DEBUG_FPRINTF(stdout, "    %s::%s() hooked to 'process_attack' (priority: %d).\n", func_new->plugnam, func_new->funcnam, priority);
+	logmsg(LOG_DEBUG, 1, "    %s::%s() hooked to 'process_attack' (priority: %d).\n", func_new->plugnam, func_new->funcnam, priority);
 	return(func_new);
 }
 
@@ -199,13 +199,13 @@ void plughook_init_plugins(void) {
 	func_tmp = funclist_init_plugins;
 	while(func_tmp) {
 		if (func_tmp->func) {
-			DEBUG_FPRINTF(stdout, "  Calling %s::%s().\n", func_tmp->plugnam, func_tmp->funcnam);
+			logmsg(LOG_DEBUG, 1, "  Calling %s::%s().\n", func_tmp->plugnam, func_tmp->funcnam);
 			func_tmp->func(NULL);
-		} else DEBUG_FPRINTF(stderr, "  Error - Function %s::%s is not registered.\n",
+		} else logmsg(LOG_DEBUG, 1, "  Error - Function %s::%s is not registered.\n",
 			func_tmp->plugnam, func_tmp->funcnam);
 		func_del = func_tmp;
 		func_tmp = func_tmp->next;
-		DEBUG_FPRINTF(stdout, "  Unhooking %s::%s().\n", func_del->plugnam, func_del->funcnam);
+		logmsg(LOG_DEBUG, 1, "  Unhooking %s::%s().\n", func_del->plugnam, func_del->funcnam);
 		free(func_del);
 	}
 	return;

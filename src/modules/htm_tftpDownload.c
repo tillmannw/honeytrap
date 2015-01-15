@@ -39,7 +39,7 @@
 #define MAX_TRANSMISSION_TRIES  10      /* retransmit 9 times */
 
 const char module_name[]="tftpDownload";
-const char module_version[]="1.0.0";
+const char module_version[]="1.0.1";
 
 
 void plugin_config(void) {
@@ -57,7 +57,7 @@ void plugin_unload(void) {
 }
 
 void plugin_register_hooks(void) {
-	DEBUG_FPRINTF(stdout, "    Plugin %s: Registering hooks.\n", module_name);
+	logmsg(LOG_DEBUG, 1, "    Plugin %s: Registering hooks.\n", module_name);
 	add_attack_func_to_list(PPRIO_ANALYZE, module_name, "cmd_parse_for_tftp", (void *) cmd_parse_for_tftp);
 
 	return;
