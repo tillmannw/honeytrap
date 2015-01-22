@@ -158,7 +158,7 @@ int cmd_parse_for_http_url(Attack *attack) {
 
 	/* no data - nothing todo */
 	if ((attack->a_conn.payload.size == 0) || (attack->a_conn.payload.data == NULL)) {
-		logmsg(LOG_DEBUG, 1, "FTP download - No data received, nothing to download.\n");
+		logmsg(LOG_DEBUG, 1, "HTTP download - No data received, nothing to download.\n");
 		return(0);
 	}
 
@@ -234,7 +234,6 @@ int cmd_parse_for_http_url(Attack *attack) {
 			} else logmsg(LOG_INFO, 1, "HTTP download - No data received.\n");
 
 			pclose(f);
-			free(string_for_processing);
 			free(cmd);
 			free(binary_stream);
 
