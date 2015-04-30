@@ -38,7 +38,7 @@ void usage(char *progname) {
 	fprintf(stdout, "\t-g:\tgroup\n");
 	fprintf(stdout, "\t-h:\tthis output\n");
 #ifdef USE_PCAP_MON
-	fprintf(stdout, "\t-i:\tinterface, default is 'any'\n");
+	fprintf(stdout, "\t-i:\tinterface, defaults to first usable device\n");
 #endif
 	fprintf(stdout, "\t-l:\tlisten timeout (sec), default is 1\n");
 	fprintf(stdout, "\t-m:\tenable mirror mode\n");

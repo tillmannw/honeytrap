@@ -264,7 +264,7 @@ int start_pcap_mon(void) {
 		clean_exit(EXIT_FAILURE);
 	}
 
-	logmsg(LOG_NOTICE, 1, "---- Trapping attacks on %s via PCAP. ----\n", dev);
+	logmsg(LOG_NOTICE, 1, "---- Trapping attacks on device '%s' via PCAP. ----\n", dev);
 
 	running = 1;
 
@@ -323,11 +323,9 @@ int start_pcap_mon(void) {
 
 char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev) {
 	char *bpf_filter_string = NULL, *bpf_ip_filter = NULL, errbuf[PCAP_ERRBUF_SIZE];
-	struct in_addr netaddr, netmask;
 	pcap_if_t *alldevsp = NULL;
 	pcap_if_t *curdev = NULL;
 	pcap_addr_t *curaddr = NULL;
-	struct sockaddr *saptr = NULL;
 	uint32_t oldstrsize = 0, newstrsize = 0;
 	int dev_found;
 
@@ -342,11 +340,6 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 			fprintf(stderr, "Error - Unable to allocate memory: %m.\n");
 			exit(EXIT_FAILURE);
 		}
-	} else if ((strcmp(dev, "any") != 0)) {
-		/* lookup net address and netmask for interface */
-		pcap_lookupnet((char *) dev, &net, &mask, errbuf);
-		netaddr.s_addr = net;
-		netmask.s_addr = mask;
 	}
 
 	/* assemble filter string */
@@ -363,7 +356,6 @@ char *create_bpf(char *bpf_cmd_ext, struct hostent *ip_cmd_opt, const char *dev)
 
 		for (curaddr = curdev->addresses; curaddr != NULL; curaddr = curaddr->next) {
 			if (curaddr->addr == NULL) continue;
-			saptr = curaddr->addr;
 			if (!curaddr->addr->sa_family) continue;
 			switch(curaddr->addr->sa_family) {
 			case AF_INET:
