@@ -16,7 +16,7 @@ Installing honeytrap is fairly straight forward. Simply run the following comman
 make
 sudo make install
 ```
-The parameter `--with-stream-mon` specifies how honeytrap should look for incoming connection attempts. On Linux, the preferred choicde is `--with-stream-mon=nfq`, which instructs honeytrap to capture packets using the `iptables NFQUEUE feature. When using this feature, an iptables rule like the following puts incoming TCP-SYN segments in a queue where they can be picked up by honeytrap:
+The parameter `--with-stream-mon` specifies how honeytrap should look for incoming connection attempts. On Linux, the preferred choicde is `--with-stream-mon=nfq`, which instructs honeytrap to capture packets using the `iptables NFQUEUE` feature. When using this feature, an iptables rule like the following puts incoming TCP-SYN segments in a queue where they can be picked up by honeytrap:
 ```
 sudo iptables -A INPUT -p tcp --syn --m state --state NEW --dport 445 -j NFQUEUE
 ```
