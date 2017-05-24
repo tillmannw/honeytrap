@@ -40,11 +40,8 @@ typedef struct queue {
 
 queue *queue_new(void);
 void queue_free(queue *q, void(*cbfn)(void *data));
-inline qelem *queue_append(queue *q, void *data);
-inline qelem *queue_cuthead(queue *q);
 qelem *queue_ins(queue *q, void *data, ssize_t max_size);
-inline qelem *queue_cuttail(queue *q);
 void *queue_unlink(queue *q, qelem *e);
-inline qelem *queue_prepend(queue *q, void *data);
+qelem *queue_append(queue *q, void *data);
 
 #endif

@@ -526,7 +526,7 @@ int handle_connection_normal(int connection_fd, uint16_t port, uint16_t proto, u
 				return(process_data
 					(attack_string, total_bytes, NULL, 0, attack->a_conn.l_port, attack));
 			} else {
-				if ((!send_default_response(connection_fd, port, proto, read_timeout)) == -1) {
+				if (send_default_response(connection_fd, port, proto, read_timeout) == -1) {
 					logmsg(LOG_ERR, 1,
 					       "   %s  Error - Sending response failed: %m.\n", portstr);
 					close(connection_fd);
