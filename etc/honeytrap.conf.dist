@@ -123,6 +123,13 @@ plugin-logAttacker = {
 }
 */
 
+// log attack details in JSON format
+/*
+plugin-logJSON = {
+	logfile = "/opt/honeytrap/attackers.json"
+}
+*/
+
 /* ----- port mode configuration below ----- */
 
 // default port configuration (ignore, normal or mirror)

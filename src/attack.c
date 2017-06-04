@@ -120,6 +120,8 @@ int process_data(u_char *a_data, uint32_t a_size, u_char *p_data, uint32_t p_siz
 		a->p_conn.payload.data = (u_char *) malloc(p_size);
 		memcpy(a->p_conn.payload.data, p_data, p_size);
 	}
+	memcpy((char *) &(a->p_conn.payload.sha512sum),
+		(char *) mem_sha512sum(a->p_conn.payload.data, a->p_conn.payload.size), 129);
 	memcpy((char *) &(a->p_conn.payload.md5sum),
 		(char *) mem_md5sum(a->p_conn.payload.data, a->p_conn.payload.size), 32);
 

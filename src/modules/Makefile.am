@@ -113,6 +113,12 @@ htm_logAttacker_la = htm_logAttacker.c
 htm_logAttacker_la_LDFLAGS = -module -no-undefined -avoid-version
 endif
 
+if BUILD_LOGJSON_PLUGIN
+lib_LTLIBRARIES += htm_logJSON.la
+htm_logJSON_la = htm_logJSON.c
+htm_logJSON_la_LDFLAGS = -module -no-undefined -avoid-version -ljson-c
+endif
+
 
 if BUILD_CSPM_PLUGIN
 SUBDIRS += htm_cspm

@@ -352,6 +352,8 @@ void start_dynamic_server(struct in_addr ip_r, uint16_t port_r, struct in_addr i
 							port_mode = port_flags_udp[htons(port_l)]->mode;
 					}
 
+					attack->op_mode = port_mode;
+
 					if (port_mode & PORTCONF_NORMAL) {
 						/* handle connection in normal mode if this port configured to be handled 'normal' */
 						logmsg(LOG_DEBUG, 1,

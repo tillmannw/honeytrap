@@ -805,6 +805,57 @@ else
 fi
 
 
+AC_ARG_WITH(logjson,
+    [  --with-logjson             log attack information in a dedicated JSON file],
+	[with_logjson="$withval"], [with_logjson=""])
+AM_CONDITIONAL(BUILD_LOGJSON_PLUGIN, test x$with_logjson = xyes)
+if test "$with_logjson" = "yes"; then
+  with_logjson="X"
+
+  AC_ARG_WITH(libjson_includes,
+    [  --with-libjson-includes=DIR   libjson include directory],
+    [with_libjson_includes="$withval"],[with_libjson_includes=no])
+
+  AC_ARG_WITH(libjson_libraries,
+    [  --with-libjson-libraries=DIR  libjson library directory],
+    [with_libjson_libraries="$withval"],[with_libjson_libraries=no])
+
+  if test "$with_libjson_includes" != "no"; then
+    CPPFLAGS="${CPPFLAGS} -I${with_libjson_includes}"
+  fi
+  HJSON="yes"
+  AC_CHECK_HEADER(json-c/json.h,, HJSON="no")
+  if test "$HJSON" = "no"; then
+    echo
+    bold "   %BError%b - libjson headers not found. Install them or use the following options:"
+    echo
+    echo
+    bold "   %B--with-libjson-includes=%b"
+    echo -e "\x5blocation of libjson header files\x5d"
+    echo
+    exit
+  fi
+
+  if test "$with_libjson_libraries" != "no"; then
+    LDFLAGS="${LDFLAGS}  -L${with_libjson_libraries}"
+  fi
+  LJSON="yes"
+  AC_CHECK_LIB(json-c, json_object_new_object,, LJSON="no")
+  if test "$LJSON" = "no"; then
+    echo
+    bold "   %BError%b - libjson library not found. Install it or use the following options:"
+    echo
+    echo
+    bold "   %B--with-libjson-libraries=%b"
+    echo -e "\x5blocation of libjson shared library files\x5d"
+    echo
+    exit
+  fi
+else
+  with_logjson=" "
+fi
+
+
 #-------------------------------------------------------------
 
 # Check for electric fence malloc debugger
@@ -873,6 +924,8 @@ echo
 bold "    (%B$with_xmatch%b)  xmatch"
 echo
 bold "    (%B$with_logattacker%b)  logattacker"
+echo
+bold "    (%B$with_logjson%b)  logJSON"
 echo
 bold "    (%B$with_submit_mwserv%b)  submitMwserv"
 echo
